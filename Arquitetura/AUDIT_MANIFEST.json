@@ -1,0 +1,12 @@
+{
+  "version": "0.9",
+  "source": "RESOURCES.zip",
+  "source_file_count": 49,
+  "scope": "MVP architecture",
+  "ideas_included": false,
+  "implementation_specs_included": false,
+  "artifacts": [
+    "AUDITORIA_FINAL_v0.9.md",
+    "PROJECT_INDEX.md"
+  ]
+}

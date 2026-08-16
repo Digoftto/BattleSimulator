@@ -1,0 +1,39 @@
+01 — Pedra do Cataclismo
+A pedra mais antiga do continente.
+Forma as muralhas intransponíveis.
+Extremamente dura.
+Quase impossível de extrair.
+Nunca aparece em pequenas pedras naturalmente.
+02 — Granito Imperial
+Principal pedra das cidades.
+Fortalezas.
+Estradas.
+Pontes.
+Monumentos.
+03 — Basalto Rochoso
+Muito escuro.
+Muito resistente.
+Usado nas regiões montanhosas e nas minas.
+04 — Calcário Ribeirinho
+Mais claro.
+Esculpido pela água.
+Muito usado em pontes e margens.
+05 — Arenito das Planícies
+Fácil de talhar.
+Muito comum.
+Casas simples.
+Muros.
+06 — Ardósia Montanhosa
+Forma placas naturais.
+Excelente para telhados.
+Escadas.
+Passagens.
+07 — Rocha Cristalina Profunda
+Encontrada apenas em minas profundas.
+Muito rara.
+Relacionada à formação dos Núcleos de Energia (não é um Núcleo, mas a rocha onde eles podem ser construídos).
+08 — Cascalho Antigo
+Resultado de milhares de anos de erosão.
+Usado em estradas.
+Drenagem.
+Pátios.

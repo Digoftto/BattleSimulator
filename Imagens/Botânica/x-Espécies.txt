@@ -1,0 +1,41 @@
+ÁRVORES DOMINANTES
+01 Primeva Ancestral
+02 Primeva Imperial
+03 Primeva da Natureza
+04 Primeva Rochosa
+05 Primeva Ribeirinha
+06 Primeva Montanhosa
+
+──────────────
+
+ARBUSTOS FRUTÍFEROS
+07 Arbusto Rubro
+08 Arbusto Dourado
+09 Arbusto Azul
+10 Arbusto Verde
+11 Arbusto Anão
+
+──────────────
+
+GRAMÍNEAS
+12 Campo Aberto
+13 Campo Úmido
+14 Campo Rochoso
+
+──────────────
+
+MUSGOS
+15 Musgo de Rocha
+16 Musgo Ribeirinho
+17 Musgo Florestal
+
+──────────────
+
+TREPADEIRAS
+18 Trepadeira Comum
+19 Trepadeira Ribeirinha
+
+──────────────
+
+PLANTA AQUÁTICA
+20 Vitória Primeva

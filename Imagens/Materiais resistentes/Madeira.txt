@@ -1,0 +1,81 @@
+FOUNDATION — CATÁLOGO DAS MADEIRAS DO CONTINENTE
+Painel Principal
+Imagem central
+As seis madeiras oficiais, já beneficiadas (não a árvore).
+Cada uma mostrando um bloco de aproximadamente 1 metro de comprimento, para comparar:
+cor;
+fibras;
+densidade visual;
+textura.
+Assim como fizemos nas pedras.
+Mapa do Continente
+No canto esquerdo inferior.
+O mesmo mapa oficial.
+Mas agora mostrando:
+áreas de ocorrência das Primevas Ancestrais;
+Primevas Imperiais;
+Primevas da Natureza;
+Primevas Rochosas;
+Primevas Ribeirinhas;
+Primevas Montanhosas.
+Não precisa ser exato.
+Apenas predominância.
+Cada Madeira terá uma ficha
+01 — Madeira Primeva Ancestral
+Imagem mostrando:
+tora recém cortada;
+tronco serrado;
+prancha;
+viga;
+madeira envelhecida.
+Características
+cor
+fibras
+densidade
+peso
+flexibilidade
+durabilidade
+trabalhabilidade
+Principais usos
+Salão Real
+Monumentos
+Artefatos históricos
+Construções simbólicas
+02 — Madeira Primeva Imperial
+Mostrando exatamente as mesmas etapas.
+Usos:
+casas;
+oficinas;
+quartéis;
+muralhas;
+pontes.
+03 — Primeva da Natureza
+Madeira menos uniforme.
+Fibras sinuosas.
+Pouca padronização.
+04 — Primeva Rochosa
+Muito escura.
+Muito pesada.
+Alta resistência.
+05 — Primeva Ribeirinha
+Mais clara.
+Muito flexível.
+Resistente à água.
+06 — Primeva Montanhosa
+Compacta.
+Anéis de crescimento muito fechados.
+Excelente resistência ao frio.
+Comparativo
+Na parte inferior.
+Uma tabela simples.
+Madeira	Peso	Resistência	Flexibilidade	Facilidade de Trabalho	Resistência à Água
+Ancestral	★★★★★	★★★★★	★★★	★★	★★★★
+Imperial	★★★	★★★★	★★★★	★★★★★	★★★
+Natureza	★★★★	★★★★	★★★★★	★★	★★★★
+Rochosa	★★★★★	★★★★★	★	★	★★
+Ribeirinha	★★	★★★	★★★★★	★★★★	★★★★★
+Montanhosa	★★★★	★★★★★	★★	★★	★★★★
+
+
+Não é para o jogador.
+É para a equipe artística.
