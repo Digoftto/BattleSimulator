@@ -27,10 +27,23 @@ extends RefCounted
 ## a Sprint correspondente for implementada — nunca antes.
 
 
-## Cria e registra uma nova Expedição no Reino, a partir da Temporada e
-## do Território informados. Falha explicitamente (assert) se a
+## Cria uma nova Expedição no Reino, a partir da Temporada e do
+## Território informados, e tenta registrá-la via Kingdom.start_expedition()
+## — a única fonte de verdade da validação de Exército travado (ARMY.md,
+## "Trava de Edição por Modo de Jogo"); este método nunca duplica essa
+## regra, apenas propaga o resultado. Falha explicitamente (assert) se a
 ## Temporada ou o Território não existirem no WorldDatabase — nunca
 ## inventa ou improvisa um substituto.
+##
+## Retorna {"success": bool, "reason": String, "expedition": ExpeditionRuntime}.
+## "expedition" é sempre a instância construída, mesmo quando "success"
+## é false, para que quem chama possa inspecioná-la se precisar — mas
+## nunca fica registrada em kingdom.active_expeditions nesse caso, e a
+## Energia dos Exércitos nunca é inicializada (resetada pra cheia)
+## quando a Expedição é rejeitada: fazer isso incondicionalmente
+## corromperia a Energia de um Exército que já pertence a outra
+## Expedição em andamento — por isso a inicialização de Energia só roda
+## DEPOIS de o registro ser aceito.
 static func start_new_expedition(
 	kingdom: Kingdom,
 	season_id: String,
@@ -40,7 +53,7 @@ static func start_new_expedition(
 	battlefields: Array[BattlefieldResource],
 	abilities_by_name: Dictionary,
 	unit_traits: Array[UnitTraitResource]
-) -> ExpeditionRuntime:
+) -> Dictionary:
 	var season: Season = WorldDatabase.get_season(season_id)
 	assert(season != null, "GameRuntime: Temporada '%s' não registrada em WorldDatabase." % season_id)
 
@@ -50,6 +63,16 @@ static func start_new_expedition(
 	var trilha: Trilha = season.get_trilha(territory_id)
 	assert(trilha != null, "GameRuntime: Trilha do Território '%s' não encontrada." % territory_id)
 
+	var expedition := ExpeditionRuntime.new(
+		squad, trilha, territory, season.enemy_catalog,
+		kingdom.regional_commander_registry, expedition_seed,
+		battlefields, abilities_by_name, unit_traits
+	)
+
+	var result: Dictionary = kingdom.start_expedition(expedition)
+	if not result["success"]:
+		return {"success": false, "reason": result["reason"], "expedition": expedition}
+
 	# Energia pertence ao Exército, nunca ao Reino (ENERGY.md) — mas sua
 	# Energia Máxima depende do nível do Núcleo do Reino, que Army não
 	# consulta sozinho. Este é o único ponto que conhece Kingdom e
@@ -58,14 +81,7 @@ static func start_new_expedition(
 	for army: Army in squad.armies:
 		army.initialize_energy(kingdom.energy_nucleus_level)
 
-	var expedition := ExpeditionRuntime.new(
-		squad, trilha, territory, season.enemy_catalog,
-		kingdom.regional_commander_registry, expedition_seed,
-		battlefields, abilities_by_name, unit_traits
-	)
-
-	kingdom.start_expedition(expedition)
-	return expedition
+	return {"success": true, "reason": "", "expedition": expedition}
 
 
 ## Sincroniza todos os sistemas do Reino que dependem da passagem do
@@ -95,9 +111,23 @@ static func sync(kingdom: Kingdom, now_unix: int) -> void:
 		# muda — inclui Tier de uma carta já dentro do Exército sendo
 		# aprimorado na Academia (a mesma CardResource, referência
 		# compartilhada). Nunca reseta a Energia atual, só ajusta o
-		# teto (ver Army.recalculate_max_energy()).
+		# teto (ver Army.recalculate_max_energy()). Isso nunca concede
+		# Energia de graça (só abaixa o teto se necessário), por isso
+		# roda incondicionalmente, mesmo pra um Exército travado abaixo.
 		army.recalculate_max_energy(kingdom.energy_nucleus_level)
-		army.sync_energy_recovery(now_unix, kingdom.energy_nucleus_level)
+
+		# ENERGY.md, "Locais de Recuperação": só recupera na Cidade ou
+		# em Acampamentos, nunca durante o avanço idle ativo de uma
+		# Expedição nem em combate. Reaproveita o mesmo predicado de
+		# is_army_locked_for_editing() (ARMY.md, "Trava de Edição") —
+		# nenhum estado novo. Enquanto travado, apenas avança o relógio
+		# de sincronização sem conceder pontos: sem isso, o tempo
+		# decorrido durante a marcha ficaria acumulado e seria pago de
+		# uma vez (retroativamente) assim que o Exército destravasse.
+		if kingdom.is_army_locked_for_editing(army)["locked"]:
+			army.last_energy_sync_unix = now_unix
+		else:
+			army.sync_energy_recovery(now_unix, kingdom.energy_nucleus_level)
 
 	for mina: Mina in kingdom.all_mines():
 		MiningProductionResolver.credit(mina, kingdom, now_unix)

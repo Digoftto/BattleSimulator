@@ -105,6 +105,8 @@ func _ready() -> void:
 	_validate_army_edit_lock()
 	_validate_enemy_composition_matches_territory_faction()
 	_validate_army_unlocks_after_returning_to_camp()
+	await _validate_army_cannot_be_double_booked()
+	_validate_energy_frozen_while_marching()
 	_validate_kingdom_state_creates_initial_mines()
 	_validate_minas_panel_ui()
 	await _validate_pve_panel_ui()
@@ -3387,10 +3389,25 @@ func _validate_switching_trilhas_records_correct_territory() -> void:
 	for territory: Territory in season.territories.values():
 		army.recover_energy_full()
 		var squad := Squad.new([army])
-		var expedition: ExpeditionRuntime = GameRuntime.start_new_expedition(
+		var start_result: Dictionary = GameRuntime.start_new_expedition(
 			kingdom, season.season_id, territory.id, squad, randi(),
 			GameDatabase.battlefields, GameDatabase.abilities_by_name, GameDatabase.unit_traits
 		)
+		# Este loop reaproveita o mesmo Exército entre Territórios sem
+		# nunca encerrar a Expedição anterior — o próprio padrão de
+		# double-booking que Kingdom.start_expedition() agora rejeita
+		# (auditoria PvE, P0 #1). Tornado visível aqui em vez de
+		# silencioso: se o Exército ainda estiver travado na Expedição
+		# do Território anterior, o registro deste Território é
+		# recusado — mas attempt_current_fase() ainda roda sobre a
+		# instância construída (nunca null), preservando o
+		# comportamento original de sempre gerar uma entrada no
+		# Histórico do Comandante para este Território.
+		print("    Território %s -> Expedição registrada em kingdom.active_expeditions? %s%s" % [
+			territory.id, str(start_result["success"]),
+			"" if start_result["success"] else " (motivo: %s)" % start_result["reason"]
+		])
+		var expedition: ExpeditionRuntime = start_result["expedition"]
 		var result: PhaseResult = expedition.attempt_current_fase()
 
 	for entry: Dictionary in commander.battle_log:
@@ -3688,6 +3705,202 @@ func _validate_army_unlocks_after_returning_to_camp() -> void:
 	GameRuntime.sync(kingdom, GameClock.now_unix())
 	print("  Energia recupera de verdade nesse estado? %s (%d -> %d, esperado: aumentou)" % [
 		str(army.current_energy > energy_before), energy_before, army.current_energy
+	])
+
+
+## Validação FUNCIONAL do P0 identificado na auditoria de Expedição: um
+## Exército já comprometido numa Expedição em andamento (travado por
+## Kingdom.is_army_locked_for_editing()) não pode ser designado a uma
+## segunda Expedição — nem via Kingdom.start_expedition() (ponto
+## central de entrada), nem via GameRuntime.start_new_expedition() (o
+## outro chamador de start_expedition() — precisa propagar a rejeição,
+## nunca devolver uma ExpeditionRuntime não registrada como se fosse
+## válida, Finding A da revisão da auditoria), nem via PvEPanel (fluxo
+## real de "Iniciar Nova Expedição"). Antes da correção, nada impedia o
+## mesmo Army (mesma referência) de acabar em dois Squad.armies
+## simultâneos.
+func _validate_army_cannot_be_double_booked() -> void:
+	print("[PvE] Validando que um Exército travado em Expedição não pode ser designado a uma segunda (P0 da auditoria)...")
+
+	var kingdom: Kingdom = KingdomState.kingdom
+	var commander := CommanderResource.new()
+	commander.commander_name = "Comandante de Teste (Double-Booking)"
+	commander.faction = "Império"
+	kingdom.add_commander(commander, GameClock.now_unix())
+	kingdom.cargo_ativo_activated += 1
+	CommandCenterResolver.move_to_active(kingdom, commander)
+	var cards: Array[CardResource] = []
+	var template: CardResource = GameDatabase.cards[0]
+	for i in range(9):
+		cards.append(kingdom.acquire_card_from_catalog(template))
+	var army: Army = kingdom.form_army(commander, cards)
+
+	var season: Season = WorldDatabase.get_season(WorldBootstrap.DEV_SEASON_ID)
+	if season == null:
+		WorldBootstrap._generate_dev_scale_world()
+		season = WorldDatabase.get_season(WorldBootstrap.DEV_SEASON_ID)
+	var territory: Territory = season.get_territory("Território de Império")
+	var trilha: Trilha = season.get_trilha(territory.id)
+
+	# --- Camada de domínio: Kingdom.start_expedition() ---
+	var squad_a := Squad.new([army])
+	var expedition_a := ExpeditionRuntime.new(
+		squad_a, trilha, territory, season.enemy_catalog, kingdom.regional_commander_registry, 555001,
+		GameDatabase.battlefields, GameDatabase.abilities_by_name, GameDatabase.unit_traits
+	)
+	var result_a: Dictionary = kingdom.start_expedition(expedition_a)
+	print("  1ª Expedição (Exército livre) -> aceita? %s (esperado: true)" % str(result_a["success"]))
+	print("  Exército travado depois de entrar em Expedição? %s (esperado: true)" % str(
+		kingdom.is_army_locked_for_editing(army)["locked"]
+	))
+
+	var squad_b := Squad.new([army])
+	var expedition_b := ExpeditionRuntime.new(
+		squad_b, trilha, territory, season.enemy_catalog, kingdom.regional_commander_registry, 555002,
+		GameDatabase.battlefields, GameDatabase.abilities_by_name, GameDatabase.unit_traits
+	)
+	var expeditions_before_b: int = kingdom.active_expeditions.size()
+	var result_b: Dictionary = kingdom.start_expedition(expedition_b)
+	print("  2ª Expedição (mesmo Exército, ainda travado) -> rejeitada, com motivo? %s ('%s') (esperado: true, motivo não-vazio)" % [
+		str(not result_b["success"]), result_b["reason"]
+	])
+	print("  active_expeditions não cresceu com a tentativa rejeitada? %s (%d -> %d, esperado: true)" % [
+		str(kingdom.active_expeditions.size() == expeditions_before_b), expeditions_before_b, kingdom.active_expeditions.size()
+	])
+	print("  Exército permanece exclusivamente designado à 1ª Expedição? %s (esperado: true)" % str(
+		expedition_a.squad.armies.has(army) and not kingdom.active_expeditions.has(expedition_b)
+	))
+
+	# --- Camada de domínio: GameRuntime.start_new_expedition() ---
+	# GameRuntime.start_new_expedition() é outro chamador de
+	# Kingdom.start_expedition() (além do PvEPanel) — precisa propagar a
+	# rejeição em vez de devolver uma ExpeditionRuntime "de aparência
+	# válida" que nunca foi registrada (Finding A da revisão da
+	# auditoria). A Energia do Exército também não pode ser inicializada
+	# (resetada pra cheia) numa tentativa rejeitada — isso corromperia a
+	# Energia real da Expedição que já o possui.
+	var energy_before_ga: int = army.current_energy
+	var squad_c := Squad.new([army])
+	var expeditions_before_ga: int = kingdom.active_expeditions.size()
+	var start_result_c: Dictionary = GameRuntime.start_new_expedition(
+		kingdom, season.season_id, territory.id, squad_c, 555003,
+		GameDatabase.battlefields, GameDatabase.abilities_by_name, GameDatabase.unit_traits
+	)
+	print("  GameRuntime.start_new_expedition() (mesmo Exército travado) -> reporta rejeição, sem sucesso? %s ('%s') (esperado: true, motivo não-vazio)" % [
+		str(not start_result_c["success"]), start_result_c["reason"]
+	])
+	print("  A Expedição construída (não-null) não ficou registrada? %s (esperado: true)" % str(
+		start_result_c["expedition"] != null and not kingdom.active_expeditions.has(start_result_c["expedition"])
+	))
+	print("  active_expeditions não cresceu via GameRuntime? %s (%d -> %d, esperado: iguais)" % [
+		str(kingdom.active_expeditions.size() == expeditions_before_ga), expeditions_before_ga, kingdom.active_expeditions.size()
+	])
+	print("  Energia do Exército NÃO foi resetada pela tentativa rejeitada? %s (%d -> %d, esperado: iguais)" % [
+		str(army.current_energy == energy_before_ga), energy_before_ga, army.current_energy
+	])
+
+	# --- Camada de UI: PvEPanel ("Iniciar Nova Expedição") ---
+	var panel: Control = load("res://scenes/command_center/panels/pve_panel.tscn").instantiate()
+	add_child(panel)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	await get_tree().process_frame
+
+	panel.refresh()
+	var use_button: Button = null
+	for row: Node in panel._existing_armies_container.get_children():
+		if row is HBoxContainer and row.get_child_count() >= 2:
+			var row_label: Label = row.get_child(0) as Label
+			if row_label != null and row_label.text.begins_with(commander.commander_name):
+				use_button = row.get_child(1) as Button
+				break
+	print("  UI: botão 'Usar no Squad' aparece desabilitado pro Exército travado, com o motivo? %s ('%s', esperado: true, contém 'Expedição')" % [
+		str(use_button != null and use_button.disabled), (use_button.text if use_button != null else "<não encontrado>")
+	])
+
+	# Mesmo que a seleção via botão esteja desabilitada, a camada de
+	# domínio precisa recusar sozinha (nunca confiar só na UI) — chama o
+	# método nomeado diretamente, simulando um clique que a UI real
+	# nunca permitiria, exatamente o cenário que a auditoria pediu pra
+	# não depender apenas de esconder/desabilitar o botão.
+	panel._on_use_existing_army_pressed(army)
+	panel._new_expedition_territory = territory
+	var expeditions_before_ui: int = kingdom.active_expeditions.size()
+	panel._on_start_new_expedition_pressed()
+	print("  UI: 'Iniciar Expedição' com o Exército travado -> nenhuma Expedição nova foi registrada? %s (%d -> %d, esperado: iguais)" % [
+		str(kingdom.active_expeditions.size() == expeditions_before_ui), expeditions_before_ui, kingdom.active_expeditions.size()
+	])
+
+	panel.queue_free()
+
+
+## Validação FUNCIONAL do P0 identificado na auditoria de Expedição:
+## GameRuntime.sync() recuperava Energia incondicionalmente pra todo
+## Exército do Reino, mesmo um travado em marcha ativa (ENERGY.md,
+## "Locais de Recuperação": só Cidade e Acampamentos, nunca durante o
+## avanço idle ativo nem em combate). Mesmo mecanismo de tempo real já
+## coberto por _validate_energy_recovers_over_real_time() (que continua
+## intocado), agora testado com o Exército preso numa Expedição.
+func _validate_energy_frozen_while_marching() -> void:
+	print("[Energia] Validando que a Energia NÃO recupera enquanto o Exército está em marcha ativa (P0 da auditoria)...")
+
+	var kingdom := Kingdom.new()
+	var commander := CommanderResource.new()
+	commander.commander_name = "Comandante de Teste (Energia em Marcha)"
+	commander.faction = "Império"
+	kingdom.add_commander(commander, GameClock.now_unix())
+	kingdom.cargo_ativo_activated += 1
+	CommandCenterResolver.move_to_active(kingdom, commander)
+	var cards: Array[CardResource] = []
+	var template: CardResource = GameDatabase.cards[0]
+	for i in range(9):
+		cards.append(kingdom.acquire_card_from_catalog(template))
+	var army: Army = kingdom.form_army(commander, cards)
+
+	var season: Season = WorldDatabase.get_season(WorldBootstrap.DEV_SEASON_ID)
+	if season == null:
+		WorldBootstrap._generate_dev_scale_world()
+		season = WorldDatabase.get_season(WorldBootstrap.DEV_SEASON_ID)
+	var territory: Territory = season.get_territory("Território de Império")
+	var trilha: Trilha = season.get_trilha(territory.id)
+	var squad := Squad.new([army])
+	var expedition := ExpeditionRuntime.new(
+		squad, trilha, territory, season.enemy_catalog, kingdom.regional_commander_registry, 777001,
+		GameDatabase.battlefields, GameDatabase.abilities_by_name, GameDatabase.unit_traits
+	)
+	var start_result: Dictionary = kingdom.start_expedition(expedition)
+	print("  Expedição iniciada de verdade? %s (esperado: true)" % str(start_result["success"]))
+
+	army.consume_energy(army.max_energy - 2)  # baixa, sem esgotar (mesmo padrão de _validate_army_unlocks_after_returning_to_camp)
+	print("  Energia baixa antes de qualquer sincronização: %d/%d" % [army.current_energy, army.max_energy])
+	print("  Exército travado (marcha ativa, longe de Acampamento)? %s (esperado: true)" % str(
+		kingdom.is_army_locked_for_editing(army)["locked"]
+	))
+
+	var now: int = GameClock.now_unix()
+	GameRuntime.sync(kingdom, now)  # 1ª sincronização, só estabelece a referência
+
+	var energy_before_wait: int = army.current_energy
+	now += 3600 * 24 * 30  # 30 dias reais — tempo de sobra pra recuperar 100% se estivesse liberado
+	GameRuntime.sync(kingdom, now)
+	print("  30 dias reais depois, ainda em marcha -> Energia continua congelada (não recuperou)? %s (%d -> %d, esperado: iguais)" % [
+		str(army.current_energy == energy_before_wait), energy_before_wait, army.current_energy
+	])
+
+	# "Volta" pro Acampamento/Cidade (mesmo caminho de
+	# _validate_army_unlocks_after_returning_to_camp: falha sem nunca
+	# ter alcançado Acampamento real -> is_waiting_at_acampamento = true,
+	# destrava is_army_locked_for_editing()).
+	expedition.attempt_current_fase()
+	print("  Depois de 'voltar' (falha, sem Acampamento real) -> destravado? %s (esperado: true)" % str(
+		not kingdom.is_army_locked_for_editing(army)["locked"]
+	))
+
+	var energy_before_return: int = army.current_energy
+	now += 3600 * 24  # +24h reais, já destravado
+	GameRuntime.sync(kingdom, now)
+	print("  24h reais depois de destravar -> Energia volta a recuperar? %s (%d -> %d, esperado: aumentou)" % [
+		str(army.current_energy > energy_before_return), energy_before_return, army.current_energy
 	])
 
 
@@ -5860,13 +6073,14 @@ func _validate_game_runtime() -> void:
 
 	var territory: Territory = season.get_territory_by_faction("Império")
 
-	var expedition: ExpeditionRuntime = GameRuntime.start_new_expedition(
+	var start_result: Dictionary = GameRuntime.start_new_expedition(
 		kingdom, season.season_id, territory.id, squad, 2025,
 		GameDatabase.battlefields, GameDatabase.abilities_by_name, GameDatabase.unit_traits
 	)
+	var expedition: ExpeditionRuntime = start_result["expedition"]
 
-	print("  Expedição criada e registrada no Reino? %s (esperado: true)" % str(
-		kingdom.active_expeditions.has(expedition)
+	print("  Expedição criada e registrada no Reino? %s (esperado: true — sucesso reportado E de fato presente em active_expeditions)" % str(
+		start_result["success"] and kingdom.active_expeditions.has(expedition)
 	))
 
 	var result: PhaseResult = expedition.attempt_current_fase()

@@ -6,13 +6,11 @@ extends Control
 ## decisão de Acampamento. Mesmo padrão das demais janelas: árvore em
 ## código, sem estado próprio, reconstruída a cada ação.
 ##
-## Fora do escopo desta janela (de propósito, não esquecimento): criar
-## uma Expedição nova. Isso exigiria escolher Território/Trilha e
-## montar um Squad do zero — depende do Editor de Exército comum
-## (COMMAND_CENTER_UI.md, "motor de geração de exército"), que ainda
-## não existe como tela. Esta janela só GERENCIA Expedições já em
-## andamento — para testar, uma é injetada por fora (ver validação no
-## bootstrap.gd), exatamente como o jogo real faria ao criar uma.
+## Também permite iniciar uma Expedição nova: escolher Território/Trilha,
+## montar um Squad usando o Editor de Exército comum (aberto como
+## overlay — ver _on_add_army_to_new_expedition_pressed()) e iniciar a
+## Expedição de verdade via Kingdom.start_expedition() (COMMAND_CENTER_UI.md,
+## "Montagem e Edição do Squad").
 
 var _root_vbox: VBoxContainer
 var _expedicoes_container: VBoxContainer
@@ -180,9 +178,15 @@ func _refresh_existing_armies_list() -> void:
 		army_label.autowrap_mode = TextServer.AUTOWRAP_WORD
 		row.add_child(army_label)
 
+		# ARMY.md, "Trava de Edição por Modo de Jogo": um Exército já
+		# comprometido em outra Expedição (ou Guarnição de Mina) em
+		# andamento não pode ser designado a uma Expedição nova — mesmo
+		# predicado e mesmo padrão de UI já usados em exercitos_panel.gd.
+		var lock: Dictionary = KingdomState.kingdom.is_army_locked_for_editing(army)
+
 		var use_button := Button.new()
-		use_button.text = "Usar no Squad"
-		use_button.disabled = _army_editor_overlay != null
+		use_button.text = "Usar no Squad" if not lock["locked"] else "Usar no Squad (travado: %s)" % lock["reason"]
+		use_button.disabled = _army_editor_overlay != null or lock["locked"]
 		use_button.pressed.connect(_on_use_existing_army_pressed.bind(army), CONNECT_DEFERRED)
 		row.add_child(use_button)
 
@@ -263,7 +267,7 @@ func refresh() -> void:
 
 	if _expedicoes_container.get_child_count() == 0:
 		var empty_label := Label.new()
-		empty_label.text = "Nenhuma Expedição em andamento. (Iniciar uma nova depende do Editor de Exército, ainda não implementado nesta janela.)"
+		empty_label.text = "Nenhuma Expedição em andamento. Use 'Iniciar Nova Expedição' abaixo para montar um Squad e partir."
 		_expedicoes_container.add_child(empty_label)
 
 
@@ -413,7 +417,15 @@ func _on_start_new_expedition_pressed() -> void:
 		squad, trilha, _new_expedition_territory, season.enemy_catalog, kingdom.regional_commander_registry,
 		GameClock.now_unix(), GameDatabase.battlefields, GameDatabase.abilities_by_name, GameDatabase.unit_traits
 	)
-	kingdom.active_expeditions.append(expedition)
+	# Kingdom.start_expedition() é o ponto central de entrada — nunca
+	# mutar kingdom.active_expeditions direto daqui (ARMY.md, "Trava de
+	# Edição por Modo de Jogo": rejeita Exércitos já travados em outra
+	# Expedição/Guarnição em andamento). A UI já filtra esses Exércitos em
+	# _refresh_existing_armies_list(), mas o domínio nunca confia só nisso.
+	var result: Dictionary = kingdom.start_expedition(expedition)
+	if not result["success"]:
+		_nova_expedicao_status_label.text = "Não foi possível iniciar: %s" % result["reason"]
+		return
 
 	_pending_squad_armies.clear()
 	refresh()

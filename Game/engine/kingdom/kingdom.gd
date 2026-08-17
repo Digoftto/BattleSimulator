@@ -846,8 +846,27 @@ func add_squad(squad: Squad) -> void:
 	squads.append(squad)
 
 
-func start_expedition(expedition: ExpeditionRuntime) -> void:
+## Registra "expedition" como ativa. ARMY.md, "Trava de Edição por Modo
+## de Jogo": um Exército já comprometido em outra Expedição em
+## andamento (is_army_locked_for_editing()) nunca pode ser designado a
+## uma segunda Expedição ao mesmo tempo — mesmo predicado usado por
+## re_form_army()/disband_army(), nenhuma regra nova. Ponto central de
+## entrada: quem inicia uma Expedição (painel de UI, GameRuntime, etc.)
+## deve sempre passar por aqui, nunca alterar active_expeditions direto.
+## Retorna {"success": bool, "reason": String} em vez de assert — ao
+## contrário de re_form_army()/disband_army() (edição de um Exército já
+## em jogo, erro de programação se a UI deixar passar), aqui a rejeição
+## é um desfecho normal e esperável de uma ação do jogador (montar um
+## Squad novo com um Exército já comprometido), então precisa de um
+## retorno inspecionável — nunca derrubar a chamada.
+func start_expedition(expedition: ExpeditionRuntime) -> Dictionary:
+	for army: Army in expedition.squad.armies:
+		var lock: Dictionary = is_army_locked_for_editing(army)
+		if lock["locked"]:
+			return {"success": false, "reason": lock["reason"]}
+
 	active_expeditions.append(expedition)
+	return {"success": true, "reason": ""}
 
 
 func set_progress_flag(flag_name: String, value: bool = true) -> void:
