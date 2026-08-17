@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="CommanderRequirementResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/commanders/commander_requirement_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+code = "R001"
+description = "Pelo menos 2 lacaios da mesma Facção do comandante"
+frequency_label = "Alta"
+domain = "faction"
+operator = "min"
+quantity = 2
+scope = "self"

@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Extração de Essência"
+category = "Habilidade de Campanha"
+tier = 3
+trigger_description = "Exército alocado em uma Mina de Essência conquistada."
+target_description = "A produção da referida Mina."
+effect_description = "Aumenta a eficiência da extração de Essência Vital."
+values_description = "Bônus (Individual): +0%\nBônus (Sinergia): +25%"
+notes = "O bônus incide apenas sobre a produção da Mina protegida por aquele Exército."

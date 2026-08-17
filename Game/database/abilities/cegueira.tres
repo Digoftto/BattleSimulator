@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Cegueira"
+category = "Habilidade Avançada"
+tier = 5
+trigger_description = "Realização de um ataque (respeitando tempo de recarga)."
+target_description = "Alvo do ataque."
+effect_description = "Aplica chance de erro aos ataques do alvo."
+values_description = "Bônus (Chance de erro): 50%\nDuração: 2 turnos\nRecarga: 3 turnos"
+notes = "Chance verificada individualmente por ataque. Se ataque falhar por Cegueira, dano e efeitos secundários (Veneno, etc.) não são aplicados. Habilidades de Precisão podem anular Cegueira. Efeito não cumulativo."

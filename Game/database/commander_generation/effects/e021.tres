@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="CommanderEffectResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/commanders/commander_effect_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+code = "E021"
+description = "Até 2 cartas de outra Facção também contam para a Afinidade"
+frequency_label = "Baixa"
+category = "structural"
+kind = "affinity"

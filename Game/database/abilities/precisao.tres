@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Precisão"
+category = "Habilidade Avançada"
+tier = 5
+trigger_description = "Realização de ataque contra alvo com habilidades de evasão/ocultação compatíveis."
+target_description = "Próprio pelotão."
+effect_description = "Ignora efeitos defensivos baseados em evasão ou ocultação, garantindo que o ataque atinja o alvo."
+values_description = ""
+notes = "Ignora Camuflagem. Não altera o dano causado."

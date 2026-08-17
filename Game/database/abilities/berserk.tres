@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Berserk"
+category = "Característica de Unidade"
+tier = 1
+trigger_description = "HP atual ≤ 50% do HP máximo (verificado no início do turno)."
+target_description = "Próprio pelotão."
+effect_description = "Aumenta o Ataque."
+values_description = "Ativação: HP ≤ 50%\nBônus: +50% de Ataque"
+notes = "Se o HP for curado acima de 50%, Berserk é desativado no início do próximo turno."

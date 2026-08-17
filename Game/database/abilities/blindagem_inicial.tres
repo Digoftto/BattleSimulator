@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Blindagem Inicial"
+category = "Característica de Unidade"
+tier = 1
+trigger_description = "Início da batalha."
+target_description = "Próprio pelotão."
+effect_description = "Gera Escudo adicional, somado ao ESC Base."
+values_description = "Escudo: +20 ESC"
+notes = "Caso o Escudo seja destruído, a habilidade não é ativada novamente. O bônus é concedido apenas uma vez por batalha. O Escudo concedido segue normalmente todas as regras gerais de Escudo."

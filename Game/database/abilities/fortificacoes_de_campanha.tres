@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Fortificações de Campanha"
+category = "Habilidade de Campanha"
+tier = 3
+trigger_description = "Permanência na Trilha PvE."
+target_description = "Todas as unidades do Exército onde o pelotão está presente."
+effect_description = "Aumenta o Escudo de todas as unidades."
+values_description = "Bônus (Individual): +10% de Escudo"
+notes = "Múltiplos pelotões com esta habilidade não acumulam efeitos."

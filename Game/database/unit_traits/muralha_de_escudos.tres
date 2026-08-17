@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="UnitTraitResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/cards/unit_trait_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+trait_name = "Muralha de Escudos"
+base_effect_description = "Enquanto sua coluna estiver completa, recebe +15% do Escudo Base."
+enhanced_effect_description = "Enquanto sua coluna estiver completa, recebe +25% do Escudo Base. (Como definimos, para a posição 1 isso significa depender das posições 6 e 7 permanecerem ocupadas.)"

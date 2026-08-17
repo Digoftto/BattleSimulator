@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="BattlefieldResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/battlefields/battlefield_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+battlefield_name = "Pântano"
+category = "Geográfico"
+description = "Um terreno lamacento e traiçoeiro que dificulta a movimentação e o avanço das tropas."
+effect = "Sempre que uma unidade for derrotada, a unidade imediatamente atrás deve aguardar 1 turno adicional antes de realizar seu primeiro avanço."
+frequency_percent = 4.0

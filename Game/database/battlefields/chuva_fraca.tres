@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="BattlefieldResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/battlefields/battlefield_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+battlefield_name = "Chuva Fraca"
+category = "Climático"
+description = "Uma precipitação constante que umedece o campo e interfere na concentração de conjuradores posicionados na retaguarda."
+effect = "Unidades Mago posicionadas nas casas 7, 8 e 9 não realizam ataques."
+frequency_percent = 4.0

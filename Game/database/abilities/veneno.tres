@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Veneno"
+category = "Característica de Unidade"
+tier = 1
+trigger_description = "Realização de ataque bem-sucedido."
+target_description = "Pelotão atingido pelo ataque."
+effect_description = "Aplica 1 carga de Veneno. Novos ataques renovam a duração. Não possui acúmulo de cargas."
+values_description = "Dano: 5 direta ao HP por turno\nDuração: 3 turnos"
+notes = "Dano direto aplicado ao final do turno da unidade envenenada. Eliminação pelo Veneno conta para o pelotão que aplicou o efeito pela última vez."

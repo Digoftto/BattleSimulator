@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Fúria"
+category = "Habilidade Avançada"
+tier = 5
+trigger_description = "Derrota de unidade inimiga da mesma coluna por qualquer fonte."
+target_description = "Próprio pelotão."
+effect_description = "Recebe bônus temporário de Ataque."
+values_description = "Bônus: +20% de Ataque\nDuração: 2 turnos"
+notes = "Novas ativações apenas renovam duração. Não necessita que eliminação tenha sido pelo pelotão com Fúria. Efeito não cumulativo."

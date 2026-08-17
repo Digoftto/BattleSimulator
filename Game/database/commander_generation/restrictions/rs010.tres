@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="CommanderRestrictionResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/commanders/commander_restriction_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+code = "RS010"
+description = "Pelo menos 2 lacaios da Facção especificada"
+frequency_label = "Média"
+domain = "faction"
+operator = "min"
+quantity = 2
+scope = "other"

@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Dreno de Vida"
+category = "Característica de Unidade"
+tier = 1
+trigger_description = "Realização de ataque que causa dano diretamente ao HP de um inimigo."
+target_description = "Mesmo alvo do ataque e próprio pelotão."
+effect_description = "Causa dano adicional diretamente ao HP do mesmo alvo e recupera HP do próprio pelotão."
+values_description = "Dano: 10 direta ao HP (adicional)\nRecuperação: 10 HP"
+notes = "Caso o ataque não cause dano ao HP (apenas ao Escudo), Dreno de Vida não é ativado. A recuperação respeita o HP máximo."

@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Comando de Reparos"
+category = "Habilidade Avançada"
+tier = 5
+trigger_description = "Realização de ação de cura."
+target_description = "3 pelotões aliados com maior dano absoluto no Escudo."
+effect_description = "As ações de cura restauram Escudo em vez de HP, distribuído entre os alvos."
+values_description = ""
+notes = "Versão avançada de Engenharia Militar. Afinidade III: a restauração ocorre em 4 pelotões. Valores extraídos diretamente da ficha de Capitão Imperial (CARD_CATALOG.md), sem alteração de balanceamento."

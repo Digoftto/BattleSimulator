@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="UnitTraitResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/cards/unit_trait_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+trait_name = "Raízes Profundas"
+base_effect_description = "Caso este pelotão tenha sido curado no turno anterior, recebe 15% menos dano até o início do próximo turno."
+enhanced_effect_description = "Caso tenha sido curado no turno anterior, recebe 25% menos dano."

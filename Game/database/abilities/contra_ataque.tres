@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Contra-ataque"
+category = "Habilidade Avançada"
+tier = 5
+trigger_description = "Recebimento de ataque corpo a corpo."
+target_description = "Unidade agressora."
+effect_description = "Realiza imediatamente um ataque completo contra o agressor."
+values_description = "Dano (Contra-ataque): 100% do Ataque"
+notes = "Pode ativar outras habilidades ofensivas. Não gera novo Contra-ataque. Não ativa se o pelotão for derrotado pelo ataque."

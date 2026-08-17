@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="BattlefieldResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/battlefields/battlefield_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+battlefield_name = "Nevoeiro Arcano"
+category = "Místico"
+description = "Um nevoeiro denso e carregado de magia instável que anula e impede a formação de proteções mágicas ou físicas."
+effect = "Todo Escudo existente é removido no início da batalha. Nenhuma unidade pode possuir Escudo enquanto este Campo estiver ativo."
+frequency_percent = 4.0

@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="BattlefieldResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/battlefields/battlefield_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+battlefield_name = "Floresta"
+category = "Geográfico"
+description = "Uma vegetação densa que oferece proteção natural e amplifica a eficácia de defesas estáticas."
+effect = "Unidades recebem 50% mais Escudo Base."
+frequency_percent = 4.0

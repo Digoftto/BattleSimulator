@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="UnitTraitResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/cards/unit_trait_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+trait_name = "Flechas Fantasmagóricas"
+base_effect_description = "Os ataques deste pelotão ativam Drenar Vida. Além disso, se este pelotão estiver com HP máximo no momento em que Drenar Vida for ativado, o excesso de cura é convertido em +10% do Ataque Base até o final do próximo turno."
+enhanced_effect_description = "Se estiver com HP máximo, recebe +15% do Ataque Base até o início do próximo turno."

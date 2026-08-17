@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Trespassar"
+category = "Habilidade Avançada"
+tier = 5
+trigger_description = "Eliminação de um alvo durante o ataque do pelotão."
+target_description = "Próximo alvo válido da mesma linha."
+effect_description = "Realiza imediatamente um novo ataque completo."
+values_description = ""
+notes = "Prioridade de seleção de alvo na linha segue direção da linha de frente para retaguarda conforme definido em COMBAT_RULES."

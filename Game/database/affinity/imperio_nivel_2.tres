@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="AffinityLevelResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/affinity/affinity_level_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+faction = "Império"
+level = 2
+effect_description = "Enquanto uma linha ou coluna for composta exclusivamente por pelotões do Império, todos os pelotões dessa formação recebem 20% menos dano de todas as fontes."

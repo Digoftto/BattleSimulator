@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="CardResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/cards/card_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+card_name = "Arqueiro Esquelético"
+faction = "Mortos-Vivos"
+card_class = "À Distância"
+rarity = "Comum"
+tier = 1
+atk = 115
+hp = 70
+esc = 10
+card_type = "Esqueleto"
+tier_1_trait_name = "Fome Eterna"
+tier_2_atk_increment = 6
+tier_3_ability_name = "Treinamento Ofensivo"
+tier_4_atk_increment = 8
+tier_5_ability_name = "Precisão"

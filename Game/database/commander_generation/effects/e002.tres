@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="CommanderEffectResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/commanders/commander_effect_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+code = "E002"
+description = "HP"
+frequency_label = "Alta"
+category = "combat"
+kind = "hp"

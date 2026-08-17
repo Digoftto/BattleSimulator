@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Ataque Duplo"
+category = "Habilidade Avançada"
+tier = 5
+trigger_description = "Realização de um ataque."
+target_description = "Mesmo alvo do ataque principal."
+effect_description = "Executa imediatamente um segundo ataque completo."
+values_description = "Dano (Segundo ataque): 100% do Ataque"
+notes = "Se o primeiro ataque eliminar o alvo, o segundo atinge a unidade que ocupar a posição. Ambos ataques podem ativar outras habilidades. Não realiza ataques se estiver incapacitada."

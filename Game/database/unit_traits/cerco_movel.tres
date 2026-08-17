@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="UnitTraitResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/cards/unit_trait_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+trait_name = "Cerco Móvel"
+base_effect_description = "Este pelotão realiza 1 ataque base por turno. Além disso, realiza 1 ataque adicional para cada posição que avançou no turno imediatamente anterior. Exemplos: Avançou 0 posições -> 1 ataque. Avançou 1 posição -> 2 ataques. Avançou 2 posições -> 3 ataques. Cada ataque segue normalmente todas as regras de combate e pode ativar habilidades."
+enhanced_effect_description = "Recebe +20% do Ataque Base para cada posição avançada no turno anterior."

@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Vínculo Cadavérico"
+category = "Habilidade Avançada"
+tier = 5
+trigger_description = "Recebimento de dano."
+target_description = "Pelotão aliado imediatamente atrás na mesma coluna."
+effect_description = "Transfere 50% do dano recebido para o alvo."
+values_description = ""
+notes = "Versão de Tier V com o mesmo efeito de Compartilhar Dor (Tier I). Criada para corrigir a referência quebrada 'Compartilhar Dor' (Ceifador Cadavérico)."

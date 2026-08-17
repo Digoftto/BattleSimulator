@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Compartilhar Dor"
+category = "Característica de Unidade"
+tier = 1
+trigger_description = "Recebimento de dano."
+target_description = "Pelotão aliado imediatamente atrás na mesma coluna."
+effect_description = "Transfere 50% do dano recebido para o alvo."
+values_description = ""
+notes = "A divisão ocorre antes da aplicação ao Escudo/HP de ambas unidades. Mantém o tipo de dano original (físico/mágico). Caso não exista um pelotão atrás, o dano é aplicado integralmente ao alvo original."

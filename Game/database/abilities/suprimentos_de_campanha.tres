@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Suprimentos de Campanha"
+category = "Habilidade de Campanha"
+tier = 3
+trigger_description = "Descanso em um Acampamento durante campanha PvE."
+target_description = "O Exército onde o pelotão está presente."
+effect_description = "Aumenta a recuperação de Energia."
+values_description = "Bônus (Individual): +10% de recuperação"
+notes = "Múltiplos pelotões com esta habilidade não acumulam efeitos."

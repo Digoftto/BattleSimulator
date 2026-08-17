@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Expansão do Acampamento"
+category = "Habilidade de Campanha"
+tier = 3
+trigger_description = "Permanência na Trilha PvE."
+target_description = "O Exército onde o pelotão está presente."
+effect_description = "Aumenta a Energia Máxima disponível."
+values_description = "Bônus (Individual): +1 Energia Máxima"
+notes = "Esta habilidade é acumulativa (+1 Energia Máxima por pelotão adicional com esta habilidade)."

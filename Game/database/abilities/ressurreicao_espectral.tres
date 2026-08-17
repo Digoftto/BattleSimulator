@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Ressurreição Espectral"
+category = "Habilidade Avançada"
+tier = 5
+trigger_description = "Derrota do pelotão pela primeira vez na batalha."
+target_description = "Próprio pelotão na mesma posição."
+effect_description = "Retorna imediatamente ao campo com 30% do HP Base."
+values_description = ""
+notes = "Versão de Tier V com o mesmo efeito de Reerguer (Tier I). Criada para corrigir a referência quebrada 'Reerguer' (Arqueira Espectral)."

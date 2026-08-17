@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="UnitTraitResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/cards/unit_trait_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+trait_name = "Mestre dos Esqueletos"
+base_effect_description = "Pelotões aliados do Tipo Esqueleto recebem +10% do Ataque Base."
+enhanced_effect_description = "Pelotões do Tipo Esqueleto recebem +20% do Ataque Base."

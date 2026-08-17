@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Inspiração"
+category = "Habilidade Avançada"
+tier = 5
+trigger_description = "Início do turno."
+target_description = "Pelotão aliado ocupando a Posição 3 do mesmo Exército."
+effect_description = "Concede bônus temporário de Ataque."
+values_description = "Bônus: +20% de Ataque\nDuração: 1 turno"
+notes = "Determinado pela ocupação no início do turno. Não afeta a própria unidade, exceto se ocupar a posição 3. Efeito não cumulativo."

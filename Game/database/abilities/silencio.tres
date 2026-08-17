@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Silêncio"
+category = "Habilidade Avançada"
+tier = 5
+trigger_description = "Início do turno."
+target_description = "Uma unidade inimiga viva aleatória."
+effect_description = "Desativa todas as habilidades ativas e passivas do alvo."
+values_description = "Duração: 1 turno"
+notes = "Não altera atributos básicos nem remove efeitos já aplicados."

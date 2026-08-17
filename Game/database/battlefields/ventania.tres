@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="BattlefieldResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/battlefields/battlefield_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+battlefield_name = "Ventania"
+category = "Climático"
+description = "Ventos fortes e rajadas imprevisíveis que dificultam a mira e a trajetória de projéteis."
+effect = "Unidades à distância causam 50% menos dano."
+frequency_percent = 4.0

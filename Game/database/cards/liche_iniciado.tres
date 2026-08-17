@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="CardResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/cards/card_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+card_name = "Liche Iniciado"
+faction = "Mortos-Vivos"
+card_class = "Mago"
+rarity = "Comum"
+tier = 1
+atk = 105
+hp = 80
+esc = 20
+card_type = "Aparição"
+tier_1_trait_name = "Mestre dos Esqueletos"
+tier_2_hp_increment = 6
+tier_3_ability_name = "Treinamento de Comandantes"
+tier_4_atk_increment = 8
+tier_5_ability_name = "Inspiração"

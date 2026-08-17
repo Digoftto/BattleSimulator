@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Engenharia Militar"
+category = "Habilidade Avançada"
+tier = 5
+trigger_description = "Realização de ação de cura."
+target_description = "Pelotão aliado com maior dano absoluto no Escudo."
+effect_description = "As ações de cura restauram Escudo em vez de HP."
+values_description = ""
+notes = "Utiliza o mesmo critério de seleção de alvo da habilidade Cura (maior dano absoluto). Múltiplos pelotões com Engenharia Militar não acumulam efeitos."

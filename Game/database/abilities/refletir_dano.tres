@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Refletir Dano"
+category = "Habilidade Avançada"
+tier = 5
+trigger_description = "Recebimento de dano de um ataque direto."
+target_description = "Unidade atacante."
+effect_description = "Devolve parcela do dano efetivamente recebido imediatamente após a resolução do ataque."
+values_description = "Bônus (Reflexo): Reflete 30% do dano recebido"
+notes = "Ignora distância. Dano refletido absorvido por Escudo/HP e não ativa habilidades secundárias. Ataques sem dano não geram reflexão."

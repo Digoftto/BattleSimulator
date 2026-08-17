@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="UnitTraitResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/cards/unit_trait_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+trait_name = "Lamento Espectral"
+base_effect_description = "Pelotões aliados do Tipo Aparição recebem 15% menos dano."
+enhanced_effect_description = "Pelotões do Tipo Aparição recebem 25% menos dano."

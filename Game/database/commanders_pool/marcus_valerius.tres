@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="CommanderResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/commanders/commander_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+commander_name = "Marcus Valerius"
+epithet = "O Inabalável"
+home_kingdom = "Império"
+serving_kingdom = "Império"
+faction = "Império"

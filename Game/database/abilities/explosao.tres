@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Explosão"
+category = "Característica de Unidade"
+tier = 1
+trigger_description = "Derrota do pelotão."
+target_description = "Unidade inimiga imediatamente à frente."
+effect_description = "Causa dano imediatamente antes da remoção do campo."
+values_description = "Dano: 50"
+notes = "Dano pode ser absorvido por Escudo. Caso não exista unidade inimiga à frente, não produz efeito. Ativada apenas uma vez."

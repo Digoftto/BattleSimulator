@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="UnitTraitResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/cards/unit_trait_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+trait_name = "Manutenção Especializada"
+base_effect_description = "As ações de cura realizadas por este pelotão restauram Escudo em vez de HP, seguindo exatamente as mesmas regras da classe Suporte. A restauração ocorre no pelotão com o maior dano absoluto em seu escudo."
+enhanced_effect_description = "A restauração ocorre nos 2 pelotões com maior dano absoluto em seu Escudo."

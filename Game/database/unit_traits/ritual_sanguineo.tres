@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="UnitTraitResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/cards/unit_trait_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+trait_name = "Ritual Sanguíneo"
+base_effect_description = "Na primeira cura realizada por este pelotão em cada turno, o pelotão curado recebe +10% do Ataque Base permanentemente durante a batalha, enquanto este pelotão perde 10 HP. A perda de HP ignora Escudo."
+enhanced_effect_description = "Na primeira cura realizada em cada turno, o pelotão curado recebe +15% do Ataque Base permanentemente."

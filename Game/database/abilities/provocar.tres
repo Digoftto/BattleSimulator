@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Provocar"
+category = "Habilidade Avançada"
+tier = 5
+trigger_description = "Permanência passiva em combate."
+target_description = "Pelotões inimigos que ataquem a Linha ocupada por este pelotão."
+effect_description = "Torna este pelotão o alvo obrigatório de todos os ataques direcionados à linha que ocupa."
+values_description = ""
+notes = "Sobrescreve a seleção padrão de alvo da coluna do atacante. Funciona desde que os atacantes sejam capazes de atacá-lo pelas regras de classe/habilidade e estejam atacando a mesma Linha."

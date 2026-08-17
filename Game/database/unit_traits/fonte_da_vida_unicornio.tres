@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="UnitTraitResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/cards/unit_trait_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+trait_name = "Fonte da Vida"
+base_effect_description = "Sempre que este pelotão recuperar HP, restaura 10 HP aos pelotões imediatamente à esquerda e à direita, respeitando o HP máximo de cada unidade."
+enhanced_effect_description = "Sempre que recuperar HP, restaura 15 HP aos pelotões adjacentes."

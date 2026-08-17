@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Bênção Vital"
+category = "Habilidade Avançada"
+tier = 5
+trigger_description = "Recuperação efetiva de HP por pelotão aliado imediatamente à esquerda."
+target_description = "Próprio pelotão."
+effect_description = "Recupera HP, respeitando o HP máximo."
+values_description = "Recuperação: 10 HP"
+notes = "Versão de Tier V com os mesmos valores de Revitalização (Tier I). Criada para corrigir a referência quebrada 'Revitalização' (Salgueiro Ancião, Unicórnio Ancestral)."

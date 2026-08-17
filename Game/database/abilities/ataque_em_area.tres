@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Ataque em Área"
+category = "Habilidade Avançada"
+tier = 5
+trigger_description = "Realização de um ataque."
+target_description = "Todos os inimigos da mesma Linha do alvo principal."
+effect_description = "Unidade na mesma coluna recebe ataque principal; demais na Linha recebem dano reduzido."
+values_description = "Dano (Alvo principal): 100% do Ataque\nDano (Demais unidades): 50% do Ataque"
+notes = "Dano calculado individualmente. Habilidades ofensivas (ex: Veneno) aplicadas individualmente a cada atingido. Se existir apenas um inimigo na Linha, funciona como ataque normal."

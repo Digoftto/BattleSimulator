@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Proteção"
+category = "Habilidade Avançada"
+tier = 5
+trigger_description = "Recebimento de dano de ataque direto por aliado imediatamente à frente."
+target_description = "Aliado à frente e próprio pelotão."
+effect_description = "Redireciona parte do dano recebido pelo aliado para si."
+values_description = "Dano (Redirecionado): 50% para a unidade com Proteção\nDano (Restante): 50% no alvo original"
+notes = "Divisão ocorre antes da aplicação ao Escudo/HP de cada unidade. Afeta apenas ataques diretos. Cessa se protetor for derrotado. Múltiplas Proteções não acumulam no mesmo alvo."

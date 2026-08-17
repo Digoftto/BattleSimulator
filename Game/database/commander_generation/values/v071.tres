@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="CommanderValueResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/commanders/commander_value_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+code = "V071"
+description = "+2 cartas"
+frequency_label = "Baixo"
+effect_kind = "affinity"
+amount = 2.0
+is_percentage = false

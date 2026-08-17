@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="BattlefieldResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/battlefields/battlefield_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+battlefield_name = "Campo Aberto"
+category = "Padrão"
+description = "Uma planície vasta e desimpedida, sob condições climáticas ideais."
+effect = "Representa o ambiente padrão. Nenhuma regra normal do jogo é alterada ou adicionada."
+frequency_percent = 64.0

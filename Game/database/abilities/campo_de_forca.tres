@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Campo de Força"
+category = "Habilidade Avançada"
+tier = 5
+trigger_description = "Recebimento do primeiro ataque durante a batalha."
+target_description = "Próprio pelotão."
+effect_description = "Anula completamente o primeiro ataque recebido."
+values_description = "Ativação: 1 vez por batalha\nAtaques anulados: 1"
+notes = "Habilidade destrói-se após o uso. Não bloqueia dano ao Escudo/HP após consumo."

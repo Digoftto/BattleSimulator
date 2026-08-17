@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Execução"
+category = "Habilidade Avançada"
+tier = 5
+trigger_description = "Realização de ataque contra unidade com HP atual ≤ 30% do HP máximo (verificado no início do turno)."
+target_description = "Alvo do ataque."
+effect_description = "Recebe bônus de dano no ataque."
+values_description = "Ativação: HP ≤ 30%\nBônus: +50% de Ataque"
+notes = ""

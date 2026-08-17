@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Detonação Ritual"
+category = "Habilidade Avançada"
+tier = 5
+trigger_description = "Derrota do pelotão."
+target_description = "Unidade inimiga imediatamente à frente."
+effect_description = "Causa dano imediatamente antes da remoção do campo."
+values_description = "Dano: 50"
+notes = "Versão de Tier V com os mesmos valores de Explosão (Tier I). Criada para corrigir a referência quebrada 'Explosão' (Altar da Reanimação)."

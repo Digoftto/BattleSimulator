@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Camuflagem"
+category = "Característica de Unidade"
+tier = 1
+trigger_description = "Primeira entrada na Linha 1."
+target_description = "Próprio pelotão."
+effect_description = "Torna o pelotão invisível, impedindo que seja alvo de ataques diretos até o final daquele turno."
+values_description = ""
+notes = "Ativada uma vez por batalha. Não impede dano causado por habilidades sem alvo direto."

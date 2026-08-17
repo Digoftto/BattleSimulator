@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Treinamento de Comandantes"
+category = "Habilidade de Campanha"
+tier = 3
+trigger_description = "Sinergia ativa e término de batalha PvE vencida."
+target_description = "O Comandante responsável pelo referido Exército."
+effect_description = "Concede experiência (XP) adicional ao Comandante."
+values_description = "Bônus (Sinergia): +15% de XP"
+notes = "Não altera XP dos Pelotões ou da Conta. O bônus é aplicado apenas ao Comandante do Exército onde a sinergia está ativa."

@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="CardResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/cards/card_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+card_name = "Ceifador Cadavérico"
+faction = "Mortos-Vivos"
+card_class = "Corpo a Corpo"
+rarity = "Épica"
+tier = 1
+atk = 165
+hp = 150
+esc = 20
+card_type = "Zumbi"
+tier_1_trait_name = "Banquete Macabro"
+tier_2_atk_increment = 8
+tier_3_ability_name = "Treinamento Defensivo"
+tier_4_hp_increment = 10
+tier_5_ability_name = "Vínculo Cadavérico"
+recipe_ingredients = Array[String](["Abominação Putrefata", "Esqueleto Guerreiro", "Muralha de Ossos"])

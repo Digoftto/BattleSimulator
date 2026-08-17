@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="CardResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/cards/card_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+card_name = "Marechal Imperial"
+faction = "Império"
+card_class = "Barreira"
+rarity = "Lendária"
+tier = 1
+atk = 90
+hp = 180
+esc = 220
+tier_1_trait_name = "Bastião Imperial"
+tier_2_esc_increment = 6
+tier_3_ability_name = "Fortificações de Campanha"
+tier_4_esc_increment = 8
+tier_5_ability_name = "Provocar"
+recipe_ingredients = Array[String](["Evocador Imperial", "Guardião Imperial", "Centurião Imperial"])

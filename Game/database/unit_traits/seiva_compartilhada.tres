@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="UnitTraitResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/cards/unit_trait_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+trait_name = "Seiva Compartilhada"
+base_effect_description = "Sempre que este pelotão atacar, restaura 5 HP ao pelotão aliado da Linha 1 da mesma coluna, respeitando o HP máximo da unidade."
+enhanced_effect_description = "Sempre que atacar, restaura 10 HP."

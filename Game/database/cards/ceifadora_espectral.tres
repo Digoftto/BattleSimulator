@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="CardResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/cards/card_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+card_name = "Ceifadora Espectral"
+faction = "Mortos-Vivos"
+card_class = "À Distância"
+rarity = "Épica"
+tier = 1
+atk = 150
+hp = 70
+esc = 10
+card_type = "Aparição"
+tier_1_trait_name = "Colheita de Almas"
+tier_2_atk_increment = 8
+tier_3_ability_name = "Treinamento Ofensivo"
+tier_4_atk_increment = 10
+tier_5_ability_name = "Ataque em Área"
+recipe_ingredients = Array[String](["Banshee", "Arqueiro Esquelético", "Arqueira Espectral"])

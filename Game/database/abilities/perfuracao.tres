@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Perfuração"
+category = "Habilidade Avançada"
+tier = 5
+trigger_description = "Realização de um ataque contra alvo com Escudo."
+target_description = "Alvo principal."
+effect_description = "Divide o dano entre Escudo e HP."
+values_description = "Dano (Escudo): 50% do Ataque (aplicado inicialmente)\nDano (HP): 50% do Ataque (aplicado diretamente)"
+notes = "Dano direto ao HP ignora o Escudo. Excedente destinado ao Escudo transfere para o HP se Escudo for destruído. Dano direto ao HP pode ativar habilidades como Dreno de Vida."

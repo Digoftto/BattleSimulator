@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Perfurante"
+category = "Habilidade Avançada"
+tier = 5
+trigger_description = "Realização do ataque contra alvo que possua Escudo."
+target_description = "Alvo do ataque."
+effect_description = "Causa dano adicional."
+values_description = "Bônus: +20% de dano"
+notes = ""

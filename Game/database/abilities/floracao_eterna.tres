@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Floração Eterna"
+category = "Habilidade Avançada"
+tier = 5
+trigger_description = "Realização de ação de cura."
+target_description = "Próprio pelotão."
+effect_description = "Os bônus concedidos por Essência Vital tornam-se permanentes durante toda a batalha."
+values_description = ""
+notes = "Versão de Tier V com o mesmo efeito de Florescimento (Tier I). Criada para corrigir a referência quebrada 'Florescimento' (Coração da Floresta)."

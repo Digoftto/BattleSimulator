@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="UnitTraitResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/cards/unit_trait_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+trait_name = "Predadora Paciente"
+base_effect_description = "Caso este pelotão não tenha sofrido dano no turno anterior, recebe +25% do Ataque Base."
+enhanced_effect_description = "Caso não tenha sofrido dano no turno anterior, recebe +40% do Ataque Base."

@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="UnitTraitResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/cards/unit_trait_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+trait_name = "Sacrifício de Carne"
+base_effect_description = "Sempre que este pelotão realizar um ataque básico, o pelotão imediatamente atrás dele perde 10 HP. Esse dano ignora Escudo."
+enhanced_effect_description = "O pelotão atrás perde 5 HP."

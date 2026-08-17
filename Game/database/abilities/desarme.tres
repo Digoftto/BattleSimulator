@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Desarme"
+category = "Habilidade Avançada"
+tier = 5
+trigger_description = "Realização de um ataque (respeitando tempo de recarga)."
+target_description = "Alvo do ataque."
+effect_description = "Reduz temporariamente o atributo Ataque do alvo."
+values_description = "Bônus (Redução de Ataque): 50%\nDuração: 2 turnos\nRecarga: 3 turnos"
+notes = "Redução aplicada antes de outros modificadores. Novas aplicações apenas renovam a duração. Efeito não cumulativo."

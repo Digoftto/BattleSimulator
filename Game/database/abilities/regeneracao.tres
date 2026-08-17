@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Regeneração"
+category = "Característica de Unidade"
+tier = 1
+trigger_description = "Final do próprio turno."
+target_description = "Próprio pelotão."
+effect_description = "Recupera HP, respeitando o HP máximo."
+values_description = "Recuperação: 20 HP"
+notes = "O efeito ocorre independentemente de o pelotão ter atacado. Não recupera Escudo."

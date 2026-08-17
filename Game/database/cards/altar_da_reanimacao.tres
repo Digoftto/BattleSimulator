@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="CardResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/cards/card_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+card_name = "Altar da Reanimação"
+faction = "Mortos-Vivos"
+card_class = "Máquina de Guerra"
+rarity = "Rara"
+tier = 1
+atk = 60
+hp = 80
+esc = 40
+tier_3_ability_name = "Extração de Cristais"
+tier_5_ability_name = "Detonação Ritual"
+recipe_ingredients = Array[String](["Liche Iniciado", "Sacerdote Profano", "Banshee"])

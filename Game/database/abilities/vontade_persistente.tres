@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Vontade Persistente"
+category = "Habilidade Avançada"
+tier = 5
+trigger_description = "Derrota de qualquer pelotão aliado."
+target_description = "Próprio pelotão."
+effect_description = "Recupera HP."
+values_description = "Recuperação: 10 HP"
+notes = "Nome mecânico genérico e reutilizável. Algumas cartas podem se referir a esta Habilidade por um nome narrativo próprio (ex: \"Trono dos Mortos\", no Lich Rei) — o efeito mecânico é sempre este, sem duplicidade de definição."

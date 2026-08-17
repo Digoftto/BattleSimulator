@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="CommanderRestrictionResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/commanders/commander_restriction_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+code = "RS024"
+description = "Deve possuir pelo menos 1 lacaio da classe especificada"
+frequency_label = "Alta"
+domain = "class"
+operator = "required"
+quantity = 1
+scope = "specific"

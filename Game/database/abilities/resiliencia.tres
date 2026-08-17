@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Resiliência"
+category = "Característica de Unidade"
+tier = 1
+trigger_description = "Recebimento de dano de qualquer fonte."
+target_description = "Próprio pelotão."
+effect_description = "Reduz o dano recebido."
+values_description = "Bônus: 15% de redução de dano"
+notes = "A redução é aplicada antes da subtração do Escudo ou HP."

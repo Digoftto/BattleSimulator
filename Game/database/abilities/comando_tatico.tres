@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Comando Tático"
+category = "Habilidade Avançada"
+tier = 5
+trigger_description = "Avanço de aliado para a Posição 5 enquanto este pelotão permanece vivo."
+target_description = "Pelotões aliados."
+effect_description = "Pelotões alvos não perdem sua ação no turno em que avançam para a Posição 5."
+values_description = ""
+notes = "Múltiplos pelotões com Comando Tático não acumulam efeitos."

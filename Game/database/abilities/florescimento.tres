@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Florescimento"
+category = "Característica de Unidade"
+tier = 1
+trigger_description = "Realização de ação de cura."
+target_description = "Próprio pelotão."
+effect_description = "Os bônus concedidos por Essência Vital tornam-se permanentes durante toda a batalha."
+values_description = ""
+notes = "O efeito é cumulativo. Cada evento de cura concede apenas uma aplicação."

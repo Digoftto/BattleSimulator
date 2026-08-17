@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="CardResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/cards/card_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+card_name = "Lich Rei"
+faction = "Mortos-Vivos"
+card_class = "Mago"
+rarity = "Lendária"
+tier = 1
+atk = 130
+hp = 120
+esc = 0
+tier_1_trait_name = "Domínio da Morte"
+tier_2_atk_increment = 8
+tier_3_ability_name = "Treinamento de Comandantes"
+tier_4_hp_increment = 10
+tier_5_ability_name = "Vontade Persistente"
+recipe_ingredients = Array[String](["Liche Iniciado", "Altar da Reanimação", "Ceifador Cadavérico"])

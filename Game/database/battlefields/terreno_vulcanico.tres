@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="BattlefieldResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/battlefields/battlefield_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+battlefield_name = "Terreno Vulcânico"
+category = "Místico"
+description = "Um solo instável e quente, infundido com energia elemental do fogo que intensifica a violência e dificulta a cura."
+effect = "Todo dano causado recebe 25% de aumento. Toda cura recebe 50% de redução."
+frequency_percent = 4.0

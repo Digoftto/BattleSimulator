@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Cura"
+category = "Característica de Unidade"
+tier = 1
+trigger_description = "Este pelotão executa a Cura Estrutural da Classe Suporte (ver COMBAT_RULES.md, seção 4.2.3)."
+target_description = "O mesmo aliado alvo da Cura Estrutural (aliado do próprio Exército com maior quantidade de HP perdido)."
+effect_description = "Modificador da Carta sobre a Cura Estrutural (Hierarquia Oficial de Modificadores de Cura, COMBAT_RULES.md 4.2.3, nível 2). Não cria uma nova cura — soma-se ao valor base de 20 HP."
+values_description = "Bônus (adicional à Cura Estrutural): +20 HP"
+notes = "O total curado por este pelotão passa a ser 40 HP (20 HP da Regra Estrutural da Classe + 20 HP deste modificador). Afeta apenas aliados do próprio Exército. A própria unidade pode ser alvo. Se nenhum aliado estiver ferido, não produz efeito."

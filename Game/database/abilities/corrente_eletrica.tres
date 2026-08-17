@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Corrente Elétrica"
+category = "Habilidade Avançada"
+tier = 5
+trigger_description = "Realização de um ataque."
+target_description = "Alvo principal e unidades inimigas atrás dele na mesma coluna."
+effect_description = "Alvo principal recebe ataque normal. Descarga propaga-se pela coluna atingindo unidades atrás com dano reduzido progressivamente."
+values_description = "Dano (Primeiro alvo): 100% do Ataque\nDano (Segundo alvo): 50% do Ataque\nDano (Terceiro alvo): 25% do Ataque"
+notes = "Apenas alvo principal ativa habilidades ofensivas secundárias; secundários recebem apenas dano elétrico."

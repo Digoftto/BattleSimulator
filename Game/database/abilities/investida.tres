@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Investida"
+category = "Habilidade Avançada"
+tier = 5
+trigger_description = "Primeiro ataque realizado após entrar na Linha 1."
+target_description = "Alvo do ataque."
+effect_description = "Concede bônus massivo de Ataque."
+values_description = "Bônus (Primeiro ataque): +200% de Ataque"
+notes = "Ativada uma vez por batalha. Se entrar na Linha 1 e não atacar no turno, a habilidade permanece disponível até o primeiro ataque."

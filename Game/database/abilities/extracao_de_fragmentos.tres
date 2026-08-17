@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Extração de Fragmentos"
+category = "Habilidade de Campanha"
+tier = 3
+trigger_description = "Sinergia ativa."
+target_description = "A produção de Fragmentos do referido exército alocado."
+effect_description = "Aumenta a produção de Fragmentos."
+values_description = "Bônus (Sinergia): +15%"
+notes = "O bônus incide apenas sobre os Fragmentos produzidos pelo Exército que está alocado. Não afeta recompensas de eventos, chefes ou missões."

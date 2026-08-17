@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Casca Resiliente"
+category = "Habilidade Avançada"
+tier = 5
+trigger_description = "Recebimento de dano de qualquer fonte."
+target_description = "Próprio pelotão."
+effect_description = "Reduz o dano recebido."
+values_description = "Bônus: 15% de redução de dano"
+notes = "Versão de Tier V com os mesmos valores de Resiliência (Tier I). Criada para corrigir a referência quebrada 'ResiliênciaS' (Carvalho Milenar)."

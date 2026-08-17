@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="UnitTraitResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/cards/unit_trait_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+trait_name = "Colheita de Almas"
+base_effect_description = "Sempre que qualquer pelotão, aliado ou inimigo, for derrotado durante a batalha, este pelotão recupera 5 HP e recebe +4% do Ataque Base permanentemente durante a batalha."
+enhanced_effect_description = "Recupera 10 HP e recebe +6% do Ataque Base."

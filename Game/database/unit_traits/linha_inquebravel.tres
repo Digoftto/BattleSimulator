@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="UnitTraitResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/cards/unit_trait_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+trait_name = "Linha Inquebrável"
+base_effect_description = "Enquanto este pelotão possuir Escudo, mantém o Agrupamento obtido no turno anterior."
+enhanced_effect_description = "Enquanto este pelotão possuir Escudo, mantém o Agrupamento obtido nos 2 turnos anteriores."

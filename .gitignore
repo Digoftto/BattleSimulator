@@ -22,3 +22,12 @@ Desktop.ini
 build/
 dist/
 exports/
+
+# Godot generated import files
+*.import
+
+# Godot local user data
+Game/user/
+
+# Godot project-local generated data
+Game/.godot/

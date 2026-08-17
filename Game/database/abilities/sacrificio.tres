@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Sacrifício"
+category = "Característica de Unidade"
+tier = 1
+trigger_description = "Derrota do pelotão."
+target_description = "Todas as unidades aliadas vivas do mesmo Exército."
+effect_description = "Concede bônus temporário de Ataque."
+values_description = "Bônus: +20% de Ataque\nDuração: 2 turnos"
+notes = "Efeitos de múltiplas unidades com Sacrifício no mesmo turno não acumulam; considera-se a maior duração."

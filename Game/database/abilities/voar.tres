@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Voar"
+category = "Característica de Unidade"
+tier = 1
+trigger_description = "Pelotão posicionado nas posições 2 a 9."
+target_description = "Próprio pelotão."
+effect_description = "Torna o pelotão imune a alvos de ataques Corpo a Corpo."
+values_description = ""
+notes = "Continua vulnerável a À Distância, Mago e dano por habilidades sem alvo direto (ex: Explosão). Ao alcançar a Posição 1, perde a proteção."

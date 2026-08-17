@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="UnitTraitResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/cards/unit_trait_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+trait_name = "Legião Infindável"
+base_effect_description = "Quando este pelotão for derrotado, evoca um Arqueiro Esquelético Reanimado na primeira posição disponível após o último pelotão do Exército, seguindo a ordem natural das posições."
+enhanced_effect_description = "Evoca 2 Arqueiros Esqueléticos Reanimados."

@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Tiro de Flanco"
+category = "Habilidade Avançada"
+tier = 5
+trigger_description = "Realização de ataque após ter mudado de linha no turno anterior."
+target_description = "Próprio pelotão."
+effect_description = "Recebe bônus de Ataque Base durante este ataque."
+values_description = "Bônus: +40% do Ataque Base"
+notes = ""

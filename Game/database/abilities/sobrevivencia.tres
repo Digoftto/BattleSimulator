@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Sobrevivência"
+category = "Habilidade Avançada"
+tier = 5
+trigger_description = "Recebimento de dano letal pela primeira vez na batalha."
+target_description = "Próprio pelotão."
+effect_description = "Anula a morte e define o HP atual para 1."
+values_description = "Ativação: 1 vez por batalha\nHP restante: 1 HP"
+notes = "Habilidade consome-se após o uso. Não recupera Escudo."

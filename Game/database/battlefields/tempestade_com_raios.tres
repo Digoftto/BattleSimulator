@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="BattlefieldResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/battlefields/battlefield_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+battlefield_name = "Tempestade com Raios"
+category = "Climático"
+description = "Uma tempestade violenta com relâmpagos constantes, forçando as tropas a se concentrarem na linha de frente para evitar os raios."
+effect = "Apenas unidades posicionadas nas casas 1, 2 e 3 podem atacar, se forem aptas a atacar dessas posições."
+frequency_percent = 4.0

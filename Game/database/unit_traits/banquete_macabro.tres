@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="UnitTraitResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/cards/unit_trait_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+trait_name = "Banquete Macabro"
+base_effect_description = "Sempre que um pelotão aliado posicionado atrás deste pelotão, seguindo a ordem natural das posições do Exército, for derrotado, este pelotão recupera 40 HP e recebe +10% do Ataque Base permanentemente durante a batalha."
+enhanced_effect_description = "Recupera 60 HP e recebe +15% do Ataque Base."

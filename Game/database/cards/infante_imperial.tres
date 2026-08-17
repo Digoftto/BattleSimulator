@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="CardResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/cards/card_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+card_name = "Infante Imperial"
+faction = "Império"
+card_class = "Corpo a Corpo"
+rarity = "Comum"
+tier = 1
+atk = 110
+hp = 115
+esc = 85
+tier_2_hp_increment = 6
+tier_3_ability_name = "Treinamento Defensivo"
+tier_4_atk_increment = 8
+tier_5_ability_name = "Provocar"

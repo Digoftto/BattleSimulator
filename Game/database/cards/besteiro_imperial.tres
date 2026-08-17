@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="CardResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/cards/card_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+card_name = "Besteiro Imperial"
+faction = "Império"
+card_class = "À Distância"
+rarity = "Rara"
+tier = 1
+atk = 170
+hp = 65
+esc = 35
+tier_1_trait_name = "Posição Preparada"
+tier_2_atk_increment = 6
+tier_3_ability_name = "Expansão do Acampamento"
+tier_4_atk_increment = 8
+tier_5_ability_name = "Tiro de Flanco"
+recipe_ingredients = Array[String](["Arqueiro Imperial", "Legionário Imperial", "Infante Imperial"])

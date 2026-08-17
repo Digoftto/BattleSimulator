@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="UnitTraitResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/cards/unit_trait_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+trait_name = "Domínio da Morte"
+base_effect_description = "Sempre que um pelotão aliado for derrotado, todos os pelotões aliados sobreviventes recebem +5% do Ataque Base, permanentemente durante a batalha."
+enhanced_effect_description = "Sempre que um pelotão aliado for derrotado, todos os pelotões aliados sobreviventes recebem +8% do Ataque Base permanentemente durante a batalha."

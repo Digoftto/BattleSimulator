@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="CardResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/cards/card_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+card_name = "Porco-Espinho Ancestral"
+faction = "Natureza"
+card_class = "À Distância"
+rarity = "Comum"
+tier = 1
+atk = 105
+hp = 115
+esc = 30
+tier_1_trait_name = "Instinto de Matilha"
+tier_2_atk_increment = 6
+tier_3_ability_name = "Treinamento Ofensivo"
+tier_4_atk_increment = 8
+tier_5_ability_name = "Precisão"

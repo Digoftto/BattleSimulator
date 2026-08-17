@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/abilities/ability_resource.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ability_name = "Concentração"
+category = "Habilidade Avançada"
+tier = 5
+trigger_description = "Permanência passiva em combate sem ter sofrido dano desde o início da batalha."
+target_description = "Próprio pelotão."
+effect_description = "Recebe bônus de Ataque Base."
+values_description = "Bônus: +15% do Ataque Base"
+notes = "O bônus é perdido imediatamente após o pelotão sofrer dano pela primeira vez."
