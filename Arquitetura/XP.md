@@ -210,7 +210,7 @@ O XP e nível da Conta possuem função social, cosmética e geram capacidade es
 
 $$\text{Sempre: } 200 \text{ XP} \longrightarrow 1 \text{ Nível de Conta} \longrightarrow 1 \text{ Ponto de Geração}$$
 
-Os **Pontos de Geração** são recursos destinados à infraestrutura do Reino e são utilizados exclusivamente para evoluir Minas (`MINES.md`) e Depósitos (`DEPOSITS.md`).
+Os **Pontos de Geração (PG)** são um recurso global de infraestrutura do Reino. Sua definição completa (o que representam, escopo e lista de sistemas que os consomem) pertence a `GENERATION_POINTS.md`, que é a SSoT do recurso — este documento define apenas a fonte (XP de Conta → PG).
 
 ---
 
@@ -234,4 +234,4 @@ Os **Pontos de Geração** são recursos destinados à infraestrutura do Reino e
 * **MATCHMAKING.md:** Regras formais e critérios de pareamento de partidas.
 * **PvE.md:** Estrutura de Campanhas, Fases, Chefes e Chefes Regionais.
 * **CARD_PROGRESSION.md:** Regras formais do sistema de Tier de cartas.
-* **MINES.md & DEPOSITS.md:** Aplicação dos Pontos de Geração e evolução de infraestrutura.
+* **GENERATION_POINTS.md:** SSoT dos Pontos de Geração (PG) — definição, escopo global e sistemas consumidores.

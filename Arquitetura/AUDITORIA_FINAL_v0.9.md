@@ -105,6 +105,14 @@ B. PG é um recurso global de infraestrutura utilizado também para ativação a
 
 Não deve ser resolvida pelo agente.
 
+### Resolução (registro posterior a esta auditoria)
+
+**CONFLITO RESOLVIDO — FECHADO.**
+
+O dono do projeto decidiu definitivamente pela interpretação B: PG é um recurso global de infraestrutura, não exclusivo de Minas/Depósitos, e se estende também a Centro de Comando e Academia (esta última identificada como um quarto consumidor de PG — via "PdG" em `ACADEMY.md` — não contemplado nesta auditoria original).
+
+A definição canônica completa do recurso passou a viver em `GENERATION_POINTS.md`, a nova SSoT de PG. "Prestígio Global" (`COMMAND_CENTER_PROGRESS.md`) e "PdG" (`ACADEMY.md`) foram corrigidos para "Pontos de Geração (PG)" nos documentos onde apareciam. Este registro histórico é preservado sem alteração acima; apenas esta nota de resolução foi adicionada.
+
 ---
 
 # 5. FORMULAS / BALANCING

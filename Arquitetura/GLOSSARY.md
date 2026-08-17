@@ -177,9 +177,9 @@ Recurso administrativo destinado à gestão e expansão militar.
 
 ### Pontos de Geração (PG)
 
-Recurso de infraestrutura concedido pelo avanço do Reino para expansão territorial e de armazenamento.
+Recurso global de infraestrutura do Reino, gerado pelo avanço de Nível de Conta (XP → PG). Não é exclusivo de nenhum sistema — atualmente aplica-se a Minas, Depósitos, Centro de Comando e Academia, podendo receber novas aplicações no futuro.
 
-* Ver: `MINES.md`, `DEPOSITS.md`
+* Ver: `GENERATION_POINTS.md`
 
 ### Coeficiente Econômico Global (CEG)
 

@@ -140,6 +140,30 @@ $$\text{Custo em PG}(n) = \left\lceil \frac{n}{4} \right\rceil$$
 | Atingir níveis 13 a 16 | $4\text{ PG}$ |
 | Atingir níveis 17 a 20 | $5\text{ PG}$ |
 
+---
+
+## Centro de Comando — Expansão Administrativa (Custo em PG)
+
+*Centralizado aqui a partir de `COMMAND_CENTER_PROGRESS.md` ("Aplicação de Custos em PG"), sem alteração de valores.*
+
+O custo em Pontos de Geração (PG) para ativar 1 unidade de Recurso Administrativo (Cargo de Comando Ativo ou Vaga da Reserva — mesmo custo para os dois) via Expansão Administrativa depende da faixa de nível atual do Centro de Comando (CdC), em blocos de 10 níveis.
+
+Fórmula oficial do custo por unidade de Recurso Administrativo ativada, para o nível atual do CdC $n$:
+
+$$\text{Custo em PG}(n) = 1 + \left\lfloor \frac{n - 1}{10} \right\rfloor$$
+
+### Tabela de Progressão do Custo de Ativação
+
+| Faixa do CdC (Nível) | PG por Unidade de Recurso (Cargo/Vaga) |
+| --- | --- |
+| 1 – 10 | 1 |
+| 11 – 20 | 2 |
+| 21 – 30 | 3 |
+| 31 – 40 | 4 |
+| 41 – 50 | 5 |
+
+A progressão de custo continua seguindo este padrão (+1 PG a cada 10 níveis).
+
 # Progressão da Conta
 
 Definições matemáticas da evolução permanente do jogador.

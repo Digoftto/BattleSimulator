@@ -342,7 +342,7 @@ Enquanto uma tarefa ainda não iniciou sua execução, é possível alterar sua 
 
 ### Melhorias das Filas
 
-As melhorias das filas são permanentes e adquiridas individualmente para cada Mestre utilizando PdG. Cada Mestre possui sua própria fila e sua própria progressão de melhorias. As melhorias de um Mestre nunca afetam outro Mestre, mesmo sendo do mesmo tipo.
+As melhorias das filas são permanentes e adquiridas individualmente para cada Mestre utilizando Pontos de Geração (PG) — o mesmo recurso global de infraestrutura do Reino usado por Minas, Depósitos e Centro de Comando (ver `GENERATION_POINTS.md`). Cada Mestre possui sua própria fila e sua própria progressão de melhorias. As melhorias de um Mestre nunca afetam outro Mestre, mesmo sendo do mesmo tipo.
 
 Fila inicial para todos os Mestres: 1 tarefa.
 
@@ -350,16 +350,16 @@ Fila inicial para todos os Mestres: 1 tarefa.
 
 Melhorias de Capacidade:
 
-* Capacidade 2 → 2 PdG
-* Capacidade 3 → 4 PdG
-* Capacidade 4 → 8 PdG
-* Capacidade 5 → 16 PdG
-* Capacidade 6 → 32 PdG
+* Capacidade 2 → 2 PG
+* Capacidade 3 → 4 PG
+* Capacidade 4 → 8 PG
+* Capacidade 5 → 16 PG
+* Capacidade 6 → 32 PG
 
 #### Filas dos Metamorfos
 
 Melhorias de Capacidade:
 
-* Capacidade 2 → 2 PdG
-* Capacidade 3 → 8 PdG
-* Capacidade 4 → 32 PdG
+* Capacidade 2 → 2 PG
+* Capacidade 3 → 8 PG
+* Capacidade 4 → 32 PG

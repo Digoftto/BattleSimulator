@@ -57,35 +57,27 @@ Depósito correspondente:
 
 ---
 
-# Fundição
+# O Depósito
 
-Responsável pelo armazenamento de Ferro Negro.
+O Depósito é **um único sistema de armazenamento**, não três construções independentes. Ele possui um único nível (`deposito_level`) e uma única progressão de evolução, pagas exclusivamente em Pontos de Geração (PG) — ver `GENERATION_POINTS.md` e `FORMULAS.md`.
 
-Sua evolução utiliza exclusivamente **Pontos de Geração** (ver FORMULAS.md).
+**Cada evolução do Depósito aumenta simultaneamente a capacidade de armazenamento dos três recursos.** Não existe evolução parcial nem custo isolado por recurso.
 
----
+Internamente, o Depósito é dividido em três áreas temáticas de armazenamento, cada uma associada a um Recurso de Construção:
 
-# Câmara Arcana
+* **Fundição** — armazena Ferro Negro.
+* **Câmara Arcana** — armazena Cristais Arcanos.
+* **Santuário Vital** — armazena Essência Vital.
 
-Responsável pelo armazenamento de Cristais Arcanos.
-
-Sua evolução utiliza exclusivamente **Pontos de Geração** (ver FORMULAS.md).
-
----
-
-# Santuário Vital
-
-Responsável pelo armazenamento de Essência Vital.
-
-Sua evolução utiliza exclusivamente **Pontos de Geração** (ver FORMULAS.md).
+Essas áreas são identidade visual/temática (ver `Fundation/Depósitos.md`), não construções separadas com níveis ou custos próprios.
 
 ---
 
 # Filosofia dos Depósitos
 
-Os três depósitos evoluem exclusivamente através de Pontos de Geração, que representam um recurso estratégico global da Cidade. Nenhum depósito consome Ferro Negro, Cristais Arcanos ou Essência Vital para evoluir.
+O Depósito evolui exclusivamente através de Pontos de Geração (PG), que representam um recurso estratégico global do Reino (ver `GENERATION_POINTS.md`). Ele nunca consome Ferro Negro, Cristais Arcanos ou Essência Vital para evoluir.
 
-Dessa forma, elimina-se a interdependência cruzada entre os armazenamentos. Os depósitos competem entre si e com as demais construções da Cidade apenas pelo orçamento disponível de Pontos de Geração.
+Dessa forma, elimina-se a interdependência cruzada entre os armazenamentos: evoluir o Depósito nunca depende de acumular os próprios recursos que ele guarda. Como sistema único, o Depósito compete com as demais construções da Cidade (Centro de Comando, Academia) apenas pelo orçamento disponível de PG — não compete internamente consigo mesmo, pois não há níveis independentes por recurso.
 
 ---
 
@@ -106,13 +98,13 @@ A Reserva Antecipada de Evolução é o mecanismo complementar a essa filosofia:
 
 # Progressão
 
-Todos os depósitos possuem:
+O Depósito possui:
 
-* níveis;
-* custos de evolução (em Pontos de Geração);
-* limite de armazenamento.
+* um único nível;
+* um único custo de evolução por nível (em Pontos de Geração — PG);
+* um único limite de armazenamento, aplicado simultaneamente aos três Recursos de Construção.
 
-Nenhum depósito pode ultrapassar o nível da Capital.
+O Depósito nunca pode ultrapassar o nível da Capital.
 
 ---
 
@@ -136,31 +128,11 @@ A partir do nível 4 (quando as minas básicas já atingiram seu teto e a econom
 
 Os custos oficiais de evolução encontram-se centralizados em `FORMULAS.md`.
 
-## Fundição
+## Armazenamento por Nível
 
-| Nível | Armazenamento |
-| --- | --- |
-| 1 | 24 |
-| 2 | 48 |
-| 3 | 96 |
-| 4+ | ? |
+A tabela abaixo é única para o Depósito — o valor de Armazenamento aplica-se simultaneamente aos três recursos (Ferro Negro, Cristais Arcanos, Essência Vital).
 
----
-
-## Câmara Arcana
-
-| Nível | Armazenamento |
-| --- | --- |
-| 1 | 24 |
-| 2 | 48 |
-| 3 | 96 |
-| 4+ | ? |
-
----
-
-## Santuário Vital
-
-| Nível | Armazenamento |
+| Nível | Armazenamento (cada um dos 3 recursos) |
 | --- | --- |
 | 1 | 24 |
 | 2 | 48 |
@@ -173,6 +145,8 @@ Os custos oficiais de evolução encontram-se centralizados em `FORMULAS.md`.
 
 Os valores numéricos poderão ser alterados para fins de balanceamento.
 
-A evolução dos três depósitos ocorre exclusivamente através de Pontos de Geração (ver FORMULAS.md) e nenhum deles consome Ferro Negro, Cristais Arcanos ou Essência Vital.
+A evolução do Depósito ocorre exclusivamente através de Pontos de Geração (ver `GENERATION_POINTS.md` e `FORMULAS.md`) e nunca consome Ferro Negro, Cristais Arcanos ou Essência Vital.
+
+Cada evolução do Depósito aumenta simultaneamente a capacidade de armazenamento dos três recursos — não existe evolução ou custo isolado por recurso.
 
 A Reserva Antecipada de Evolução nunca ultrapassa o exigido pela construção de destino, nunca retorna ao Depósito de origem, e nunca permite evolução com Recursos incompletos.

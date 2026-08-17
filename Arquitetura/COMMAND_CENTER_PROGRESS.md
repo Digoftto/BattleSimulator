@@ -16,12 +16,12 @@ A evolução do Centro de Comando representa exclusivamente a expansão administ
 
 O Centro de Comando nunca fortalece diretamente os comandantes; seu papel é ampliar a infraestrutura necessária para administrar o contingente militar do Reino ao longo do tempo.
 
-A expansão do Centro de Comando amplia continuamente a Capacidade Administrativa do Reino, mas nunca obriga o jogador a utilizar imediatamente essa capacidade. A decisão de transformar Infraestrutura Administrativa em Recursos Administrativos pertence exclusivamente ao jogador através do investimento de Prestígio Global (PG).
+A expansão do Centro de Comando amplia continuamente a Capacidade Administrativa do Reino, mas nunca obriga o jogador a utilizar imediatamente essa capacidade. A decisão de transformar Infraestrutura Administrativa em Recursos Administrativos pertence exclusivamente ao jogador através do investimento de Pontos de Geração (PG).
 
 O crescimento ocorre através de dois sistemas complementares:
 
 * **Progressão Vertical:** Expansão do nível do edifício e criação de Infraestrutura Administrativa.
-* **Expansão Administrativa:** Ativação operacional de Recursos Administrativos utilizando Prestígio Global (PG).
+* **Expansão Administrativa:** Ativação operacional de Recursos Administrativos utilizando Pontos de Geração (PG).
 
 ---
 
@@ -113,7 +113,7 @@ A Expansão Administrativa é a única responsável por transformar Infraestrutu
 
 Características:
 
-* Consome Prestígio Global (PG).
+* Consome Pontos de Geração (PG).
 * Ativa Cargos de Comando Ativo e Vagas da Reserva individualmente dentro da Infraestrutura Administrativa do nível atual.
 
 Recursos Administrativos que ainda não foram ativados (permanecendo apenas como Infraestrutura Administrativa) permanecem indisponíveis para utilização pelos demais sistemas do jogo.
@@ -150,17 +150,7 @@ A tabela abaixo define a distribuição oficial da **Infraestrutura Administrati
 
 # Aplicação de Custos em PG
 
-Tabela referencial de custos em PG para ativação de Recursos Administrativos via Expansão Administrativa. O custo é determinado pela faixa de nível atual do CdC.
-
-| Faixa do CdC (Nível) | PG por Unidade de Recurso (Cargo/Vaga) |
-| --- | --- |
-| 1 – 10 | 1 |
-| 11 – 20 | 2 |
-| 21 – 30 | 3 |
-| 31 – 40 | 4 |
-| 41 – 50 | 5 |
-
-A progressão de custo continua seguindo este padrão (+1 PG a cada 10 níveis). A fórmula matemática oficial encontra-se em `FORMULAS.md`.
+O custo em PG para ativação de Recursos Administrativos (Cargo Ativo ou Vaga da Reserva) via Expansão Administrativa é determinado pela faixa de nível atual do CdC. A fórmula oficial e a tabela de referência estão centralizadas em `FORMULAS.md` ("Custo em PG do Centro de Comando") — este documento apenas aplica esse custo à Expansão Administrativa, nunca o redefine.
 
 ---
 
@@ -181,7 +171,7 @@ Essa é a única exceção à regra geral ("toda Infraestrutura Administrativa p
 * Toda Infraestrutura Administrativa precisa ser ativada via Expansão Administrativa, tornando-se Recursos Administrativos, antes de ser utilizada para alocar um comandante — exceto a Exceção Inicial descrita acima.
 * A Progressão Vertical nunca recruta ou cria comandantes.
 * A Expansão Administrativa nunca recruta ou cria comandantes.
-* Prestígio Global (PG) nunca é utilizado para evoluir o nível vertical (edifício).
+* Pontos de Geração (PG) nunca é utilizado para evoluir o nível vertical (edifício).
 * Recursos base (Ouro, Madeira, etc.) nunca são utilizados para ativar Recursos Administrativos na Expansão Administrativa.
 
 ---
@@ -195,7 +185,7 @@ Este documento define:
 * Expansão Administrativa.
 * Conceitos de Recursos Administrativos (Cargos de Comando Ativo e Vagas da Reserva).
 * Distribuição oficial de Infraestrutura Administrativa por nível.
-* Aplicação dos custos em Prestígio Global (PG).
+* Aplicação dos custos em Pontos de Geração (PG).
 
 Este documento **não** define:
 

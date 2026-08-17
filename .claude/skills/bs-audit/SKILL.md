@@ -23,11 +23,14 @@ Use this skill before or after any non-trivial rule or architecture change.
 
 ## Known unresolved items
 
-- Scope/ownership of PG across Mines, Deposits, Command Center and related systems must follow the final canonical decision.
 - `Treinamento Arcano` is unresolved because its historical definition is missing.
 - Construction balance parameters may be intentionally pending; do not invent `b`/`x`.
 - Academy time-reduction wording must follow the final canonical curve, not an invented literal interpretation.
 - Missing historical documents must be recovered before reconstructing old mechanics.
+
+## Resolved decisions
+
+- PG (Pontos de Geração) is one shared global infrastructure resource, not exclusive to any system. SSoT: `Arquitetura/GENERATION_POINTS.md`. "Prestígio Global" and "PdG" are not alternative resources.
 
 ## Classification
 
