@@ -28,9 +28,11 @@ import re
 import glob
 import os
 import sys
+from pathlib import Path
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CARD_CATALOG_PATH = "/mnt/project/CARD_CATALOG.md"  # ajustar se a SSOT mudar de local
+REPO_ROOT = Path(PROJECT_ROOT).parent
+CARD_CATALOG_PATH = REPO_ROOT / "Arquitetura" / "CARD_CATALOG.md"
 CARDS_GLOB = os.path.join(PROJECT_ROOT, "database", "cards", "*.tres")
 
 
@@ -85,6 +87,13 @@ def get_field(text: str, field: str) -> str:
 
 
 def main() -> int:
+    if not CARD_CATALOG_PATH.is_file():
+        raise FileNotFoundError(
+            f"CARD_CATALOG.md não encontrado em '{CARD_CATALOG_PATH}'. "
+            "Verifique se o repositório contém 'Arquitetura/CARD_CATALOG.md' "
+            "na raiz, ao lado da pasta 'Game'."
+        )
+
     with open(CARD_CATALOG_PATH, encoding="utf-8") as f:
         canonical = extract_canonical_tier3(f.read())
 
