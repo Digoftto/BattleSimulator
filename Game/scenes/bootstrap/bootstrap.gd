@@ -117,13 +117,20 @@ func _ready() -> void:
 	await _validate_exercitos_panel()
 	await _validate_real_button_clicks_no_crash()
 	_validate_initial_mine_no_conquest()
-	# DESLIGADO TEMPORARIAMENTE (2026): testa o comportamento
-	# assíncrono do cálculo de Eficiência (WorkerThreadPool), que foi
-	# temporariamente substituído por uma versão síncrona em
-	# minas_panel.gd até o bug de threading ser corrigido de verdade
-	# (ver conversa registrada). Reativar junto com a reversão em
-	# minas_panel.gd/game_runtime.gd.
-	# _validate_mining_incremental_estimation()
+	# F-003: testa o comportamento assíncrono real do cálculo de
+	# Eficiência (WorkerThreadPool) — 5 blocos, batalhas únicas e
+	# válidas. Demorado (~4 minutos: simula um bloco real de 3.628
+	# batalhas duas vezes, além de duas varreduras exaustivas de
+	# 362.880 permutações para os testes de exclusão/esgotamento) —
+	# opt-in via linha de comando (ver _should_run_mining_estimation_test()),
+	# pra não pesar toda execução de bootstrap.tscn quando a mudança
+	# sendo validada não tem nada a ver com Minas. Continua totalmente
+	# intacta e com as mesmas asserções — só a invocação é opcional
+	# (ver relatório final F-003, "heavy regression test placement").
+	if _should_run_mining_estimation_test():
+		_validate_mining_incremental_estimation()
+	else:
+		print("[Bootstrap] _validate_mining_incremental_estimation() PULADA (opt-in, ~4min) — rode com `-- --mining-estimation` pra incluí-la.")
 	_validate_mine_activation_and_time_sync()
 	_validate_army_editor_cancel()
 	await _validate_pve_use_existing_army()
@@ -5102,52 +5109,232 @@ func _validate_initial_mine_no_conquest() -> void:
 ## de verdade (WorkerThreadPool), confirma que não trava, não perde
 ## nem duplica permutações, e o resultado bate certinho.
 ##
-## Validação FUNCIONAL da Estimativa Incremental de Eficiência
-## completa (MINES.md, "Cálculo Incremental por Amostragem"): ordem
-## embaralhada sem repetição, matemática de blocos correta, o fluxo
-## real do botão (assíncrono, nunca trava), avanço em segundo plano
-## via GameRuntime.sync(), e persistência real (save/load).
+## True se o teste pesado de Estimativa Incremental de Eficiência
+## (F-003, ~4 minutos) deve rodar nesta execução — opt-in via
+## argumento de linha de comando, pra não pesar toda execução normal
+## de bootstrap.tscn com um teste específico de Minas. Usa
+## OS.get_cmdline_user_args() (argumentos depois de "--", o canal
+## reservado do Godot para argumentos do próprio jogo/script — nunca
+## interpretado pelo motor) — nenhuma outra checagem de ambiente é
+## necessária. Exemplo de uso:
+## godot --headless --path Game res://scenes/bootstrap/bootstrap.tscn -- --mining-estimation
+func _should_run_mining_estimation_test() -> bool:
+	return OS.get_cmdline_user_args().has("--mining-estimation")
+
+
+## Validação FUNCIONAL da Estimativa Incremental de Eficiência final
+## (MINES.md, "Cálculo Incremental por Amostragem", F-003): distribuição
+## exata dos 5 blocos somando 18.144, unicidade de FORMAÇÃO EFETIVA
+## (nunca de permutação bruta — colapso da Máquina de Guerra), exclusão
+## de Suporte-na-Posição-5 antes de contar/registrar, esgotamento do
+## universo bruto, reaproveitamento de Eficiência por assinatura da
+## Guarnição, correção do crédito de produção com Eficiência
+## desconhecida, o fluxo real do botão (assíncrono, nunca trava),
+## avanço em segundo plano via GameRuntime.sync() sem tarefas
+## pendentes órfãs, e persistência real (save/load). Opt-in — ver
+## _should_run_mining_estimation_test(); continua totalmente intacta
+## e chamável explicitamente a qualquer momento (diretamente, ou via
+## bootstrap.tscn com `-- --mining-estimation`).
 func _validate_mining_incremental_estimation() -> void:
-	print("[Minas] Validando a Estimativa Incremental completa (blocos, assíncrono, persistência)...")
+	print("[Minas] Validando a Estimativa Incremental final (5 blocos, batalhas únicas e válidas, F-003)...")
+
+	# --- Distribuição exata dos 5 blocos, somando exatamente 18.144 ---
+	var block_targets: Array[int] = []
+	var block_sum: int = 0
+	for i in range(MiningCycleResolver.HIGH_CONFIDENCE_BLOCKS):
+		var target: int = MiningCycleResolver._block_target(i)
+		block_targets.append(target)
+		block_sum += target
+	print("  Distribuição exata dos 5 blocos: %s (esperado: [3628, 3629, 3629, 3629, 3629]) | Soma: %d (esperado: 18144)" % [
+		str(block_targets), block_sum
+	])
 
 	var mina := Mina.new(700, "Império")
 	MiningCycleResolver.start_estimation(mina, 42)
-
 	var unique_indices: Dictionary = {}
 	for index: int in mina.efficiency_permutation_order:
 		unique_indices[index] = true
-	print("  Ordem embaralhada tem as 362.880 permutações, cada uma exatamente uma vez? %s (%d únicas, esperado: true, 362880)" % [
-		str(unique_indices.size() == MiningCycleResolver.TOTAL_PERMUTATIONS), unique_indices.size()
+	print("  Ordem embaralhada tem as 362.880 permutações brutas, cada uma exatamente uma vez? %s (%d únicas, esperado: true, 362880) | Cursor começa em 0? %s" % [
+		str(unique_indices.size() == MiningCycleResolver.TOTAL_PERMUTATIONS), unique_indices.size(), str(mina.efficiency_permutation_cursor == 0)
 	])
 
-	var reference_cards: Array[CardResource] = CampaignTestFixtures.build_campaign_enemy_army().cards
-	mina.reference_cards = reference_cards
-	var block_0: Array = MiningCycleResolver._block_permutations(mina, 0)
-	var block_99: Array = MiningCycleResolver._block_permutations(mina, 99)
-	var total_covered: int = 0
-	for i in range(MiningCycleResolver.TOTAL_BLOCKS):
-		total_covered += MiningCycleResolver._block_permutations(mina, i).size()
-	print("  Bloco 0 tem ~3.629 permutações? %s (%d) | Todos os 100 blocos juntos cobrem as 362.880, sem sobrar nem faltar? %s (%d, esperado: true, true, 362880)" % [
-		str(block_0.size() > 3600), block_0.size(), str(total_covered == MiningCycleResolver.TOTAL_PERMUTATIONS), total_covered
+	# --- Colapso da Máquina de Guerra: duas permutações BRUTAS
+	# diferentes (Máquina de Guerra em posições diferentes), mesma
+	# ordem relativa das demais 8 cartas -> mesma chave EFETIVA ---
+	var mdg_reference_cards: Array[CardResource] = [
+		_build_combat_card("MdG-Ref", "Máquina de Guerra", 100, 100, 20),
+		_build_combat_card("Ref-CQC-1", "Corpo a Corpo", 100, 100, 20),
+		_build_combat_card("Ref-CQC-2", "Corpo a Corpo", 100, 100, 20),
+		_build_combat_card("Ref-CQC-3", "Corpo a Corpo", 100, 100, 20),
+		_build_combat_card("Ref-Distancia-1", "À Distância", 80, 70, 10),
+		_build_combat_card("Ref-Distancia-2", "À Distância", 80, 70, 10),
+		_build_combat_card("Ref-Barreira", "Barreira", 50, 120, 60),
+		_build_combat_card("Ref-Mago", "Mago", 90, 60, 0),
+		_build_combat_card("Ref-Suporte", "Suporte", 30, 80, 10),
+	]
+	var mdg_index_by_card: Dictionary = {}
+	for i in range(mdg_reference_cards.size()):
+		mdg_index_by_card[mdg_reference_cards[i]] = i
+
+	var perm_a: Array = mdg_reference_cards.duplicate()  # Máquina de Guerra no início (índice 0)
+	var perm_b: Array = mdg_reference_cards.slice(1) + [mdg_reference_cards[0]]  # Máquina de Guerra no fim; resto na MESMA ordem relativa
+	var key_a: String = MiningCycleResolver._effective_formation_key(perm_a, mdg_index_by_card)
+	var key_b: String = MiningCycleResolver._effective_formation_key(perm_b, mdg_index_by_card)
+	print("  2 permutações brutas com a Máquina de Guerra em índices diferentes, mesma ordem relativa das demais -> mesma chave efetiva? %s ('%s' == '%s', esperado: true)" % [
+		str(key_a == key_b), key_a, key_b
 	])
 
-	print("  Alta confiança (5 blocos) e estimativa completa (100 blocos) -> limites corretos? %s (esperado: true)" % str(
-		not MiningCycleResolver.has_high_confidence(mina) and not MiningCycleResolver.is_estimation_complete(mina)
+	# --- _build_next_batch(): unicidade real dentro de um lote, e o
+	# set de "vistas" cresce exatamente pelo tamanho do lote (só
+	# formações SELECIONADAS entram — nunca as apenas inspecionadas) ---
+	var mdg_mina := Mina.new(800, "Império")
+	mdg_mina.reference_cards = mdg_reference_cards
+	var reference_commander_mdg := CommanderResource.new()
+	reference_commander_mdg.commander_name = "Chefe de Mina (Teste MdG)"
+	mdg_mina.reference_commander = reference_commander_mdg
+	MiningCycleResolver.start_estimation(mdg_mina, 999)
+
+	var small_batch: Array = MiningCycleResolver._build_next_batch(mdg_mina, 50)
+	var batch_keys: Dictionary = {}
+	for permutation: Array in small_batch:
+		batch_keys[MiningCycleResolver._effective_formation_key(permutation, mdg_index_by_card)] = true
+	print("  Lote de 50 formações únicas e válidas -> nenhuma chave repetida dentro do lote? %s (%d chaves distintas, esperado: true, 50) | Set de vistas da Mina == tamanho do lote? %s (%d, esperado: 50)" % [
+		str(batch_keys.size() == small_batch.size()), batch_keys.size(),
+		str(mdg_mina.efficiency_seen_formation_keys.size() == small_batch.size()), mdg_mina.efficiency_seen_formation_keys.size()
+	])
+	print("  Cursor avançou (>= tamanho do lote, pode ser maior por causa de duplicatas/colapso da Máquina de Guerra descartadas)? %s (%d, esperado: >= 50) | Nunca excede o universo bruto? %s" % [
+		str(mdg_mina.efficiency_permutation_cursor >= small_batch.size()), mdg_mina.efficiency_permutation_cursor,
+		str(mdg_mina.efficiency_permutation_cursor <= MiningCycleResolver.TOTAL_PERMUTATIONS)
+	])
+
+	# --- Suporte na Posição 5 + esgotamento do universo bruto: 1
+	# Suporte, sem Máquina de Guerra -> exatamente 1/9 das 362.880
+	# permutações brutas têm o Suporte na Posição 5 (inválidas);
+	# pedir mais que o universo válido força o esgotamento total do
+	# cursor, sem fabricar formações extras. ---
+	var s5_reference_cards: Array[CardResource] = [
+		_build_combat_card("S5-CQC-1", "Corpo a Corpo", 100, 100, 20),
+		_build_combat_card("S5-CQC-2", "Corpo a Corpo", 100, 100, 20),
+		_build_combat_card("S5-CQC-3", "Corpo a Corpo", 100, 100, 20),
+		_build_combat_card("S5-Distancia-1", "À Distância", 80, 70, 10),
+		_build_combat_card("S5-Suporte", "Suporte", 30, 80, 10),
+		_build_combat_card("S5-Distancia-2", "À Distância", 80, 70, 10),
+		_build_combat_card("S5-Barreira", "Barreira", 50, 120, 60),
+		_build_combat_card("S5-Mago", "Mago", 90, 60, 0),
+		_build_combat_card("S5-Distancia-3", "À Distância", 80, 70, 10),
+	]
+	var s5_mina := Mina.new(801, "Império")
+	s5_mina.reference_cards = s5_reference_cards
+	var reference_commander_s5 := CommanderResource.new()
+	reference_commander_s5.commander_name = "Chefe de Mina (Teste Suporte@5)"
+	s5_mina.reference_commander = reference_commander_s5
+	MiningCycleResolver.start_estimation(s5_mina, 1000)
+
+	var s5_batch: Array = MiningCycleResolver._build_next_batch(s5_mina, 400000)  # bem mais que o universo válido inteiro -> força esgotamento
+	var expected_valid_no_machine: int = MiningCycleResolver.TOTAL_PERMUTATIONS * 8 / 9  # 1/9 tem o Suporte na Posição 5 (9 cartas, sem Máquina de Guerra, cada uma igualmente provável em cada posição)
+	print("  1 Suporte, sem Máquina de Guerra, pedindo mais que o universo inteiro -> cursor esgota exatamente em 362.880? %s (%d) | Formações válidas encontradas == esperado (8/9 do total)? %s (%d, esperado: %d)" % [
+		str(s5_mina.efficiency_permutation_cursor == MiningCycleResolver.TOTAL_PERMUTATIONS), s5_mina.efficiency_permutation_cursor,
+		str(s5_batch.size() == expected_valid_no_machine), s5_batch.size(), expected_valid_no_machine
+	])
+	print("  Nenhuma formação fabricada além do universo válido real (lote == set de vistas, sem repetição nem padding)? %s (%d == %d, esperado: true)" % [
+		str(s5_batch.size() == s5_mina.efficiency_seen_formation_keys.size()), s5_batch.size(), s5_mina.efficiency_seen_formation_keys.size()
+	])
+
+	# --- Universo válido MENOR que o alvo de 18.144: 5 Suportes + 1
+	# Máquina de Guerra -> só 8! = 40.320 formações efetivas possíveis
+	# (colapso da Máquina de Guerra), das quais 5/8 têm algum Suporte
+	# na Posição 5 (inválidas) -> só 40.320 * 3/8 = 15.120 válidas,
+	# abaixo do alvo de 18.144. Simula todas, sem repetir nenhuma. ---
+	var small_universe_cards: Array[CardResource] = [
+		_build_combat_card("SU-MdG", "Máquina de Guerra", 100, 100, 20),
+		_build_combat_card("SU-Suporte-1", "Suporte", 30, 80, 10),
+		_build_combat_card("SU-Suporte-2", "Suporte", 30, 80, 10),
+		_build_combat_card("SU-Suporte-3", "Suporte", 30, 80, 10),
+		_build_combat_card("SU-Suporte-4", "Suporte", 30, 80, 10),
+		_build_combat_card("SU-Suporte-5", "Suporte", 30, 80, 10),
+		_build_combat_card("SU-CQC", "Corpo a Corpo", 100, 100, 20),
+		_build_combat_card("SU-Barreira", "Barreira", 50, 120, 60),
+		_build_combat_card("SU-Distancia", "À Distância", 80, 70, 10),
+	]
+	var su_mina := Mina.new(802, "Império")
+	su_mina.reference_cards = small_universe_cards
+	var reference_commander_su := CommanderResource.new()
+	reference_commander_su.commander_name = "Chefe de Mina (Teste Universo Pequeno)"
+	su_mina.reference_commander = reference_commander_su
+	MiningCycleResolver.start_estimation(su_mina, 1001)
+
+	var su_batch: Array = MiningCycleResolver._build_next_batch(su_mina, MiningCycleResolver.TARGET_VALID_BATTLES)  # pede os 18.144 cheios
+	var expected_small_universe: int = 15120
+	print("  Universo válido MENOR que 18.144 (5 Suportes + 1 Máquina de Guerra) -> simula exatamente o universo disponível, sem repetir? %s (%d encontradas, esperado: %d, < 18144) | Universo esgotado? %s" % [
+		str(su_batch.size() == expected_small_universe), su_batch.size(), expected_small_universe,
+		str(su_mina.efficiency_permutation_cursor == MiningCycleResolver.TOTAL_PERMUTATIONS)
+	])
+
+	# --- Reaproveitamento de Eficiência por assinatura da Guarnição ---
+	var signature_commander := CommanderResource.new()
+	signature_commander.instance_id = 5001
+	signature_commander.accumulated_xp = 100
+	var signature_cards: Array[CardResource] = []
+	for i in range(9):
+		var c := _build_combat_card("Assinatura-%d" % i, "Corpo a Corpo", 100, 100, 20)
+		c.instance_id = 6000 + i
+		signature_cards.append(c)
+	var signature_army := Army.new()
+	signature_army.commander = signature_commander
+	signature_army.cards = signature_cards
+
+	var signature_mina := Mina.new(803, "Império")
+	signature_mina.cycle_efficiency = 0.72
+	MiningCycleResolver.capture_garrison_signature(signature_mina, signature_army)
+	print("  Assinatura idêntica (mesmo Comandante/XP/cartas/Tier) -> Eficiência reaproveitável? %s (esperado: true)" % str(
+		MiningCycleResolver.garrison_signature_matches(signature_mina, signature_army)
 	))
-	mina.efficiency_blocks_completed = 5
-	print("  Após 5 blocos -> alta confiança atingida, mas ainda não completa? %s (esperado: true)" % str(
-		MiningCycleResolver.has_high_confidence(mina) and not MiningCycleResolver.is_estimation_complete(mina)
+	signature_cards[0].tier = 3
+	print("  Mudança de Tier numa única carta -> Eficiência NÃO é mais reaproveitável? %s (esperado: true)" % str(
+		not MiningCycleResolver.garrison_signature_matches(signature_mina, signature_army)
 	))
-	mina.efficiency_blocks_completed = 100
-	print("  Após 100 blocos -> estimativa completa? %s (esperado: true)" % str(
-		MiningCycleResolver.is_estimation_complete(mina)
+	signature_cards[0].tier = 1
+	signature_commander.accumulated_xp = 500
+	print("  Mudança de XP do Comandante -> Eficiência NÃO é mais reaproveitável? %s (esperado: true)" % str(
+		not MiningCycleResolver.garrison_signature_matches(signature_mina, signature_army)
 	))
+
+	# --- Correção do crédito de produção com Eficiência desconhecida (-1.0) ---
+	var credit_kingdom := Kingdom.new()
+	credit_kingdom.deposito_level = 1
+	var credit_mina := Mina.new(1600, "Império")
+	credit_mina.region = 1
+	credit_mina.structure_level = 1
+	credit_mina.cycle_started_unix = GameClock.now_unix()
+	credit_mina.cycle_efficiency = -1.0  # 1º bloco ainda em andamento
+	var before_credit_unix: int = credit_mina.last_production_credit_unix
+	MiningProductionResolver.credit(credit_mina, credit_kingdom, GameClock.now_unix() + 3600 * 3)
+	print("  Crédito de produção com Eficiência desconhecida -> janela NÃO é marcada como creditada (fica pendente, não perdida)? %s (%d -> %d, esperado: iguais)" % [
+		str(credit_mina.last_production_credit_unix == before_credit_unix), before_credit_unix, credit_mina.last_production_credit_unix
+	])
+	credit_mina.cycle_efficiency = 1.0  # Eficiência real chega
+	MiningProductionResolver.credit(credit_mina, credit_kingdom, GameClock.now_unix() + 3600 * 3)
+	print("  Assim que a Eficiência real existe -> a janela pendente inteira (3h) é cobrada de uma vez, sem perda? %s (%d, esperado: > %d)" % [
+		str(credit_mina.last_production_credit_unix > before_credit_unix), credit_mina.last_production_credit_unix, before_credit_unix
+	])
 
 	# --- Persistência (save/load) ---
-	mina.efficiency_blocks_completed = 7
-	mina.efficiency_wins = 20000
-	mina.efficiency_ties = 3000
-	mina.efficiency_losses = 2405
+	# IMPORTANTE (F-003, escopo aprovado): KingdomSaveService/
+	# kingdom_save_service.gd está FORA do escopo de arquivos aprovado
+	# para esta tarefa, e o próprio save/load do jogo não está
+	# conectado a nenhum caminho de produção hoje (só testes chamam
+	# KingdomSaveService.save()/load_into() em todo o repositório) —
+	# ver relatório final F-003, item "save/load". Por isso, os campos
+	# NOVOS desta reformulação (efficiency_permutation_cursor,
+	# efficiency_current_block_valid_count, efficiency_seen_formation_keys,
+	# efficiency_source_*) ainda NÃO são persistidos por
+	# kingdom_save_service.gd — só os campos que já existiam antes
+	# desta tarefa continuam corretamente persistidos (confirmado
+	# abaixo). Corrigir isso pertence a uma tarefa própria, exigida
+	# apenas quando save/load for de fato ligado à produção.
+	mina.efficiency_blocks_completed = 3
+	mina.efficiency_wins = 12000
+	mina.efficiency_ties = 2000
 	var save_kingdom := Kingdom.new()
 	var mina_list: Array[Mina] = [mina]
 	save_kingdom.territory_mines["Território de Teste da Estimativa"] = mina_list
@@ -5155,12 +5342,14 @@ func _validate_mining_incremental_estimation() -> void:
 	var loaded_kingdom := Kingdom.new()
 	KingdomSaveService.load_into(loaded_kingdom)
 	var loaded_mina: Mina = loaded_kingdom.territory_mines["Território de Teste da Estimativa"][0]
-	print("  Round-trip salvar/carregar preserva o progresso acumulado de verdade? %s (esperado: true)" % str(
-		loaded_mina.efficiency_blocks_completed == 7 and loaded_mina.efficiency_wins == 20000 and
+	print("  Round-trip salvar/carregar preserva os campos JÁ existentes antes desta tarefa (blocos, vitórias, ordem embaralhada)? %s (esperado: true)" % str(
+		loaded_mina.efficiency_blocks_completed == 3 and loaded_mina.efficiency_wins == 12000 and
 		loaded_mina.efficiency_permutation_order.size() == MiningCycleResolver.TOTAL_PERMUTATIONS
 	))
+	print("  (Nota F-003) Campos novos desta reformulação NÃO são persistidos ainda — save/load não está em nenhum caminho de produção hoje; cursor após carregar: %d (esperado: 0, valor padrão — não é um bug desta tarefa, é escopo aprovado)" % loaded_mina.efficiency_permutation_cursor)
 
-	# --- O fluxo real do botão: nunca trava, avança sozinho em segundo plano ---
+	# --- O fluxo real do botão: nunca trava, avança sozinho em segundo
+	# plano, sem tarefas pendentes órfãs ---
 	var kingdom: Kingdom = KingdomState.kingdom
 	var guarnicao_commander := CommanderResource.new()
 	guarnicao_commander.commander_name = "Comandante da Guarnição (Teste)"
@@ -5168,11 +5357,17 @@ func _validate_mining_incremental_estimation() -> void:
 	kingdom.add_commander(guarnicao_commander, GameClock.now_unix())
 	kingdom.cargo_ativo_activated += 1  # garante capacidade real, direto — activate_next() só ativa Infraestrutura já existente no Nível atual do CdC, que o Reino compartilhado já pode ter esgotado
 	CommandCenterResolver.move_to_active(kingdom, guarnicao_commander)
-	var champion_template: CardResource = GameDatabase.get_card("Campeão Imperial")
+	# Legionário Imperial (Comum, Soldo 1) — 9 cópias somam 9 de Soldo,
+	# dentro do teto até de "Recruta" (18). 9x "Campeão Imperial"
+	# (Épica, Soldo 4 cada = 36) excede até o teto máximo de
+	# "Lorde-Comandante" (32) — inválida pra batalha em QUALQUER
+	# Patente, o que impediria este teste de nunca completar um bloco.
+	var legionario_template: CardResource = GameDatabase.get_card("Legionário Imperial")
 	var guarnicao_cards: Array[CardResource] = []
 	for i in range(9):
-		guarnicao_cards.append(kingdom.acquire_card_from_catalog(champion_template))
+		guarnicao_cards.append(kingdom.acquire_card_from_catalog(legionario_template))
 	var guarnicao_army: Army = kingdom.form_army(guarnicao_commander, guarnicao_cards)
+	print("  (diagnóstico) Guarnição de teste pronta para batalha? %s (esperado: true)" % str(guarnicao_army.is_ready_for_battle()))
 
 	var real_mina := Mina.new(701, "Império")
 	real_mina.conquer()
@@ -5181,15 +5376,19 @@ func _validate_mining_incremental_estimation() -> void:
 	real_mina.assign_guarnicao(guarnicao_army)
 	kingdom.territory_mines["Território Real de Teste"] = [real_mina]
 
+	# Trava de Ciclo: a Guarnição não pode ser trocada com um Ciclo
+	# ativo (ARMY.md, "Trava de Edição por Modo de Jogo").
 	var panel: Control = load("res://scenes/command_center/panels/minas_panel.tscn").instantiate()
 	add_child(panel)
 	panel._on_start_cycle_pressed(real_mina)
-
 	print("  Clicar 'Iniciar Ciclo' retorna NA HORA, sem travar (dispara em segundo plano)? %s | Eficiência ainda desconhecida nesse instante? %s (esperado: true, true)" % [
 		str(not real_mina.efficiency_pending_task_ids.is_empty()), str(real_mina.cycle_efficiency < 0.0)
 	])
+	print("  Ciclo ativo -> Guarnição travada contra edição/reatribuição? %s (esperado: true)" % str(
+		kingdom.is_army_locked_for_editing(guarnicao_army)["locked"]
+	))
 
-	# Espera de verdade o 1º bloco terminar (produção real, ~3.629
+	# Espera de verdade o 1º bloco terminar (produção real, ~3.628
 	# combates — pode demorar de fato aqui, sem paralelismo real numa
 	# sandbox de 1 núcleo só; numa máquina com vários núcleos de
 	# verdade, isso é bem mais rápido, exatamente o ponto de tudo isso).
@@ -5201,6 +5400,33 @@ func _validate_mining_incremental_estimation() -> void:
 	print("  O 1º bloco termina de verdade e atualiza a Eficiência real (não mais -1)? %s (%.1f%%, %d bloco(s), esperado: true, 0-100%%, >= 1)" % [
 		str(real_mina.cycle_efficiency >= 0.0), real_mina.cycle_efficiency * 100.0, real_mina.efficiency_blocks_completed
 	])
+	print("  wins + ties + losses acumulados == batalhas válidas do bloco 1 (nunca conta permutação inválida/duplicada)? %s (%d, esperado: %d)" % [
+		str(real_mina.efficiency_wins + real_mina.efficiency_ties + real_mina.efficiency_losses == MiningCycleResolver._block_target(0)),
+		real_mina.efficiency_wins + real_mina.efficiency_ties + real_mina.efficiency_losses, MiningCycleResolver._block_target(0)
+	])
+
+	# GameRuntime.sync() já dispara o bloco 2 sozinho, em segundo
+	# plano, na MESMA chamada que fechou o bloco 1 (continuação
+	# correta e esperada — não é o bug de "Invalid Task ID"; drenar
+	# bloco a bloco até o 5º levaria ~5x mais tempo só para este
+	# teste). Em vez disso, trava a estimativa DESTE mina de teste no
+	# estado terminal agora (has_high_confidence() -> true), o que faz
+	# GameRuntime.sync() parar de agendar trabalho novo pra ela a
+	# partir da próxima chamada — e drena o que QUER que já esteja
+	# pendente neste exato instante (0 ou 1 lote, nunca mais, já que
+	# nenhum lote novo será disparado depois disso), pra não deixar
+	# nenhuma tarefa órfã no WorkerThreadPool quando o painel for
+	# destruído a seguir (erro de encerramento, não o problema de
+	# "Invalid Task ID" já confirmado/corrigido).
+	real_mina.efficiency_blocks_completed = MiningCycleResolver.HIGH_CONFIDENCE_BLOCKS
+	var drain_attempts: int = 0
+	while not real_mina.efficiency_pending_task_ids.is_empty() and drain_attempts < 700:
+		MiningCycleResolver.poll_pending_block(real_mina)
+		OS.delay_msec(250)
+		drain_attempts += 1
+	print("  Travar a estimativa em alta confiança impede novos lotes, e o que já estava em voo é drenado sem deixar tarefa órfã? %s (esperado: true — vazio)" % str(
+		real_mina.efficiency_pending_task_ids.is_empty()
+	))
 
 	panel.queue_free()
 

@@ -144,28 +144,34 @@ static func sync(kingdom: Kingdom, now_unix: int) -> void:
 		MineGuarnicaoResolver.release_if_cycle_ended(mina, now_unix)
 
 		# Estimativa Incremental de Eficiência (MINES.md, "Cálculo
-		# Incremental por Amostragem"): avança os blocos de fundo — 1
-		# thread a menos que o de conquista, de propósito (2 threads),
-		# pra pesar pouco na máquina enquanto o jogador já está
-		# jogando normal. Nunca dispara um bloco novo em cima de um já
-		# em andamento (poll primeiro).
-		# DESLIGADO TEMPORARIAMENTE (2026) — o cálculo de Eficiência em
-		# segundo plano (WorkerThreadPool) ainda tem um bug de
-		# threading não resolvido ("Invalid Task ID"), e por sync()
-		# ser chamado por praticamente toda tela do jogo, o problema
-		# estava vazando pra lugares sem nenhuma relação com Minas
-		# (crash relatado em PvE/Editor de Exército). Reativar só
-		# depois de confirmar a correção de verdade — ver conversa
-		# registrada sobre paralelização de MiningEfficiencyEstimator.
-		# if mina.cycle_started_unix != 0 and not mina.efficiency_permutation_order.is_empty() and not MiningCycleResolver.is_estimation_complete(mina):
-		# 	if MiningCycleResolver.poll_pending_block(mina):
-		# 		mina.cycle_efficiency = MiningCycleResolver.current_efficiency(mina)
-		# 	if mina.efficiency_pending_task_ids.is_empty() and mina.guarnicao_army != null:
-		# 		MiningCycleResolver.start_next_block_async(
-		# 			mina, mina.guarnicao_army.commander, mina.guarnicao_army.cards, mina.reference_commander,
-		# 			GameDatabase.battlefields, GameDatabase.abilities_by_name, GameDatabase.unit_traits,
-		# 			BACKGROUND_EFFICIENCY_THREAD_COUNT
-		# 		)
+		# Incremental por Amostragem", F-003 — reativado): avança os
+		# blocos de fundo — 1 thread a menos que o de conquista, de
+		# propósito (2 threads), pra pesar pouco na máquina enquanto o
+		# jogador já está jogando normal. Nunca dispara um lote novo em
+		# cima de um já em andamento (poll primeiro, sempre limpa
+		# efficiency_pending_task_ids antes de decidir o próximo passo —
+		# no máximo 1 lote pendente por Mina a qualquer momento, a
+		# mesma invariante que evita a cascata histórica de "Invalid
+		# Task ID"). Para de agendar blocos novos assim que
+		# has_high_confidence() for true (5 blocos concluídos OU
+		# universo bruto de 362.880 esgotado antes disso) — nunca
+		# continua rumo a um "bloco 6".
+		if mina.cycle_started_unix != 0 and not mina.efficiency_permutation_order.is_empty() and not MiningCycleResolver.has_high_confidence(mina):
+			if MiningCycleResolver.poll_pending_block(mina):
+				mina.cycle_efficiency = MiningCycleResolver.current_efficiency(mina)
+				if MiningCycleResolver.has_high_confidence(mina) and mina.guarnicao_army != null:
+					# Eficiência definitiva do Ciclo — registra a
+					# assinatura da Guarnição responsável por ela, pra
+					# permitir reaproveitamento em um Ciclo futuro com a
+					# mesma configuração exata (MINES.md,
+					# "Reaproveitamento de Eficiência").
+					MiningCycleResolver.capture_garrison_signature(mina, mina.guarnicao_army)
+			if mina.efficiency_pending_task_ids.is_empty() and mina.guarnicao_army != null and not MiningCycleResolver.has_high_confidence(mina):
+				MiningCycleResolver.start_next_block_async(
+					mina, mina.guarnicao_army.commander, mina.guarnicao_army.cards, mina.reference_commander,
+					GameDatabase.battlefields, GameDatabase.abilities_by_name, GameDatabase.unit_traits,
+					BACKGROUND_EFFICIENCY_THREAD_COUNT
+				)
 
 	AcademyResolver.sync(kingdom, now_unix)
 	CommanderTrainingResolver.sync(kingdom, now_unix)

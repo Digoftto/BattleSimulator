@@ -142,16 +142,26 @@ static func poll_batch(task_ids: Array[int], chunk_results: Array) -> Variant:
 	var total_wins: int = 0
 	var total_ties: int = 0
 	var total_losses: int = 0
+	var total_valid: int = 0
 	for result: Dictionary in chunk_results:
 		total_wins += result.get("wins", 0)
 		total_ties += result.get("ties", 0)
 		total_losses += result.get("losses", 0)
+		total_valid += result.get("valid_battles", 0)
 
-	return {"wins": total_wins, "ties": total_ties, "losses": total_losses}
+	return {"wins": total_wins, "ties": total_ties, "losses": total_losses, "valid_battles": total_valid}
 
 
 ## Executa uma fatia (sequencial, dentro de 1 thread) de permutações —
 ## a função que cada tarefa do WorkerThreadPool roda.
+##
+## Cada "permutation" recebida aqui JÁ chegou validada e deduplicada em
+## nível de formação efetiva (MiningCycleResolver._build_next_batch(),
+## na thread principal, antes do despacho) — nunca checada de novo
+## aqui: a filtragem de unicidade/validade da Formação de Referência
+## não pode rodar dentro do WorkerThreadPool, que executa em paralelo
+## sem estado compartilhado seguro (F-003). Por isso, toda permutação
+## deste chunk é sempre simulada — sem "continue" nenhum.
 static func _run_chunk(
 	chunk: Array,
 	guarnicao_commander: CommanderResource,
@@ -177,11 +187,14 @@ static func _run_chunk(
 	# tarefa inteira no meio da thread — isso corrompia
 	# chunk_results[chunk_index] (nunca escrito) e gerava uma cascata
 	# de "Invalid Task ID" em QUALQUER outro código que tentasse fazer
-	# poll_batch() depois. Retorna 0/0/0 pra este bloco (visível e
+	# poll_batch() depois (F-003, causa raiz confirmada). Continua
+	# protegendo especificamente a Guarnição — a única entrada aqui que
+	# NÃO passa pela filtragem de _build_next_batch(), pois não muda
+	# por permutação. Retorna 0/0/0/0 pra este bloco (visível e
 	# investigável) em vez de travar todo o resto do sistema.
 	if not guarnicao_army.is_ready_for_battle():
-		BattleLogger.err("MiningEfficiencyEstimator", "Guarnição inválida pra batalha (Soldo além do teto ou Formação incompleta) — bloco pulado, resultado 0/0/0.")
-		chunk_results[chunk_index] = {"wins": 0, "ties": 0, "losses": 0}
+		BattleLogger.error("MiningEfficiencyEstimator", "Guarnição inválida pra batalha (Soldo além do teto ou Formação incompleta) — bloco pulado, resultado 0/0/0/0.")
+		chunk_results[chunk_index] = {"wins": 0, "ties": 0, "losses": 0, "valid_battles": 0}
 		return
 
 	for permutation: Array in chunk:
@@ -192,8 +205,17 @@ static func _run_chunk(
 			cards.append(card as CardResource)
 		reference_army.cards = cards
 
+		# Rede de segurança (F-003): toda permutação que chega aqui já
+		# deveria ter passado pela validação em
+		# MiningCycleResolver._build_next_batch() (thread principal).
+		# Esta checagem é redundante NO CAMINHO FELIZ, mas continua
+		# aqui de propósito — igual à checagem da Guarnição acima —
+		# porque um assert de CombatEngine disparando dentro da
+		# WorkerThreadPool corrompe chunk_results[chunk_index] (nunca
+		# escrito) e gera a mesma cascata histórica de "Invalid Task
+		# ID". Nunca confia cegamente que a pré-filtragem é infalível.
 		if not reference_army.is_ready_for_battle():
-			BattleLogger.err("MiningEfficiencyEstimator", "Permutação da Formação de Referência inválida — pulada individualmente, não conta pro resultado.")
+			BattleLogger.error("MiningEfficiencyEstimator", "Permutação da Formação de Referência chegou inválida a _run_chunk() apesar da pré-filtragem — pulada individualmente, não conta como valid_battle.")
 			continue
 
 		var state: CombatState = CombatEngine.initialize(guarnicao_army, reference_army, battlefields, abilities_by_name, unit_traits)
@@ -208,7 +230,7 @@ static func _run_chunk(
 			_:
 				ties += 1
 
-	chunk_results[chunk_index] = {"wins": wins, "ties": ties, "losses": losses}
+	chunk_results[chunk_index] = {"wins": wins, "ties": ties, "losses": losses, "valid_battles": wins + ties + losses}
 
 
 static func _split_into_chunks(items: Array, chunk_count: int) -> Array:

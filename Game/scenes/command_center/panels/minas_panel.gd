@@ -95,8 +95,8 @@ func refresh() -> void:
 				if mina.cycle_efficiency < 0.0:
 					cycle_label.text = "Ciclo ativo — faltam ~%.1fh | Eficiência: calculando o primeiro bloco..." % remaining_hours
 				elif not MiningCycleResolver.has_high_confidence(mina):
-					cycle_label.text = "Ciclo ativo — faltam ~%.1fh | Eficiência: %.1f%% (ainda se ajustando — bloco %d/100)" % [
-						remaining_hours, mina.cycle_efficiency * 100.0, mina.efficiency_blocks_completed
+					cycle_label.text = "Ciclo ativo — faltam ~%.1fh | Eficiência: %.1f%% (ainda se ajustando — bloco %d/%d)" % [
+						remaining_hours, mina.cycle_efficiency * 100.0, mina.efficiency_blocks_completed, MiningCycleResolver.HIGH_CONFIDENCE_BLOCKS
 					]
 				else:
 					cycle_label.text = "Ciclo ativo — faltam ~%.1fh | Eficiência: %.1f%%" % [remaining_hours, mina.cycle_efficiency * 100.0]
@@ -218,50 +218,31 @@ func _on_assign_guarnicao_pressed(mina: Mina) -> void:
 ## pra pesar pouco na máquina enquanto o jogador já está jogando).
 const FIRST_BLOCK_THREAD_COUNT: int = 8
 
-## DESLIGADO TEMPORARIAMENTE (2026): o cálculo assíncrono por blocos
-## (WorkerThreadPool) tem um bug de threading não resolvido ("Invalid
-## Task ID") que estava vazando pra crashes em telas sem relação
-## nenhuma com Minas. Até corrigir de verdade, "Iniciar Ciclo" usa uma
-## amostra pequena, síncrona, sem threads — funcional e sem crash,
-## mas SEM os blocos incrementais nem o refinamento em segundo plano
-## (ver conversa registrada sobre paralelização de
-## MiningEfficiencyEstimator). Reverter pra start_next_block_async()
-## assim que a causa raiz for confirmada e corrigida.
+## F-003 (reativado): se a Guarnição atual tem exatamente a mesma
+## configuração relevante para combate (Comandante + XP + as 9 cartas,
+## na mesma ordem, com o mesmo Tier/atributos) que a Eficiência já
+## congelada de um Ciclo anterior desta Mina, reaproveita esse valor
+## direto — nunca recalcula à toa (MINES.md, "Reaproveitamento de
+## Eficiência"). Caso contrário, inicia uma estimativa nova de verdade:
+## dispara o 1º bloco com mais threads (coberto pela cena de conquista
+## no fluxo real) e retorna na hora, sem travar a tela — os blocos
+## seguintes avançam sozinhos em segundo plano via GameRuntime.sync().
 func _on_start_cycle_pressed(mina: Mina) -> void:
 	if mina.guarnicao_army == null:
 		return
 
-	var permutations: Array = MiningPermutations.generate_all(mina.reference_cards)
-	permutations.shuffle()
-	var sample: Array = permutations.slice(0, mini(200, permutations.size()))
+	if MiningCycleResolver.garrison_signature_matches(mina, mina.guarnicao_army):
+		mina.start_cycle(GameClock.now_unix(), mina.cycle_efficiency)
+		refresh()
+		return
 
-	var wins: int = 0
-	var ties: int = 0
-	var losses: int = 0
-	for permutation: Array in sample:
-		var reference_army := Army.new()
-		reference_army.commander = mina.reference_commander
-		var cards: Array[CardResource] = []
-		for card: Variant in permutation:
-			cards.append(card as CardResource)
-		reference_army.cards = cards
-
-		if not mina.guarnicao_army.is_ready_for_battle() or not reference_army.is_ready_for_battle():
-			continue  # composição de teste/dado inválido — pula em vez de derrubar o cálculo inteiro
-
-		var state: CombatState = CombatEngine.initialize(
-			mina.guarnicao_army, reference_army, GameDatabase.battlefields, GameDatabase.abilities_by_name, GameDatabase.unit_traits
-		)
-		state.enable_battle_log = false
-		CombatEngine.run(state)
-		match state.winner_side:
-			0: wins += 1
-			1: losses += 1
-			_: ties += 1
-
-	var total: int = wins + ties + losses
-	var efficiency: float = (wins * 1.0 + ties * 0.5 + losses * 0.2) / float(total) if total > 0 else 0.0
-	mina.start_cycle(GameClock.now_unix(), efficiency)
+	MiningCycleResolver.start_estimation(mina, GameClock.now_unix())
+	mina.start_cycle(GameClock.now_unix(), -1.0)
+	MiningCycleResolver.start_next_block_async(
+		mina, mina.guarnicao_army.commander, mina.guarnicao_army.cards, mina.reference_commander,
+		GameDatabase.battlefields, GameDatabase.abilities_by_name, GameDatabase.unit_traits,
+		FIRST_BLOCK_THREAD_COUNT
+	)
 	refresh()
 
 

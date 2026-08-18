@@ -94,20 +94,41 @@ var cycle_efficiency: float = -1.0
 var auto_renew_enabled: bool = false
 
 ## --- Estimativa Incremental de Eficiência (MINES.md, "Cálculo
-## Incremental por Amostragem") ---
+## Incremental por Amostragem") — modelo final: até 18.144 BATALHAS
+## ÚNICAS E VÁLIDAS (formação efetiva, nunca permutação bruta), em
+## exatamente 5 blocos, nunca 100. ---
 
-## Ordem embaralhada dos índices das 362.880 permutações — gerada uma
-## única vez, no início da estimativa (nunca de novo, senão blocos já
-## processados poderiam repetir). Cada bloco consome uma fatia nova
-## desta ordem, nunca sorteada de novo.
+## Ordem embaralhada dos índices das 362.880 permutações brutas —
+## gerada uma única vez, no início da estimativa (nunca de novo, senão
+## formações já examinadas poderiam repetir). O cursor abaixo avança
+## por ela sequencialmente, nunca sorteada de novo.
 var efficiency_permutation_order: Array[int] = []
 
-## Quantos blocos de 1% (dos 100) já foram processados e agregados.
+## Quantas permutações BRUTAS já foram examinadas (válidas, inválidas
+## ou duplicadas — todas contam aqui) desde o início da estimativa.
+## Monotônico, nunca retrocede, nunca reexamina o mesmo índice bruto
+## duas vezes. Teto: MiningCycleResolver.TOTAL_PERMUTATIONS (362.880).
+var efficiency_permutation_cursor: int = 0
+
+## Quantas BATALHAS ÚNICAS E VÁLIDAS o bloco atual (efficiency_blocks_
+## completed) já acumulou. Zerado sempre que um bloco se encerra.
+var efficiency_current_block_valid_count: int = 0
+
+## Quantos dos 5 blocos já foram concluídos e agregados.
 var efficiency_blocks_completed: int = 0
 
 var efficiency_wins: int = 0
 var efficiency_ties: int = 0
 var efficiency_losses: int = 0
+
+## Chaves das formações EFETIVAS (não das permutações brutas — ver
+## MiningCycleResolver._effective_formation_key()) já selecionadas para
+## simulação nesta estimativa — nunca a mesma formação de combate duas
+## vezes, mesmo que múltiplas permutações brutas colapsem nela (Máquina
+## de Guerra sempre na Posição 9, CombatEngine._place_army()). Uma
+## chave só entra aqui quando a formação é válida E de fato selecionada
+## pro lote a ser simulado — nunca por ter sido apenas inspecionada.
+var efficiency_seen_formation_keys: Dictionary = {}
 
 ## IDs de tarefa do WorkerThreadPool de um bloco em andamento — vazio
 ## quando nenhum bloco está sendo calculado no momento. Nunca
@@ -116,6 +137,15 @@ var efficiency_losses: int = 0
 ## simplesmente reiniciado do zero na próxima sincronização.
 var efficiency_pending_task_ids: Array[int] = []
 var efficiency_pending_chunk_results: Array = []
+
+## --- Assinatura da Guarnição associada à Eficiência congelada acima
+## (MINES.md, "Reaproveitamento de Eficiência") — permite decidir se um
+## novo Ciclo com a mesma Guarnição pode reaproveitar cycle_efficiency
+## em vez de recalcular. Ver MiningCycleResolver.garrison_signature*().
+## -1 = nenhuma assinatura registrada ainda (nunca reaproveitável). ---
+var efficiency_source_commander_id: int = -1
+var efficiency_source_commander_xp: int = -1
+var efficiency_source_card_signature: Array = []
 
 
 ## True se a Mina está ativamente produzindo, em relação a "now_unix"

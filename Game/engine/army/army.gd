@@ -196,3 +196,39 @@ func energy_total(nucleus_level: int) -> int:
 ## o Soldo Total está dentro do teto da Patente do comandante.
 func is_ready_for_battle() -> bool:
 	return is_formation_complete() and is_soldo_within_cap()
+
+
+## Verifica se, ao resolver o posicionamento de "cards" pelo mesmo
+## algoritmo de CombatEngine._place_army() (uma carta de Máquina de
+## Guerra, se houver, sempre ocupa a Posição 9; as demais ocupam 1-8 na
+## ordem em que aparecem no Array), um pelotão de Classe Suporte
+## ocuparia a Posição 5 — proibido por COMBAT_RULES.md 6.5, "Restrição
+## de Posicionamento Inicial": a Penalidade de Reorganização (5.2.2) não
+## se aplica a quem já inicia a batalha na Posição 5, então um Suporte
+## que iniciasse ali, bloqueado por um pelotão de Classe convencional
+## atrás dele na Cadeia de Bloqueio, travaria permanentemente a Posição
+## 5 sem nunca pagar o custo de reorganização.
+##
+## NÃO é chamada por is_ready_for_battle() ainda — EnemyArmyGenerator
+## (via ArmyPositioningHeuristic.apply_heuristic()) e os Arquétipos de
+## Formação β/δ/ε (ArmyFormationArchetypes) podem, hoje, colocar um
+## Suporte na Posição 5 (nenhum dos dois evita isso ao preencher posições
+## "sobrando"), então transformar esta checagem num reject/assert em
+## is_ready_for_battle() derrubaria formações de PvE/Minas já geradas
+## por esses caminhos, sem relação com esta correção. Ver
+## TECHNICAL_BACKLOG.md (F-018) — corrigir os geradores é pré-requisito
+## antes de usar esta função como trava de validação.
+func has_support_at_position_5() -> bool:
+	var machine_card: CardResource = null
+	var other_cards: Array[CardResource] = []
+	for card: CardResource in cards:
+		if card.card_class == "Máquina de Guerra" and machine_card == null:
+			machine_card = card
+		else:
+			other_cards.append(card)
+
+	var remaining_positions: Array[int] = [1, 2, 3, 4, 5, 6, 7, 8]
+	var index_of_position_5: int = remaining_positions.find(5)
+	if index_of_position_5 >= other_cards.size():
+		return false
+	return other_cards[index_of_position_5].card_class == "Suporte"

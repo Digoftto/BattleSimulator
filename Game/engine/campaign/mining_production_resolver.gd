@@ -22,6 +22,19 @@ static func credit(mina: Mina, kingdom: Kingdom, now_unix: int) -> void:
 	if mina.cycle_started_unix == 0:
 		return  # nunca foi ativada
 
+	# F-003: enquanto a Eficiência ainda é desconhecida (sentinela
+	# -1.0 — 1º bloco da estimativa ainda em andamento),
+	# MineEconomy.hourly_production() produziria um valor negativo se
+	# chamado aqui. Em vez de creditar 0 e AVANÇAR
+	# last_production_credit_unix (o que perderia essa janela pra
+	# sempre — "nunca creditando duas vezes o mesmo intervalo" também
+	# significa nunca marcar uma janela como paga sem pagar nada), a
+	# janela simplesmente fica pendente: nada é avançado aqui, e a
+	# próxima chamada (já com uma Eficiência real) cobre o intervalo
+	# inteiro de uma vez, sem perda nem duplicação.
+	if mina.cycle_efficiency < 0.0:
+		return
+
 	# MINES.md: Mina Inicial produz continuamente pra sempre, sem
 	# Ciclo de 100h — só as Minas de Trilha (Regionais) têm esse
 	# limite. "effective_now" nunca é limitado pro caso da Inicial.
