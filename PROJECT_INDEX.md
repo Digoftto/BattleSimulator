@@ -158,6 +158,7 @@ validate against SSoT
 - Seasons → `Arquitetura/SEASONS.md`
 - XP → `Arquitetura/XP.md`
 - Resources → `Arquitetura/RESOURCES.md`
+- PG (Pontos de Geração) → `Arquitetura/GENERATION_POINTS.md`
 
 ## Confirmed MVP invariants
 
@@ -172,9 +173,9 @@ validate against SSoT
 - `Treinamento Arcano` remains unresolved until missing historical documentation is recovered.
 - Do not reconstruct the historical chain of `Engenharia Militar II` by inference.
 
-## Known decision-sensitive area
+## Resolved decision record
 
-PG scope/ownership has had conflicting statements across economic systems. Until the canonical decision is frozen, do not invent a new PG spending rule or silently remove an existing one. Flag the conflict.
+PG scope/ownership previously had conflicting statements across economic systems ("Prestígio Global", "PdG", and a false Mines/Deposits-exclusivity claim). This has been resolved by the project owner: PG is one shared global infrastructure resource (`Pontos de Geração`), not exclusive to any system. Current consumers: Mines, Deposits, Command Center, Academy — the list may grow. SSoT: `Arquitetura/GENERATION_POINTS.md`.
 
 ## Legacy and audit files
 

@@ -22,4 +22,7 @@ enum Type {
 	AFTER_HEAL_PERFORMED,
 	AFTER_HEAL_RECEIVED,
 	UNIT_DIED,
+	## F-028: publicado exatamente uma vez, quando a batalha realmente
+	## termina (ver CombatEngine.run()/_publish_battle_finished()).
+	BATTLE_FINISHED,
 }

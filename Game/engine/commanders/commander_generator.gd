@@ -38,24 +38,26 @@ static func generate(
 	requirements: Array[CommanderRequirementResource],
 	targets: Array[CommanderTargetResource],
 	effects: Array[CommanderEffectResource],
-	values: Array[CommanderValueResource]
+	values: Array[CommanderValueResource],
+	rng: RandomNumberGenerator = null
 ) -> CommanderDoctrine:
 	var doctrine := CommanderDoctrine.new()
 
 	# Etapa 1 — Sortear a Facção do comandante.
-	doctrine.faction = FACTIONS[randi() % FACTIONS.size()]
+	var faction_roll: int = rng.randi() if rng != null else randi()
+	doctrine.faction = FACTIONS[faction_roll % FACTIONS.size()]
 
 	# Etapa 2 — Sortear uma Restrição válida.
 	doctrine.restriction = WeightedRandom.pick(restrictions, func(r: CommanderRestrictionResource) -> int:
 		return CommanderFrequency.weight_for(r.frequency_label)
-	)
-	doctrine.restriction_param = _sample_param(doctrine.restriction.domain, doctrine.restriction.operator, doctrine.restriction.scope, doctrine.faction)
+	, rng)
+	doctrine.restriction_param = _sample_param(doctrine.restriction.domain, doctrine.restriction.operator, doctrine.restriction.scope, doctrine.faction, rng)
 
 	# Etapa 3 — Eliminar todos os Requisitos incompatíveis com a Restrição.
 	var candidate_requirements: Array = []
 	var candidate_requirement_params: Dictionary = {}
 	for requirement: CommanderRequirementResource in requirements:
-		var requirement_param: String = _sample_param(requirement.domain, requirement.operator, requirement.scope, doctrine.faction)
+		var requirement_param: String = _sample_param(requirement.domain, requirement.operator, requirement.scope, doctrine.faction, rng)
 		if _is_restriction_requirement_compatible(doctrine.restriction, doctrine.restriction_param, requirement, requirement_param):
 			candidate_requirements.append(requirement)
 			candidate_requirement_params[requirement] = requirement_param
@@ -65,7 +67,7 @@ static func generate(
 	# Etapa 4 — Sortear um Requisito (entre os válidos).
 	doctrine.requirement = WeightedRandom.pick(candidate_requirements, func(r: CommanderRequirementResource) -> int:
 		return CommanderFrequency.weight_for(r.frequency_label)
-	)
+	, rng)
 	doctrine.requirement_param = candidate_requirement_params[doctrine.requirement]
 
 	# Etapa 5 — Selecionar um Alvo compatível.
@@ -75,7 +77,7 @@ static func generate(
 	# pode ser avaliada após o Efeito ser conhecido (Etapa 6).
 	doctrine.target = WeightedRandom.pick(targets, func(t: CommanderTargetResource) -> int:
 		return CommanderFrequency.weight_for(t.frequency_label)
-	)
+	, rng)
 
 	# Etapa 6 — Selecionar um Efeito compatível.
 	var candidate_effects: Array = []
@@ -88,7 +90,7 @@ static func generate(
 
 	doctrine.effect = WeightedRandom.pick(candidate_effects, func(e: CommanderEffectResource) -> int:
 		return CommanderFrequency.weight_for(e.frequency_label)
-	)
+	, rng)
 
 	# Etapa 7 — Selecionar um Valor compatível (mesma categoria do Efeito).
 	var candidate_values: Array = values.filter(func(v: CommanderValueResource) -> bool:
@@ -99,7 +101,7 @@ static func generate(
 
 	doctrine.value = WeightedRandom.pick(candidate_values, func(v: CommanderValueResource) -> int:
 		return CommanderFrequency.weight_for(v.frequency_label)
-	)
+	, rng)
 
 	# Etapa 8 — Calcular o Rarity Score (soma dos Pesos de Frequência).
 	doctrine.rarity_score = CommanderFrequency.weight_for(doctrine.restriction.frequency_label) \
@@ -114,18 +116,21 @@ static func generate(
 ## Sorteia o parâmetro de tempo de geração (quando aplicável) para uma
 ## entrada de Restrição ou Requisito, conforme seu domínio/operador/escopo.
 ## Retorna string vazia quando a entrada não é parametrizada.
-static func _sample_param(domain: String, operator: String, scope: String, own_faction: String) -> String:
+static func _sample_param(domain: String, operator: String, scope: String, own_faction: String, rng: RandomNumberGenerator = null) -> String:
 	match domain:
 		"class":
-			return CLASSES[randi() % CLASSES.size()]
+			var class_roll: int = rng.randi() if rng != null else randi()
+			return CLASSES[class_roll % CLASSES.size()]
 		"battlefield":
 			if operator == "forbidden" or operator == "during":
-				return NON_STANDARD_BATTLEFIELDS[randi() % NON_STANDARD_BATTLEFIELDS.size()]
+				var battlefield_roll: int = rng.randi() if rng != null else randi()
+				return NON_STANDARD_BATTLEFIELDS[battlefield_roll % NON_STANDARD_BATTLEFIELDS.size()]
 			return ""
 		"faction":
 			if scope == "other":
 				var others: Array = FACTIONS.filter(func(f: String) -> bool: return f != own_faction)
-				return others[randi() % others.size()]
+				var other_roll: int = rng.randi() if rng != null else randi()
+				return others[other_roll % others.size()]
 			return ""
 		"game_mode":
 			return scope  # já fixo no catálogo ("pvp" / "pve" / "mines")

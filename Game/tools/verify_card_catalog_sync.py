@@ -36,6 +36,18 @@ CARD_CATALOG_PATH = REPO_ROOT / "Arquitetura" / "CARD_CATALOG.md"
 CARDS_GLOB = os.path.join(PROJECT_ROOT, "database", "cards", "*.tres")
 
 
+# Rótulos de campo da própria "Estrutura da Ficha" (o template no topo
+# de CARD_CATALOG.md que descreve quais campos uma carta possui — Nome,
+# Facção, Classe... — não uma carta em si). Usados apenas pela rede de
+# segurança ao final de extract_canonical_tier3(); nunca coincidem com
+# um nome de carta real.
+FICHA_LEGEND_FIELDS = {
+    "nome", "facção", "classe", "tier", "raridade", "lore",
+    "atributos base", "tier i", "tier iii", "tier v",
+    "receita de combinação", "observações",
+}
+
+
 def extract_canonical_tier3(catalog_text: str) -> dict:
     """Extrai {nome_da_carta: tier_3_ability_name} de CARD_CATALOG.md.
 
@@ -43,14 +55,31 @@ def extract_canonical_tier3(catalog_text: str) -> dict:
     cabeçalho "Carta N", que já se mostrou frágil a variações de
     formatação) — associa cada "Tier III" ao "Nome" mais recentemente
     visto antes dele.
+
+    Ignora tudo antes da primeira ocorrência real de "Carta N": a seção
+    "Estrutura da Ficha" no início do documento (o template que lista
+    os nomes dos campos de uma carta, incluindo linhas "Nome" e
+    "Tier III" isoladas) não é uma carta e não pode ser varrida como se
+    fosse uma — sem essa guarda, o parser confundia o próprio template
+    com uma carta fantasma ("Facção" -> "Tier V", contada como uma 40ª
+    carta inexistente; ver TECHNICAL_BACKLOG.md, F-006).
     """
     lines = [l.strip() for l in catalog_text.replace("\r\n", "\n").split("\n")]
     result = {}
     current_name = None
+    scanning = False  # só True depois da primeira "Carta N" real — a
+    # "Estrutura da Ficha" (topo do documento) nunca contém esse marcador.
 
     i = 0
     while i < len(lines):
         line = lines[i]
+
+        if not scanning:
+            if re.fullmatch(r"(?:Carta|carta) \d+", line):
+                scanning = True
+            else:
+                i += 1
+                continue
 
         if line.lower() == "nome":
             for j in range(i + 1, min(i + 3, len(lines))):
@@ -77,6 +106,19 @@ def extract_canonical_tier3(catalog_text: str) -> dict:
                     break
 
         i += 1
+
+    # Rede de segurança (regressão): mesmo com a guarda de "scanning"
+    # acima, nenhuma carta real pode ter como nome um dos próprios
+    # rótulos de campo da Ficha (Nome, Facção, Classe...). Se isso
+    # acontecer de novo — por exemplo, uma nova seção de template
+    # adicionada em outro ponto do documento — falha alto e claro em
+    # vez de silenciosamente contar uma carta fantasma.
+    phantom = FICHA_LEGEND_FIELDS.intersection(name.lower() for name in result)
+    assert not phantom, (
+        "extract_canonical_tier3: nome(s) de carta suspeito(s) — coincide(m) com "
+        f"rótulo(s) de campo da Estrutura da Ficha, provável template sendo lido "
+        f"como carta: {sorted(phantom)}"
+    )
 
     return result
 

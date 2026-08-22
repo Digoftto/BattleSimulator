@@ -23,6 +23,16 @@ var _nova_expedicao_status_label: Label
 var _existing_armies_container: VBoxContainer
 var _nova_expedicao_iniciar_button: Button
 
+## Resultado (texto) da última "Tentativa de Fase" de cada Expedição
+## (F-003) — {ExpeditionRuntime: String}. Guardado por Expedição (não um
+## único Label global) porque pode haver mais de uma Expedição ativa ao
+## mesmo tempo. Reaproveita o texto que ExpeditionRuntime.attempt_current_fase()
+## já escreve em expedition.history_log (Vitória: Fragmentos/Fase/
+## Formação vencedora já computados por RewardResolver/AccountXPResolver
+## dentro do próprio motor; Derrota: motivo já escrito pelo motor) — a UI
+## nunca recalcula recompensa, só exibe o que o motor já produziu.
+var _last_phase_result_text: Dictionary = {}
+
 
 var _loading_label: Label = null
 
@@ -86,8 +96,8 @@ func _build_static_structure() -> void:
 	_root_vbox.add_child(title)
 
 	var back_button := Button.new()
-	back_button.text = "<- Voltar para a Cidade"
-	back_button.pressed.connect(_on_back_to_city_pressed, CONNECT_DEFERRED)
+	back_button.text = "<- Voltar para o Centro de Comando"
+	back_button.pressed.connect(_on_back_to_command_center_pressed, CONNECT_DEFERRED)
 	_root_vbox.add_child(back_button)
 
 	_expedicoes_container = VBoxContainer.new()
@@ -246,6 +256,12 @@ func refresh() -> void:
 
 		_build_squad_rows(vbox, expedition)
 
+		if _last_phase_result_text.has(expedition):
+			var result_label := Label.new()
+			result_label.text = _last_phase_result_text[expedition]
+			result_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+			vbox.add_child(result_label)
+
 		if expedition.is_waiting_at_acampamento:
 			var wait_label := Label.new()
 			wait_label.text = "Aguardando decisão no Acampamento (Fase %d)." % expedition.current_fase
@@ -284,8 +300,12 @@ func _build_squad_rows(vbox: VBoxContainer, expedition: ExpeditionRuntime) -> vo
 		vbox.add_child(row)
 
 		var marker: String = "-> " if i == expedition.squad.active_index else "   "
+		# F-009: Exércitos sem army_name explícito (ex: formado pelo Kit
+		# Inicial) nunca devem aparecer como rótulo vazio — não altera
+		# Army.army_name, só o texto mostrado.
+		var display_name: String = army.army_name if army.army_name != "" else "Exército %d" % (i + 1)
 		var label := Label.new()
-		label.text = "%s%d. %s | Energia: %d/%d" % [marker, i + 1, army.army_name, army.current_energy, army.max_energy]
+		label.text = "%s%d. %s | Energia: %d/%d" % [marker, i + 1, display_name, army.current_energy, army.max_energy]
 		label.custom_minimum_size = Vector2(400, 0)
 		row.add_child(label)
 
@@ -322,8 +342,19 @@ func _status_name(status: ExpeditionRuntime.Status) -> String:
 	return ExpeditionRuntime.Status.keys()[status]
 
 
+## F-003: torna o resultado da tentativa visível de verdade (antes,
+## PhaseResult era descartado — o jogador clicava "Tentar Fase Atual" e
+## não tinha nenhuma resposta imediata). Não recalcula recompensa/XP
+## aqui: só reaproveita as linhas que o próprio attempt_current_fase()
+## já escreveu em expedition.history_log nesta chamada (Fragmentos,
+## Formação vencedora e motivo de derrota já vêm computados pelo motor).
 func _on_attempt_fase_pressed(expedition: ExpeditionRuntime) -> void:
-	expedition.attempt_current_fase()
+	var log_count_before: int = expedition.history_log.size()
+	var result: PhaseResult = expedition.attempt_current_fase()
+	if result != null:
+		var new_lines: Array = expedition.history_log.slice(log_count_before)
+		var prefix: String = "Vitória! " if result.victory else "Derrota. "
+		_last_phase_result_text[expedition] = prefix + " ".join(new_lines)
 	refresh()
 
 
@@ -431,5 +462,5 @@ func _on_start_new_expedition_pressed() -> void:
 	refresh()
 
 
-func _on_back_to_city_pressed() -> void:
-	get_tree().change_scene_to_file.call_deferred("res://scenes/city/city_panel.tscn")
+func _on_back_to_command_center_pressed() -> void:
+	get_tree().change_scene_to_file.call_deferred("res://scenes/command_center/command_center_panel.tscn")

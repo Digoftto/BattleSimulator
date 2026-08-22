@@ -18,7 +18,42 @@ extends RefCounted
 ## narrativo fora do meu papel de engenheiro.
 
 const FACTIONS: Array[String] = ["Império", "Natureza", "Mortos-Vivos"]
-const CARDS_FROM_OTHER_FACTIONS: int = 3
+
+## F-030: roster oficial dos 3 Exércitos Iniciais (INICIALIZAÇÃO.png,
+## MVP aprovado) — nomes de carta canônicos, validados um a um contra
+## res://database/cards/ antes desta mudança (todas as 18 cartas
+## referenciadas existem, com Facção/Raridade exatas; nenhum nome
+## duplicado dentro de nenhum dos 3 Exércitos; Soldo total 9, bem
+## abaixo do teto de Recruta). Único ponto de verdade — a UI
+## (StarterKitPanel) e o simulador (F-029) sempre leem daqui, nunca
+## replicam este roster.
+##
+## Substitui o sorteio de Facção secundária + 3 cartas dela que existia
+## antes (Array.shuffle(), sem seed, um resultado novo a cada
+## carregamento da tela) — a arte oficial exige um roster ESTÁVEL por
+## Facção, não uma amostra aleatória. Cada Exército continua 6 cartas
+## da própria Facção (todas as Comuns dela, sempre as mesmas 6 no
+## catálogo atual) + 3 de uma única Facção secundária FIXA (não
+## necessariamente a mesma para as 3 Facções — Império e Mortos-Vivos
+## usam Natureza como secundária, Natureza usa Mortos-Vivos — decisão
+## de proprietário, não uma fórmula de rotação genérica).
+const STARTER_ROSTER_CARD_NAMES: Dictionary = {
+	"Império": [
+		"Arqueiro Imperial", "Engenheiro Imperial", "Escudeiro Imperial",
+		"Evocador Imperial", "Infante Imperial", "Legionário Imperial",
+		"Carvalho Ancião", "Trepadeira Ancestral", "Flor da Aurora",
+	],
+	"Natureza": [
+		"Carvalho Ancião", "Ent Jovem", "Flor da Aurora",
+		"Porco-Espinho Ancestral", "Trepadeira Ancestral", "Urso Ancestral",
+		"Liche Iniciado", "Abominação Putrefata", "Sacerdote Profano",
+	],
+	"Mortos-Vivos": [
+		"Abominação Putrefata", "Arqueiro Esquelético", "Banshee",
+		"Esqueleto Guerreiro", "Liche Iniciado", "Sacerdote Profano",
+		"Ent Jovem", "Urso Ancestral", "Flor da Aurora",
+	],
+}
 
 
 ## Gera as 3 opções (uma por Facção) — não altera o Reino ainda, só
@@ -42,29 +77,27 @@ static func generate_options(all_cards: Array[CardResource]) -> Array[Dictionary
 	return options
 
 
-## 9 cartas Comuns, Tier I, todas diferentes entre si — 6 da Facção
-## (todas as Comuns disponíveis dela) + 3 misturadas entre as outras
-## duas Facções.
+## 9 cartas Comuns, Tier I, todas diferentes entre si — exatamente as 9
+## cartas do roster oficial desta Facção (STARTER_ROSTER_CARD_NAMES,
+## F-030), nunca sorteadas.
 static func _build_starter_composition(faction: String, all_cards: Array[CardResource]) -> Array[CardResource]:
-	var faction_commons: Array[CardResource] = all_cards.filter(
-		func(c: CardResource) -> bool: return c.faction == faction and c.rarity == "Comum"
-	)
-	var other_commons: Array[CardResource] = all_cards.filter(
-		func(c: CardResource) -> bool: return c.faction != faction and c.rarity == "Comum"
-	)
-	other_commons.shuffle()
-
-	var chosen: Array[CardResource] = []
-	chosen.append_array(faction_commons)
-	for i in range(mini(CARDS_FROM_OTHER_FACTIONS, other_commons.size())):
-		chosen.append(other_commons[i])
+	var card_names: Array = STARTER_ROSTER_CARD_NAMES[faction]
 
 	var result: Array[CardResource] = []
-	for template: CardResource in chosen:
+	for card_name: String in card_names:
+		var template: CardResource = _find_card_by_name(all_cards, card_name)
+		assert(template != null, "StarterKitResolver: carta '%s' do roster oficial de %s não foi encontrada no catálogo (res://database/cards/)." % [card_name, faction])
 		var copy: CardResource = template.duplicate()
 		copy.tier = 1
 		result.append(copy)
 	return result
+
+
+static func _find_card_by_name(all_cards: Array[CardResource], card_name: String) -> CardResource:
+	for card: CardResource in all_cards:
+		if card.card_name == card_name:
+			return card
+	return null
 
 
 ## Efetiva a escolha do jogador — só pode acontecer uma vez por Reino

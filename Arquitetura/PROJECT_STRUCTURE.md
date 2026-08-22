@@ -1,50 +1,12 @@
 # PROJECT_STRUCTURE.md
 
-# Estrutura do Projeto
-
-## Objetivo
-
-Este documento define a organização oficial da documentação de Battle Simulator.
-
-Seu objetivo é:
-
-- organizar toda a documentação do projeto;
-- definir responsabilidades entre os documentos;
-- evitar duplicação de informações;
-- estabelecer um padrão para criação de novos documentos;
-- facilitar futuras expansões do jogo.
-
-Este documento não define mecânicas de jogo.
-
-Sua função é exclusivamente organizar e padronizar toda a documentação do projeto.
-
----
-
-# Filosofia da Documentação
-
-A documentação de Battle Simulator segue os mesmos princípios utilizados no desenvolvimento do jogo:
-
-- simplicidade na leitura;
-- profundidade na implementação;
-- modularidade;
-- reutilização de informações;
-- facilidade de manutenção.
-
-Sempre que possível, cada sistema deve possuir um único documento responsável.
-
-Novas funcionalAqui está a revisão final do documento `PROJECT_STRUCTURE.md`, com as correções de nomenclatura, ajustes de *ownership* e atualização da sequência de leitura aplicados rigorosamente, sem alterar a estrutura geral ou a finalidade do arquivo.
-
----
-
-# PROJECT_STRUCTURE.md
-
 # Estrutura e Organização da Documentação
 
 ## Objetivo
 
-Este documento define a organização oficial, a taxonomia e a estrutura de diretórios de toda a documentação técnica do projeto Battle Simulator.
+Este documento define a organização oficial, a taxonomia e a estrutura de diretórios da documentação técnica de arquitetura do Battle Simulator (`Arquitetura/`).
 
-Seu objetivo é servir como o mapa arquitetural da documentação, garantindo que cada sistema, mecânica ou diretriz possua uma localização única, delimitada e identificável (*Single Source of Truth*).
+Seu objetivo é servir como o mapa da documentação de regras de jogo, garantindo que cada sistema, mecânica ou diretriz possua uma localização única, delimitada e identificável (*Single Source of Truth*).
 
 Este documento **não** define regras de jogo, fórmulas, parâmetros econômicos ou mecânicas de combate.
 
@@ -54,17 +16,17 @@ Este documento **não** define regras de jogo, fórmulas, parâmetros econômico
 
 Este documento é a Fonte Única de Verdade (*Single Source of Truth*) para:
 
-* A árvore oficial de documentos do projeto;
-* A categorização e agrupamento conceitual dos arquivos `/docs`;
-* As convenções de nomenclatura e padrão de estrutura dos arquivos de documentação;
-* A ordem recomendada de leitura e dependência arquitetural;
-* Os princípios de modularidade, escopo e governança documental.
+* A árvore oficial de documentos de `Arquitetura/`;
+* A categorização e agrupamento conceitual desses arquivos;
+* As convenções de nomenclatura e padrão de estrutura de cada documento;
+* A ordem recomendada de leitura e dependência arquitetural dentro de `Arquitetura/`.
 
 Este documento **não** define:
 
 * Decisões formais de desenvolvimento e regras de agentes (`DECISOES.md`);
 * Glossário e termos oficiais do projeto (`GLOSSARY.md`);
-* Regras, balanceamento ou funcionamento interno de qualquer sistema de jogo.
+* Regras, balanceamento ou funcionamento interno de qualquer sistema de jogo;
+* A relação entre `Arquitetura/` e as demais áreas do repositório (`PROJECT_INDEX.md`, na raiz do projeto, é a fonte única de verdade para isso — ver "Relação com as Demais Áreas do Repositório" abaixo, que apenas resume, sem substituir, o que `PROJECT_INDEX.md` já estabelece).
 
 ---
 
@@ -79,48 +41,62 @@ A documentação do Battle Simulator é projetada sob os seguintes pilares:
 
 ---
 
-## Estrutura Oficial da Documentação
+## Estrutura Oficial de `Arquitetura/`
 
-Os documentos do projeto estão organizados rigorosamente nos seguintes grupos conceituais:
+Os documentos abaixo refletem os arquivos que atualmente existem em `Arquitetura/`, organizados por grupo conceitual.
 
-### 1. Governança Arquitetural
+### 1. Governança e Auditoria
 
-Documentos institucionais que estabelecem as regras de desenvolvimento, documentação e manutenção do projeto (não definem mecânicas de jogo).
+Documentos institucionais que estabelecem as regras de desenvolvimento, documentação e manutenção do projeto, e registros de auditoria histórica (não definem mecânicas de jogo).
 
-* `PROJECT_STRUCTURE.md` — Mapa oficial e diretrizes da documentação.
-* `DECISOES.md` — Registro oficial de decisões arquiteturais (*ADR*), políticas e convenções de desenvolvimento.
+* `PROJECT_STRUCTURE.md` — Este documento: mapa e diretrizes da documentação de `Arquitetura/`.
+* `DECISOES.md` — Registro oficial de decisões arquiteturais, políticas e convenções de desenvolvimento; regras para agentes de IA.
+* `AUDITORIA_FINAL_v0.9.md` — Registro histórico de uma auditoria de consistência da arquitetura. Evidência histórica, não autoridade de regra corrente (`PROJECT_INDEX.md`, "Legacy and audit files").
 
-### 2. Visão e Filosofia
+### 2. Visão, Filosofia e Facções
 
-Documentos de fundamentação conceitual, direção de design e linguagem oficial.
+Fundamentação conceitual, direção de design e linguagem oficial.
 
-* `GAME_PHILOSOPHY.md` — Filosofia de design, pilares de balanceamento e diretrizes de experiência do jogador.
-* `GLOSSARY.md` — Dicionário técnico e convenções linguísticas oficiais do projeto.
-* `DESIGN.md` — Diretrizes de design de interface e experiência visual/conceitual.
-* `LORE.md` — Contexto narrativo, temática e universo do jogo.
+* `GAME_PHILOSOPHY.md` — Filosofia de design e pilares de balanceamento.
+* `GLOSSARY.md` — Dicionário técnico e convenções linguísticas oficiais.
+* `LORE.md` — Contexto narrativo e universo do jogo.
+* `FACTION_DESIGN.md` — Identidade e design das Facções (Império, Natureza, Mortos-Vivos).
 
-### 3. Sistemas Centrais e Combate
+### 3. Motor de Combate e Habilidades
 
 Módulos que especificam o funcionamento do motor de simulação e regras de batalha.
 
 * `COMBAT_CORE.md` — Especificação do motor e matemática base de combate.
 * `COMBAT_RULES.md` — Regras de engajamento, alvos e cálculo de dano.
-* `ABILITIES.md` — Mecânicas, gatilhos e catálogo de habilidades.
+* `ABILITIES.md` — Mecânicas, gatilhos e catálogo de Habilidades.
+* `AFFINITY.md` — Regras de afinidade tática entre cartas de uma mesma Facção.
+* `BATTLEFIELDS.md` — Campos de Batalha e seus efeitos.
 
-### 4. Coleção e Progressão de Cartas
+### 4. Cartas e Progressão
 
 Módulos dedicados às entidades colecionáveis e sua evolução.
 
 * `CARD.md` — Estrutura e propriedades formais das cartas.
-* `CARD_PROGRESSION.md` — Sistema de evolução e fusão de cópias de cartas.
-* `AFFINITY.md` — Regras de sinergia e afinidades táticas.
+* `CARD_CATALOG.md` — Catálogo de conteúdo: a ficha de cada carta existente. Descreve conteúdo, não cria regras (as regras pertencem a `CARD.md`/`CARD_PROGRESSION.md`).
+* `CARD_PROGRESSION.md` — Sistema de evolução de Tier e fusão de cópias.
+* `LIBRARY.md` — Biblioteca de coleção do jogador (interface conceitual).
+* `LIBRARY_CONTENT.md` — Conteúdo/receitas de referência da Biblioteca.
 
-### 5. Comandantes e Administração Militar
+### 5. Comandantes, Exércitos e Centro de Comando
 
-Módulos dedicados à liderança, recrutamento e teto de exércitos.
+Módulos dedicados à liderança, geração procedural de Comandantes, recrutamento e organização militar.
 
-* `COMMANDERS.md` — Regras formais, recrutamento, restrições e vantagens dos Comandantes.
-* `SOLDO.md` — Regras de Soldo, composição de Exércitos e limites de Soldo.
+* `COMMANDERS.md` — Regras formais, patentes e coleção de Comandantes.
+* `COMMANDER_GENERATION.md` — Fluxo oficial de geração procedural de Comandantes.
+* `COMMANDER_RESTRICTIONS.md`, `COMMANDER_REQUIREMENTS.md`, `COMMANDER_TARGETS.md`, `COMMANDER_EFFECTS.md`, `COMMANDER_VALUES.md` — Os 5 Bancos Oficiais consumidos pelo motor de geração descrito em `COMMANDER_GENERATION.md`.
+* `ARMY.md` — Estrutura do Exército, Formações e Trava de Edição por Modo de Jogo.
+* `SOLDO.md` — Regras de Soldo e limites de composição de Exércitos.
+* `COMMAND_CENTER.md` — Estados administrativos e organização do Centro de Comando.
+* `COMMAND_CENTER_PROGRESS.md` — Progressão estrutural do Centro de Comando (Infraestrutura/Recursos Administrativos).
+* `COMMAND_CENTER_RECRUITMENT.md` — Recrutamento de Comandantes.
+* `COMMAND_CENTER_TRAINING.md` — Treinamento de Comandantes.
+* `COMMAND_CENTER_LEGACY.md` — Aposentadoria: Legado Administrativo e Grande Legado Militar.
+* `COMMAND_CENTER_UI.md` — Especificação das janelas de interface do Centro de Comando (PvP, Minas, PvE, Treinamento, Legado, Comandantes).
 
 ### 6. Infraestrutura do Reino (Cidade)
 
@@ -128,28 +104,50 @@ Módulos dedicados à progressão urbana e capacidade permanente do Reino.
 
 * `CITY.md` — Organização arquitetural e conceitual da Cidade.
 * `CAPITAL.md` — Regras e limites de expansão da Capital.
-* `COMMAND_CENTER.md` — Limites estruturais da administração militar e reserva.
-* `ACADEMY.md` — Pesquisa tecnológica e desenvolvimento do Reino.
-* `ENERGY_NUCLEUS.md` — Gerenciamento e capacidade do sistema de energia.
-* `DEPOSITS.md` — Armazenamento e proteção dos recursos de construção.
+* `ACADEMY.md` — Produção e Aprimoramento de cartas.
+* `ENERGY_NUCLEUS.md` — Capacidade e taxa de recuperação de Energia.
+* `ENERGY.md` — Sistema de Energia dos Exércitos (consumo, fontes, recuperação).
+* `DEPOSITS.md` — Armazenamento dos Recursos de Construção (Depósito único, três recursos).
+* `MINES.md` — Conquista territorial e extração de Recursos de Construção.
+* `OBSERVATORY.md` — Observatório da Cidade.
 
 ### 7. Economia e Progressão Global
 
-Módulos que regem a matemática financeira, recursos e níveis da conta.
+Módulos que regem a matemática financeira, recursos e progressão permanente da Conta.
 
-* `RESOURCES.md` — Tipos, origens e utilidade dos recursos do jogo.
-* `XP.md` — Sistema de experiência do Comandante e do Reino (Estrutural e Operacional).
+* `RESOURCES.md` — Tipos, origens e utilidade dos recursos do jogo (Fragmentos, VRP/VRG).
+* `GENERATION_POINTS.md` — Pontos de Geração (PG): recurso global de infraestrutura, fonte (XP → PG) e sistemas consumidores.
+* `XP.md` — Sistema de Experiência do Comandante e da Conta (Reino).
 * `FORMULAS.md` — Curvas matemáticas, fórmulas de custo e Coeficiente Econômico Global (CEG).
+* `BALANCING_SIMULATION.md` — Simulações de calibração de balanceamento; registra os parâmetros `b`/`x` atualmente vigentes por construção.
 
 ### 8. Modos de Jogo e Competição
 
-Módulos que especificam as interfaces de jogo e regras de partida.
+Módulos que especificam as regras de partida e progressão pelos modos de jogo.
 
-* `PvE.md` — Estrutura de campanhas, trilhas, fases e chefes.
+* `PvE.md` — Estrutura de Campanha: Territórios, Trilhas, Fases, Acampamentos, Chefes.
 * `MATCHMAKING.md` — Algoritmo e regras de pareamento de partidas PvP.
-* `RANKING.md` — Ligas, divisões e pontuação competitiva.
-* `MINES.md` — Conquista territorial e extração de recursos no mapa.
-* `SEASONS.md` — Ciclos temporais de temporada e expansão permanente do mundo.
+* `RANKING.md` — Ligas, Divisões e pontuação competitiva.
+* `SEASONS.md` — Ciclos temporais de Temporada e expansão permanente do mundo.
+
+### 9. Onboarding
+
+* `TUTORIAL.md` — Especificação do fluxo de tutorial do jogador.
+* `TUTORIAL_REVIEW.md` — Revisão/apontamentos sobre o tutorial. Documento de revisão, não redefine regras já estabelecidas em `TUTORIAL.md`.
+
+---
+
+## Relação com as Demais Áreas do Repositório
+
+Esta seção apenas resume — não substitui — a hierarquia de autoridade oficial definida em `PROJECT_INDEX.md` (raiz do projeto).
+
+* **`Arquitetura/`** (este diretório): fonte única de verdade das regras de jogo atuais. É o único diretório que este documento organiza em detalhe.
+* **`Fundation/`**: diretrizes de produção e arte (bíblias visuais, layouts de interação, catálogos de arte). Explica *como construir/apresentar* um sistema — nunca sobrepõe silenciosamente uma regra de jogo definida em `Arquitetura/`.
+* **`Game/`**: implementação em Godot/GDScript das regras definidas em `Arquitetura/`. Código é evidência do estado atual da implementação, nunca autoridade sobre a regra documentada.
+* **`Assets/`**: arquivos de arte e recursos de produção atualmente entregues.
+* **`Ideias/`**: propostas futuras, não-canônicas. Sem autoridade sobre o jogo atual até promoção explícita.
+
+Em caso de dúvida sobre qual diretório é autoritativo para uma dada pergunta, `PROJECT_INDEX.md` prevalece sobre este resumo.
 
 ---
 
@@ -160,48 +158,10 @@ Todo documento técnico de sistema deve adotar a seguinte estrutura padronizada 
 1. **Título do Documento:** Nome oficial do módulo/sistema.
 2. **Objetivo:** Declaração sucinta do propósito do documento no jogo.
 3. **Responsabilidade do Documento:** Lista explícita do que o documento especifica (SSOT) e do que ele **não** define (com redirecionamentos).
-4. **Funcionamento:** Explica o funcionamento conceitual do sistema e suas relações principais com os demais módulos do jogo (sem implementação de código).
+4. **Funcionamento/Filosofia:** Explica o funcionamento conceitual do sistema e suas relações principais com os demais módulos do jogo (sem implementação de código).
 5. **Regras:** Definições formais, invariantes e limitações do sistema.
 6. **Regras Permanentes:** Diretrizes arquiteturais imutáveis que regem o módulo.
 7. **Referências:** Lista de links para os documentos correlatos.
-
----
-
-## Ordem Recomendada de Leitura
-
-Para compreender a arquitetura completa do Battle Simulator de forma lógica e incremental, recomenda-se a seguinte sequência de leitura:
-
-```
-[1. Governança & Fundamentos]
-   ├── PROJECT_STRUCTURE.md
-   ├── DECISOES.md
-   ├── GLOSSARY.md
-   └── GAME_PHILOSOPHY.md
-
-[2. Motor de Combate (Núcleo)]
-   ├── COMBAT_CORE.md
-   ├── COMBAT_RULES.md
-   └── ABILITIES.md
-
-[3. Coleção & Liderança]
-   ├── CARD.md
-   ├── CARD_PROGRESSION.md
-   ├── COMMANDERS.md
-   └── SOLDO.md
-
-[4. Infraestrutura & Economia]
-   ├── RESOURCES.md
-   ├── FORMULAS.md
-   ├── CITY.md
-   └── XP.md
-
-[5. Modos de Jogo & Competição]
-   ├── PvE.md
-   ├── MATCHMAKING.md
-   ├── MINES.md
-   └── SEASONS.md
-
-```
 
 ---
 
@@ -210,435 +170,13 @@ Para compreender a arquitetura completa do Battle Simulator de forma lógica e i
 * **Inexistência de Duplicidade:** Se uma regra já estiver definida em seu documento proprietário, nenhum outro arquivo deve repeti-la; deve-se utilizar apenas uma referência formal (ex: `Ver: SOLDO.md`).
 * **Expansão sem Quebra:** Novos sistemas devem ser adicionados através de novos arquivos Markdown, registrando-os neste documento sem alterar a estrutura dos arquivos existentes.
 * **Consistência Atemporal:** Alterações nas regras do jogo atualizam o documento proprietário da mecânica, mantendo a estrutura deste guia de organização estável e atemporal.
+* **Este documento reflete o repositório real:** nenhuma entrada aqui deve referenciar um arquivo que não existe em `Arquitetura/`. Ao criar um novo documento de arquitetura, adicione-o aqui na mesma alteração.
 
 ---
 
 ## Referências
 
-* **DECISOES.md:** Políticas de desenvolvimento, regras de agentes de IA e congelamento de documentos.
-* **GLOSSARY.md:** Definições conceituais da terminologia oficial do projeto.
-* **GAME_PHILOSOPHY.md:** Princípios gerais de design e experiência do jogo.idades devem reutilizar sistemas existentes antes de criar novas regras.
-
----
-
-# Organização da Documentação
-
-A documentação está organizada por sistemas independentes.
-
-Cada sistema possui um documento principal responsável por definir suas regras.
-
-## 1. Visão do Projeto
-
-Define a identidade do jogo.
-
-Documentos:
-
-- VISION.md
-- DESIGN.md
-- LORE.md
-- GLOSSARY.md
-
----
-
-## 2. Mecânicas Centrais
-
-Responsáveis pelas regras fundamentais do jogo.
-
-Documentos:
-
-- COMBAT_CORE.md
-- COMBAT_RULES.md
-- ABILITIES.md
-- ENERGY.md
-- ENERGY_NUCLEUS.md
-- FORMULAS.md
-- XP.md
-
----
-
-## 3. Cartas
-
-Responsáveis pelas unidades do jogo.
-
-Documentos:
-
-- CARD.md
-- CARD_CATALOG.md
-- CARD_PROGRESSION.md
-- FACTION_IDENTITY.md
-- FACTION_DESIGN.md
-
----
-
-## 4. Comandantes
-
-Responsáveis pelo sistema completo de comandantes.
-
-Documentos:
-
-- COMMANDERS.md
-- COMMAND_CENTER.md
-- COMMAND_CENTER_TRAINING.md
-- ACADEMY.md
-- LEGACY.md
-- SOLDO.md
-
----
-
-## 5. Cidade
-
-Responsáveis pela progressão permanente do Reino.
-
-Documentos:
-
-- CITY.md
-- CAPITAL.md
-- MINES.md
-- DEPOSITS.md
-- OBSERVATORY.md
-- RESOURCES.md
-
----
-
-## 6. Modos de Jogo
-
-Documentos responsáveis pelos diferentes modos disponíveis.
-
-Documentos:
-
-- GAME_LOOP.md
-- PvE.md
-- MATCHMAKING.md
-- BATTLEFIELDS.md
-- SEASONS.md
-
----
-
-## 7. Desenvolvimento
-
-Documentação utilizada durante o desenvolvimento do projeto.
-
-Documentos:
-
-- ROADMAP.md
-- IMPLEMENTATION_ROADMAP.md
-- MVP_TEST_PLAN.md
-- CHANGELOG.md
-- TODO.md
-- RELATORIO_DE_BALANCEAMENTO.md
-
----
-
-# Princípios da Documentação
-
-## 1. Fonte Única da Verdade
-
-Cada sistema possui exatamente um documento responsável por definir suas regras.
-
-Todos os demais documentos devem apenas referenciar esse documento.
-
-Exemplo:
-
-As regras de Tier pertencem exclusivamente ao CARD_PROGRESSION.md.
-
-Nenhum outro documento deve redefinir essas regras.
-
----
-
-## 2. Um Sistema, Um Documento
-
-Cada documento deve possuir uma responsabilidade clara.
-
-Sempre que possível, um documento deve responder apenas por um único sistema.
-
----
-
-## 3. Catálogos não criam regras
-
-Catálogos descrevem conteúdo.
-
-Nunca definem mecânicas.
-
-Exemplo:
-
-CARD_CATALOG.md descreve cartas.
-
-As regras pertencem a CARD.md.
-
----
-
-## 4. O Glossário é a referência oficial
-
-Todos os termos utilizados na documentação devem seguir as definições presentes em GLOSSARY.md.
-
-Novas definições devem ser adicionadas exclusivamente ao Glossário.
-
----
-
-## 5. Referenciar é melhor do que repetir
-
-Sempre que uma informação já estiver documentada em outro arquivo, deve-se utilizar uma referência ao documento oficial.
-
-Evitar copiar regras entre documentos.
-
----
-
-## 6. Inconsistências devem ser corrigidas
-
-Caso duas definições diferentes sejam encontradas para o mesmo sistema, considera-se que a documentação está inconsistente.
-
-A inconsistência deve ser corrigida.
-
-Nunca deve existir mais de uma definição válida para uma mesma regra.
-
----
-
-## 7. Documentos devem evoluir de forma independente
-
-Sempre que um sistema puder evoluir independentemente dos demais, ele deve possuir documentação própria.
-
-Isso reduz retrabalho e facilita futuras expansões.
-
----
-
-# Critérios para Criação de Novos Documentos
-
-Um novo documento deve ser criado quando:
-
-- o sistema possuir regras próprias;
-- puder evoluir independentemente;
-- for utilizado por vários outros sistemas;
-- tornar um documento existente excessivamente grande.
-
-Não criar documentos apenas para separar conteúdo visualmente.
-
-Criar documentos apenas quando existir ganho real de organização.
-
----
-
-# Convenções da Documentação
-
-Todos os documentos devem seguir, sempre que possível, a estrutura abaixo.
-
-## Objetivo
-
-Explica por que aquele sistema existe.
-
----
-
-## Funcionamento
-
-Explica como o sistema funciona.
-
----
-
-## Regras
-
-Define todas as regras oficiais do sistema.
-
----
-
-## Observações
-
-Informações complementares.
-
-Utilizar apenas quando necessário.
-
----
-
-## Referências
-
-Sempre que um sistema depender de outro documento, a referência deve ser feita ao documento oficial.
-
----
-
-# Processo de Manutenção da Documentação
-
-Sempre que uma regra for alterada, deve-se seguir obrigatoriamente o processo abaixo.
-
-## 1.
-
-Alterar o documento responsável pela regra.
-
----
-
-## 2.
-
-Identificar todos os documentos que fazem referência a essa regra.
-
----
-
-## 3.
-
-Revisar esses documentos.
-
----
-
-## 4.
-
-Corrigir eventuais inconsistências.
-
----
-
-## 5.
-
-Atualizar exemplos, quando necessário.
-
----
-
-## 6.
-
-Caso a alteração torne um documento excessivamente grande ou gere um novo sistema independente, avaliar a criação de um novo documento.
-
----
-
-# Estrutura Atual do Projeto
-
-## Visão
-
-- VISION.md
-- DESIGN.md
-- LORE.md
-- GLOSSARY.md
-
----
-
-## Mecânicas
-
-- COMBAT_CORE.md
-- COMBAT_RULES.md
-- ABILITIES.md
-- ENERGY.md
-- FORMULAS.md
-- XP.md
-
----
-
-## Cartas
-
-- CARD.md
-- CARD_CATALOG.md
-- CARD_PROGRESSION.md
-- FACTION_IDENTITY.md
-
----
-
-## Comandantes
-
-- COMMANDERS.md
-- COMMAND_CENTER.md
-- ACADEMY.md
-- LEGACY.md
-- SOLDO.md
-
----
-
-## Cidade
-
-- CITY.md
-- CAPITAL.md
-- MINES.md
-- DEPOSITS.md
-- OBSERVATORY.md
-- RESOURCES.md
-
----
-
-## Modos de Jogo
-
-- GAME_LOOP.md
-- PvE.md
-- MATCHMAKING.md
-- BATTLEFIELDS.md
-- SEASONS.md
-
----
-
-## Desenvolvimento
-
-- ROADMAP.md
-- IMPLEMENTATION_ROADMAP.md
-- MVP_TEST_PLAN.md
-- CHANGELOG.md
-- TODO.md
-- RELATORIO_DE_BALANCEAMENTO.md
-
----
-
-# Ordem Recomendada de Leitura
-
-Para compreender completamente Battle Simulator, recomenda-se a seguinte sequência:
-
-## Etapa 1 — Visão Geral
-
-1. VISION.md
-2. GLOSSARY.md
-3. DESIGN.md
-4. LORE.md
-
----
-
-## Etapa 2 — Mecânicas Centrais
-
-5. ENERGY_NUCLEUS.md
-6. COMBAT_CORE.md
-7. COMBAT_RULES.md
-8. ABILITIES.md
-9. ENERGY.md
-10. FORMULAS.md
-11. XP.md
-
----
-
-## Etapa 3 — Cartas
-
-13. CARD.md
-14. CARD_CATALOG.md
-15. CARD_PROGRESSION.md
-16. FACTION_IDENTITY.md
-
----
-
-## Etapa 4 — Comandantes
-
-17. COMMANDERS.md
-18. COMMAND_CENTER.md
-19. ACADEMY.md
-20. LEGACY.md
-21. SOLDO.md
-
----
-
-## Etapa 5 — Cidade
-
-22. CITY.md
-23. CAPITAL.md
-24. MINES.md
-25. DEPOSITS.md
-26. OBSERVATORY.md
-27. RESOURCES.md
-
----
-
-## Etapa 6 — Modos de Jogo
-
-28. PvE.md
-29. MATCHMAKING.md
-30. BATTLEFIELDS.md
-31. SEASONS.md
-
----
-
-# Filosofia Final
-
-Battle Simulator foi concebido para ser um jogo de alta profundidade estratégica com regras simples de compreender.
-
-A documentação segue exatamente a mesma filosofia.
-
-Cada documento deve possuir um propósito claro.
-
-Cada sistema deve possuir uma única fonte oficial.
-
-Sempre que possível, sistemas devem ser reutilizados em vez de duplicados.
-
-Uma documentação bem organizada reduz inconsistências, facilita a implementação, simplifica o balanceamento e permite que novas temporadas sejam adicionadas sem necessidade de reestruturar o projeto.
+* **PROJECT_INDEX.md** (raiz do projeto) — Mapa de roteamento canônico entre todas as áreas do repositório e hierarquia de autoridade.
+* **DECISOES.md** — Políticas de desenvolvimento, regras de agentes de IA e convenções de congelamento de documentos.
+* **GLOSSARY.md** — Definições conceituais da terminologia oficial do projeto.
+* **GAME_PHILOSOPHY.md** — Princípios gerais de design e experiência do jogo.

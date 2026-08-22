@@ -174,7 +174,7 @@ func _build_static_structure() -> void:
 	_root_vbox.add_child(_formations_section)
 
 	var formations_title := Label.new()
-	formations_title.text = "Posicionar Cartas (arraste a força certa pra cada posição):"
+	formations_title.text = "Posicionar Cartas (escolha a carta certa pra cada posição no menu):"
 	_formations_section.add_child(formations_title)
 
 	_formation_tabs_row = HBoxContainer.new()

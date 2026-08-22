@@ -69,6 +69,8 @@ Todos os pelotões do Império recebem:
 #### Afinidade II
 Enquanto uma linha ou coluna for composta exclusivamente por pelotões do Império, todos os pelotões dessa formação recebem 20% menos dano de todas as fontes.
 
+> **Decisão resolvida (F-036):** "composta exclusivamente" exige as 3 posições da linha/coluna OCUPADAS e todas pertencentes ao Império. Uma posição vaga (por morte em batalha, ainda sem substituição) já desqualifica aquela linha/coluna, mesmo sem nenhum pelotão de outra Facção presente.
+
 #### Afinidade III
 As Características de Unidade dos pelotões do Império passam a utilizar seus Valores Aprimorados.
 

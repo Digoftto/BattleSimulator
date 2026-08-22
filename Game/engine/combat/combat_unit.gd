@@ -41,6 +41,19 @@ var barreira_position_bonus_applied: bool = false
 ## agnósticos dessa regra (decisão registrada nas Sprints 16/17/19).
 var silenced_until_turn: int = -1
 
+## F-035 (AFFINITY.md, Afinidade II do Império): multiplicador de dano
+## RECEBIDO, recalculado a cada snapshot de turno (AffinityRuntime).
+## 1.0 = sem redução. Nunca persiste entre turnos por si só — sempre
+## reescrito no snapshot seguinte, mesmo quando o efeito continua ativo.
+var affinity_incoming_damage_multiplier: float = 1.0
+
+## F-035 (AFFINITY.md, Afinidade II da Natureza): true quando este
+## pelotão ainda não consumiu o bônus de "primeira cura do turno" (+10
+## HP). Recalculado no snapshot de turno (true se a Afinidade II da
+## Natureza estiver ativa para a Facção/lado); consumido (-> false) na
+## primeira Cura Estrutural que este pelotão receber naquele turno.
+var affinity_first_heal_bonus_available: bool = false
+
 
 func _init(p_card: CardResource, p_side: int, p_position: int) -> void:
 	card = p_card

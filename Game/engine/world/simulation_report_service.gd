@@ -105,6 +105,20 @@ static func _enemy_entry_to_dict(entry: EnemyArmyEntry) -> Dictionary:
 		"cards": entry.cards.map(func(c: CardResource) -> Dictionary: return card_to_dict(c)),
 		"commander_name": entry.commander.commander_name if entry.commander != null else "",
 		"commander_faction": entry.commander.faction if entry.commander != null else "",
+		# F-006: accumulated_xp precisa sobreviver ao round-trip — é dele
+		# que Army.commander_patente() deriva a Patente e, por consequência,
+		# o teto de Soldo (Army.is_soldo_within_cap()). Sem isso, todo
+		# Comandante recarregado voltava com accumulated_xp=0 ("Recruta",
+		# teto 18) mesmo quando EnemyArmyGenerator._build_commander() tinha
+		# deliberadamente atribuído a Patente mais alta da Região (ex:
+		# "Major", teto 24, pra Região 1) — reprovando Army.is_ready_for_battle()
+		# para composições geradas validamente (achado da F-005).
+		"commander_accumulated_xp": entry.commander.accumulated_xp if entry.commander != null else 0,
+		# Doutrina (Chefes Regionais/Normais/de Mina) — mesmo formato já
+		# usado por KingdomSaveService._doctrine_to_dict(): só os códigos
+		# dos 5 componentes (cada um já mora no GameDatabase como Resource
+		# do catálogo oficial), sem duplicar esse conteúdo no arquivo.
+		"commander_doctrine": _doctrine_to_dict(entry.commander.doctrine) if entry.commander != null else {},
 	}
 
 
@@ -127,9 +141,64 @@ static func _dict_to_enemy_entry(data: Dictionary) -> EnemyArmyEntry:
 		var commander := CommanderResource.new()
 		commander.commander_name = data.get("commander_name", "")
 		commander.faction = data.get("commander_faction", "")
+		commander.accumulated_xp = data.get("commander_accumulated_xp", 0)
+		commander.doctrine = _dict_to_doctrine(data.get("commander_doctrine", {}))
 		entry.commander = commander
 
 	return entry
+
+
+## Serialização da Doutrina de um Comandante — mesmo formato de
+## KingdomSaveService._doctrine_to_dict() (só os códigos dos 5
+## componentes, já carregados do catálogo oficial em GameDatabase).
+## {} quando o Comandante não tem Doutrina (ex: Fases Normais —
+## EnemyArmyGenerator._build_commander() nunca atribui Doutrina a um
+## Comandante "técnico" de Fase Normal).
+static func _doctrine_to_dict(doctrine: CommanderDoctrine) -> Dictionary:
+	if doctrine == null:
+		return {}
+	return {
+		"faction": doctrine.faction,
+		"restriction_code": doctrine.restriction.code,
+		"restriction_param": doctrine.restriction_param,
+		"requirement_code": doctrine.requirement.code,
+		"requirement_param": doctrine.requirement_param,
+		"target_code": doctrine.target.code,
+		"effect_code": doctrine.effect.code,
+		"value_code": doctrine.value.code,
+		"rarity_score": doctrine.rarity_score,
+	}
+
+
+## Reconstrói a Doutrina buscando cada componente no GameDatabase pelo
+## código salvo. null quando data estiver vazio (sem Doutrina) ou algum
+## código salvo não existir mais no catálogo atual.
+static func _dict_to_doctrine(data: Dictionary) -> CommanderDoctrine:
+	if data.is_empty():
+		return null
+
+	var doctrine := CommanderDoctrine.new()
+	doctrine.faction = data.get("faction", "")
+	doctrine.restriction = _find_by_code(GameDatabase.commander_restrictions, data.get("restriction_code", ""))
+	doctrine.restriction_param = data.get("restriction_param", "")
+	doctrine.requirement = _find_by_code(GameDatabase.commander_requirements, data.get("requirement_code", ""))
+	doctrine.requirement_param = data.get("requirement_param", "")
+	doctrine.target = _find_by_code(GameDatabase.commander_targets, data.get("target_code", ""))
+	doctrine.effect = _find_by_code(GameDatabase.commander_effects, data.get("effect_code", ""))
+	doctrine.value = _find_by_code(GameDatabase.commander_values, data.get("value_code", ""))
+	doctrine.rarity_score = data.get("rarity_score", 0)
+
+	if doctrine.restriction == null or doctrine.requirement == null or doctrine.target == null or doctrine.effect == null or doctrine.value == null:
+		return null
+
+	return doctrine
+
+
+static func _find_by_code(bank: Array, code: String) -> Variant:
+	for entry: Variant in bank:
+		if entry.code == code:
+			return entry
+	return null
 
 
 ## Serialização leve de carta — só os campos que definem a carta em si

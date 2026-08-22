@@ -427,9 +427,9 @@ Modo de jogo voltado à conquista de territórios e extração de recursos.
 
 ### Arsenal
 
-Interface dedicada à gestão e composição militar do Reino.
+Interface dedicada à gestão e composição militar do Reino. Acessado através do Centro de Comando, não como destino direto da Cidade (F-016/F-017).
 
-* Ver: `COMMANDERS.md`
+* Ver: `COMMANDERS.md`, `COMMAND_CENTER_UI.md`
 
 ### Biblioteca
 

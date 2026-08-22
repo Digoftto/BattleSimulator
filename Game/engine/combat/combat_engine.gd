@@ -8,10 +8,16 @@ extends RefCounted
 ## Classe, cálculo de dano/cura e Condições de Encerramento.
 ##
 ## Não implementa Habilidades (Tier I/III/V), Buffs, Debuffs, Cooldown,
-## Duração, Reanimação/Evocação, aplicação de efeitos de Afinidade/Campo
-## de Batalha/Doutrina. Onde essas regras se conectariam, há um ponto de
-## extensão comentado (ver _environment_update_phase), mas nenhuma lógica
-## é implementada.
+## Duração, Reanimação/Evocação, aplicação de efeitos de Campo de
+## Batalha/Doutrina (além dos já cobertos por CommanderDoctrineRuntime).
+## Onde essas regras se conectariam, há um ponto de extensão comentado
+## (ver _environment_update_phase), mas nenhuma lógica é implementada.
+##
+## F-035: Afinidade (AFFINITY.md) passou a ser aplicada — ver
+## AffinityRuntime. Nível III ("Valores Aprimorados") permanece
+## bloqueado por ausência de valores numéricos em CARD_CATALOG.md; ver
+## AffinityRuntime para o detalhamento completo do que está e do que
+## não está implementado.
 ##
 ## Puramente determinístico quanto à estrutura: recebe os Exércitos e o
 ## catálogo de Campos de Batalha por parâmetro. Não depende de
@@ -20,13 +26,27 @@ extends RefCounted
 const MAX_TURNS: int = 64
 const STRUCTURAL_HEAL_AMOUNT: int = 20  # Cura Estrutural da Classe Suporte (COMBAT_RULES.md 4.2.3)
 
+## F-028: versão das regras de combate estruturais implementadas por
+## esta classe (COMBAT_CORE.md/COMBAT_RULES.md) — copiada em
+## CombatState.rules_version no momento da criação de cada batalha, pra
+## que um resultado antigo permaneça interpretável mesmo depois que
+## este valor mudar. Sistema deliberadamente simples (F-028, escopo
+## aprovado): apenas uma String comparável, sem parsing semântico
+## (major/minor), sem migração — só o suficiente pra nunca misturar
+## dados estatísticos de regras diferentes.
+const RULES_VERSION: String = "1.0"
+
 
 ## Executa uma batalha completa entre army_a (lado 0) e army_b (lado 1) e
 ## retorna o Combat State final, já com o Resultado preenchido.
 ## "game_mode" ("pve" | "pvp" | "mines") é opcional — usado pela
 ## Doutrina do Comandante (Restrições/Requisitos de domínio "game_mode").
-static func run_battle(army_a: Army, army_b: Army, battlefields: Array[BattlefieldResource], abilities_by_name: Dictionary, unit_traits: Array[UnitTraitResource], game_mode: String = "pve") -> CombatState:
-	var state: CombatState = initialize(army_a, army_b, battlefields, abilities_by_name, unit_traits, game_mode)
+## "seed_value" é opcional (F-028): omitido (ou negativo), o
+## comportamento é idêntico ao de antes — RNG verdadeiramente aleatório.
+## Fornecido (>= 0), a batalha inteira (Campo de Batalha, Habilidades
+## dependentes de RNG) se torna reproduzível — ver CombatState._init().
+static func run_battle(army_a: Army, army_b: Army, battlefields: Array[BattlefieldResource], abilities_by_name: Dictionary, unit_traits: Array[UnitTraitResource], game_mode: String = "pve", seed_value: int = -1) -> CombatState:
+	var state: CombatState = initialize(army_a, army_b, battlefields, abilities_by_name, unit_traits, game_mode, seed_value)
 	run(state)
 	return state
 
@@ -34,27 +54,48 @@ static func run_battle(army_a: Army, army_b: Army, battlefields: Array[Battlefie
 ## Inicializa o Combat State (Preparação + Turno 1 pronto para começar),
 ## sem executar nenhum turno. Exposto separadamente de run_battle() para
 ## permitir registrar ouvintes em state.event_bus antes da execução
-## (ver validação em bootstrap.gd).
-static func initialize(army_a: Army, army_b: Army, battlefields: Array[BattlefieldResource], abilities_by_name: Dictionary, unit_traits: Array[UnitTraitResource], game_mode: String = "pve") -> CombatState:
-	return _initialize(army_a, army_b, battlefields, abilities_by_name, unit_traits, game_mode)
+## (ver validação em bootstrap.gd). "seed_value": ver run_battle().
+static func initialize(army_a: Army, army_b: Army, battlefields: Array[BattlefieldResource], abilities_by_name: Dictionary, unit_traits: Array[UnitTraitResource], game_mode: String = "pve", seed_value: int = -1) -> CombatState:
+	return _initialize(army_a, army_b, battlefields, abilities_by_name, unit_traits, game_mode, seed_value)
 
 
 ## Executa o loop de turnos de um Combat State já inicializado, até a
-## Conclusão da batalha.
+## Conclusão da batalha, publicando BATTLE_FINISHED exatamente uma vez
+## ao final (F-028) — cobre tanto o caminho normal (fim por eliminação/
+## limite de turnos, decidido dentro de _run_turn) quanto o caminho de
+## bloqueio por Restrição de Campo de Batalha, que já chega aqui com
+## is_finished = true vindo de _initialize() (loop roda zero vezes).
+## Chamadas que só usam initialize() sem nunca chamar run() (alguns
+## testes, deliberadamente) nunca publicam este evento — consistente
+## com o fato de que, do ponto de vista de quem chama, a batalha nunca
+## foi de fato executada.
 static func run(state: CombatState) -> void:
 	while not state.is_finished:
 		_run_turn(state)
+	_publish_battle_finished(state)
+
+
+static func _publish_battle_finished(state: CombatState) -> void:
+	var finished_ctx := CombatContext.new()
+	finished_ctx.state = state
+	finished_ctx.turn = state.turn
+	state.event_bus.publish(CombatEventType.Type.BATTLE_FINISHED, finished_ctx)
 
 
 # ---------------------------------------------------------------------------
 # Inicialização (COMBAT_RULES.md, capítulo 2)
 # ---------------------------------------------------------------------------
 
-static func _initialize(army_a: Army, army_b: Army, battlefields: Array[BattlefieldResource], abilities_by_name: Dictionary, unit_traits: Array[UnitTraitResource], game_mode: String = "pve") -> CombatState:
+static func _initialize(army_a: Army, army_b: Army, battlefields: Array[BattlefieldResource], abilities_by_name: Dictionary, unit_traits: Array[UnitTraitResource], game_mode: String = "pve", seed_value: int = -1) -> CombatState:
 	assert(army_a.is_ready_for_battle(), "CombatEngine: Exército A não está pronto para batalha (ver ARMY.md/Army.is_ready_for_battle()).")
 	assert(army_b.is_ready_for_battle(), "CombatEngine: Exército B não está pronto para batalha (ver ARMY.md/Army.is_ready_for_battle()).")
 
-	var state := CombatState.new()
+	# F-028: a seed precisa existir ANTES do primeiro consumo de RNG
+	# desta batalha — o sorteio do Campo de Batalha, logo abaixo, é
+	# exatamente esse primeiro consumo. CombatState._init() já aplica a
+	# seed (ou randomiza, se omitida) antes de devolver a instância —
+	# nenhum RNG é consumido entre a criação do CombatState e este ponto.
+	var state := CombatState.new(seed_value)
 	state.game_mode = game_mode
 	state.commander_a = army_a.commander
 	state.commander_b = army_b.commander
@@ -90,6 +131,12 @@ static func _initialize(army_a: Army, army_b: Army, battlefields: Array[Battlefi
 	for unit: CombatUnit in state.units:
 		_apply_initial_position_effects(unit)
 		_apply_doctrine_hp_shield_bonus(unit, state)
+
+	# F-035 (COMBAT_RULES.md 2.1, itens 5 e 7): snapshot inicial de
+	# Afinidade, seguido da aplicação dos bônus de Nível I de atributo
+	# "Base" (ESC do Império / HP da Natureza) — ver AffinityRuntime.
+	AffinityRuntime.snapshot_turn(state)
+	AffinityRuntime.apply_initial_stat_bonuses(state)
 
 	state.effect_runtime = EffectRuntime.new()
 	state.effect_runtime.initialize(state, abilities_by_name, unit_traits)
@@ -198,17 +245,20 @@ static func _format_line_snapshot(state: CombatState, side: int, positions: Arra
 	return " ".join(parts)
 
 
-## Ponto de extensão: Atualização do Combat State (Ambiente) — Efeitos de
-## Campo de Batalha, recálculo de Afinidade e aplicação de Buffs/Debuffs
-## ativos entrariam aqui (COMBAT_RULES.md 3.2). Nenhuma lógica é
-## implementada nesta Sprint.
-static func _environment_update_phase(_state: CombatState) -> void:
-	pass
+## Atualização do Combat State (Ambiente) — COMBAT_RULES.md 3.2, item 2.
+## F-035: recálculo e snapshot dos Níveis de Afinidade (AffinityRuntime).
+## Efeitos de Campo de Batalha e Buffs/Debuffs ativos permanecem como
+## ponto de extensão — nenhuma lógica adicional é implementada aqui.
+static func _environment_update_phase(state: CombatState) -> void:
+	AffinityRuntime.snapshot_turn(state)
 
 
 ## Movimentação (Fase de Avanço, 5.2). Avanço automático por coluna,
-## processado do fundo para a frente, respeitando as exceções estruturais
-## de Suporte (5.2.3) e Máquina de Guerra (6.6/posição fixa).
+## processado do fundo para a frente, respeitando a exceção estrutural de
+## Suporte (5.2.3/6.5). A Máquina de Guerra só tem restrição de
+## posicionamento INICIAL (6.6, posição 9 obrigatória) — depois de
+## iniciado o combate, segue a regra geral de avanço como qualquer outra
+## Classe (não é uma exceção de movimento).
 static func _movement_phase(state: CombatState) -> void:
 	for side in [0, 1]:
 		for column: Array in CombatBoard.COLUMNS:
@@ -238,25 +288,41 @@ static func _movement_phase(state: CombatState) -> void:
 				state.event_bus.publish(CombatEventType.Type.UNIT_MOVED, move_ctx)
 
 
-## Regra geral: avança se a posição à frente estiver livre. Exceções
-## estruturais (5.2.3): Máquina de Guerra nunca avança; Suporte só avança
-## se não houver aliado atrás, ou se o único aliado atrás for uma Máquina
-## de Guerra.
+## Regra geral: avança se a posição à frente estiver livre. Exceção
+## estrutural (5.2.3): apenas a Classe Suporte tem regra de movimento
+## própria (6.5, Cadeia de Bloqueio) — Máquina de Guerra segue a regra
+## geral como qualquer outra Classe (sua única restrição é de
+## posicionamento INICIAL, 6.6, aplicada em _place_army(), nunca aqui).
 static func _can_advance(state: CombatState, unit: CombatUnit) -> bool:
 	match unit.card.card_class:
-		"Máquina de Guerra":
-			return false
 		"Suporte":
-			var allies_behind: Array[CombatUnit] = []
-			for behind_pos: int in CombatBoard.positions_behind(unit.position):
-				var ally: CombatUnit = state.unit_at(unit.side, behind_pos)
-				if ally != null:
-					allies_behind.append(ally)
-			if allies_behind.is_empty():
-				return true
-			return allies_behind.size() == 1 and allies_behind[0].card.card_class == "Máquina de Guerra"
+			return _support_chain_clear(state, unit)
 		_:
 			return true
+
+
+## Cadeia de Bloqueio do Suporte (COMBAT_RULES.md 6.5). Verifica apenas a
+## posição IMEDIATAMENTE atrás de "unit":
+## - Vazia, ou ocupada por Máquina de Guerra: nunca bloqueia — a cadeia
+##   termina aqui, o que estiver mais atrás (mesmo um pelotão
+##   convencional) é irrelevante (Máquina de Guerra é opaca à cadeia).
+## - Ocupada por outro Suporte: a mesma verificação se aplica
+##   recursivamente a esse Suporte (Suporte é transparente à cadeia — é
+##   preciso checar o que está atrás DELE também).
+## - Ocupada por qualquer outra Classe (Corpo a Corpo, Barreira, À
+##   Distância ou Mago): bloqueia o avanço de toda a cadeia de Suportes
+##   à sua frente.
+static func _support_chain_clear(state: CombatState, unit: CombatUnit) -> bool:
+	var behind_positions: Array[int] = CombatBoard.positions_behind(unit.position)
+	if behind_positions.is_empty():
+		return true
+
+	var ally: CombatUnit = state.unit_at(unit.side, behind_positions[0])
+	if ally == null or ally.card.card_class == "Máquina de Guerra":
+		return true
+	if ally.card.card_class == "Suporte":
+		return _support_chain_clear(state, ally)
+	return false
 
 
 static func _apply_arrival_position_effects(unit: CombatUnit) -> void:
@@ -371,22 +437,32 @@ static func _assign_heal_actions(state: CombatState, side: int, healers: Array[C
 			actions[healer] = {"type": "none"}
 
 
+## F-033: prioriza o menor PERCENTUAL de HP restante (current_hp /
+## card.hp), não o maior déficit ABSOLUTO — antes desta mudança, uma
+## unidade de HP máximo alto podia monopolizar a cura mesmo estando
+## proporcionalmente menos ferida que uma unidade de HP máximo baixo
+## (ex: 400/1000 = 40% perdia pra 250/500 = 50% no critério antigo,
+## mesmo a segunda estando mais ferida na proporção). Desempate: menor
+## número de posição (mais perto da Posição 1) — decisão explícita do
+## proprietário, não uma noção geométrica nova (a numeração de posições
+## já existente é usada diretamente, nunca OFFICIAL_RESOLUTION_ORDER,
+## que é uma ordem de RESOLUÇÃO de ações simultâneas, não de
+## PROXIMIDADE à Posição 1).
 static func _most_injured_ally(state: CombatState, side: int, exclude: Array[CombatUnit]) -> CombatUnit:
 	var best: CombatUnit = null
-	var best_loss: int = 0
+	var best_hp_ratio: float = 1.0
 
 	for unit: CombatUnit in state.units_of_side(side):
 		if exclude.has(unit):
 			continue
-		var loss: int = unit.card.hp - unit.current_hp
-		if loss <= 0:
+		if unit.current_hp >= unit.card.hp:
 			continue
-		var is_better: bool = loss > best_loss
-		var is_tied_with_priority: bool = loss == best_loss and best != null and \
-			CombatBoard.OFFICIAL_RESOLUTION_ORDER.find(unit.position) < CombatBoard.OFFICIAL_RESOLUTION_ORDER.find(best.position)
+		var hp_ratio: float = float(unit.current_hp) / float(unit.card.hp)
+		var is_better: bool = hp_ratio < best_hp_ratio
+		var is_tied_with_priority: bool = hp_ratio == best_hp_ratio and best != null and unit.position < best.position
 		if best == null or is_better or is_tied_with_priority:
 			best = unit
-			best_loss = loss
+			best_hp_ratio = hp_ratio
 
 	return best
 
@@ -479,8 +555,11 @@ static func _execute_action(state: CombatState, unit: CombatUnit, action: Dictio
 ## Redução de Escudo antes da Vida; enquanto existir Escudo, nenhum dano
 ## é aplicado à Vida nesta mesma ação (4.1) — sem penetração estrutural
 ## (fora de escopo, pertence a Habilidades como Perfuração/Perfurante).
+## F-035: aplica o multiplicador de dano recebido da Afinidade II do
+## Império (target.affinity_incoming_damage_multiplier, congelado por
+## AffinityRuntime no snapshot do turno — nunca recalculado aqui).
 static func _apply_damage_amount(attack_value: float, target: CombatUnit) -> void:
-	var damage: int = int(round(attack_value))
+	var damage: int = int(round(attack_value * target.affinity_incoming_damage_multiplier))
 
 	if target.current_esc > 0:
 		var absorbed: int = mini(damage, target.current_esc)
@@ -490,19 +569,39 @@ static func _apply_damage_amount(attack_value: float, target: CombatUnit) -> voi
 
 
 ## Ataque efetivo, considerando o Bônus de Posição estrutural da Classe
-## Corpo a Corpo (+50% de Ataque na Posição 1, COMBAT_RULES.md 6.1) e o
-## Efeito de Ataque da Doutrina do Comandante, se houver
-## (COMMANDER_EFFECTS.md E001).
+## Corpo a Corpo (+50% de Ataque na Posição 1, COMBAT_RULES.md 6.1), a
+## Afinidade dos Mortos-Vivos (F-035: Nível I "+8 ATK Base" e Nível II
+## "+5%% do Ataque Base" após a primeira morte da Facção no turno
+## anterior — ambos somados ao ATK Base, antes dos multiplicadores de
+## Posição/Comandante, já que AFFINITY.md descreve os dois como bônus de
+## "Ataque Base") e o Efeito de Ataque da Doutrina do Comandante, se
+## houver (COMMANDER_EFFECTS.md E001).
 static func _effective_attack(unit: CombatUnit, state: CombatState) -> float:
 	var atk: float = float(unit.card.atk)
+	if unit.card.faction == "Mortos-Vivos":
+		var undead_level: int = AffinityRuntime.level_for(state, unit.side, "Mortos-Vivos")
+		if undead_level >= 1:
+			atk += 8.0
+		if undead_level >= 2 and state.undead_affinity_death_bonus_active.get(unit.side, false):
+			atk += 0.05 * float(unit.card.atk)
 	if unit.card.card_class == "Corpo a Corpo" and unit.position == 1:
 		atk *= 1.5
 	atk *= CommanderDoctrineRuntime.attack_multiplier(unit, state)
 	return atk
 
 
+## F-035: aplica a Afinidade II da Natureza sobre o valor BASE da Cura
+## Estrutural (COMBAT_RULES.md 4.2.3, Hierarquia Oficial de Modificadores
+## de Cura, item 5) — "+10 HP adicionais" na primeira cura recebida por
+## este pelotão no turno, consumindo a flag congelada por AffinityRuntime
+## (nunca decide o ALVO da cura — isso continua em _most_injured_ally/
+## F-033, intocado).
 static func _apply_structural_heal(target: CombatUnit) -> void:
-	target.current_hp = mini(target.current_hp + STRUCTURAL_HEAL_AMOUNT, target.card.hp)
+	var heal_amount: int = STRUCTURAL_HEAL_AMOUNT
+	if target.affinity_first_heal_bonus_available:
+		heal_amount += 10
+		target.affinity_first_heal_bonus_available = false
+	target.current_hp = mini(target.current_hp + heal_amount, target.card.hp)
 
 
 ## Resolução das Mortes. Verifica HP <= 0, remove simultaneamente do
@@ -513,6 +612,12 @@ static func _death_resolution_phase(state: CombatState) -> void:
 		if unit.is_alive and unit.current_hp <= 0:
 			unit.is_alive = false
 			state.eliminated_units.append(unit)
+			# F-035 (AFFINITY.md, Afinidade II dos Mortos-Vivos): registra a
+			# morte como PENDENTE para o próximo snapshot de turno — nunca
+			# ativa o bônus no turno corrente (ver CombatState.
+			# undead_affinity_death_bonus_pending/_active).
+			if unit.card.faction == "Mortos-Vivos":
+				state.undead_affinity_death_bonus_pending[unit.side] = true
 			if state.enable_battle_log:
 				state.battle_log.append("Lado %d: %s (pos %d) foi destruído no Turno %d." % [unit.side, unit.card.card_name, unit.position, state.turn])
 

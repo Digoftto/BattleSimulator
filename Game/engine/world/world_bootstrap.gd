@@ -41,13 +41,44 @@ static func ensure_world_loaded() -> void:
 		return
 
 	var loaded_season: Season = SimulationReportService.load_season()
-	if loaded_season != null:
+	if loaded_season != null and _catalog_is_valid(loaded_season.enemy_catalog):
 		WorldDatabase.register_season(loaded_season)
 		WorldDatabase.set_current_season(loaded_season.season_id)
 		BattleLogger.info("WorldBootstrap", "Mundo carregado do arquivo gerado pela ferramenta externa: Temporada '%s'." % loaded_season.season_id)
 		return
+	elif loaded_season != null:
+		# F-009 (achado da F-005): um Catálogo salvo em disco por uma
+		# versão anterior de SimulationReportService (antes da correção
+		# da F-006) pode conter EnemyArmyEntry cujo Comandante perdeu o
+		# accumulated_xp/Doutrina no round-trip — reprovando
+		# Army.is_ready_for_battle() e travando CombatEngine em tempo
+		# real. Preferir gerar o Mundo de desenvolvimento ao vivo (já
+		# comprovadamente válido, ver EnemyArmyGenerator) a confiar num
+		# Catálogo que não passa na mesma checagem que o próprio Combate
+		# exige.
+		BattleLogger.info("WorldBootstrap", "Catálogo salvo em disco contém Exército(s) inválido(s) para batalha — ignorado; gerando Mundo de desenvolvimento ao vivo em seu lugar.")
 
 	_generate_dev_scale_world()
+
+
+## Confirma que todo EnemyArmyEntry do Catálogo carregado está pronto
+## para batalha (mesma checagem que CombatEngine já exige de qualquer
+## Exército — Army.is_ready_for_battle()) antes de confiar nele. Não
+## introduz nenhum mecanismo de validação novo — apenas reaproveita o
+## que já existe, no único lugar (carregamento do Mundo) onde um
+## Catálogo inteiro precisa ser aceito ou rejeitado de uma vez.
+static func _catalog_is_valid(catalog: SeasonCatalog) -> bool:
+	for faction: String in ["Império", "Natureza", "Mortos-Vivos"]:
+		for category in EnemyArmyEntry.Category.values():
+			for entry: EnemyArmyEntry in catalog.get_entries(faction, category):
+				if entry.commander == null:
+					return false
+				var probe := Army.new()
+				probe.cards = entry.cards
+				probe.commander = entry.commander
+				if not probe.is_ready_for_battle():
+					return false
+	return true
 
 
 static func _generate_dev_scale_world() -> void:

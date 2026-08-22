@@ -42,11 +42,26 @@ static func assign(mina: Mina, army: Army, now_unix: int) -> Dictionary:
 
 
 ## Libera a Guarnição de "mina" de volta para Army.Availability.AVAILABLE
-## se o Ciclo de Mineração atual já tiver terminado (ou nunca tiver
-## começado). Não faz nada se o ciclo ainda estiver ativo — chamado
+## se o Ciclo de Mineração atual já tiver terminado. Não faz nada se o
+## ciclo ainda estiver ativo, nem se a Guarnição foi designada mas o
+## Ciclo ainda não foi iniciado pelo jogador (cycle_started_unix == 0)
+## — "Escolher a Guarnição da Mina" e "Iniciar o Ciclo de Mineração"
+## são passos SEPARADOS do fluxo real (MINES.md, "Ciclo operacional
+## completo", passos 4 e 5; botões distintos em minas_panel.gd:
+## _on_assign_guarnicao_pressed()/_on_start_cycle_pressed()), e
+## _on_assign_guarnicao_pressed() chama refresh() -> GameRuntime.sync()
+## -> este método logo em seguida à designação. Antes desta correção
+## (F-045), essa checagem tratava "nunca começou" igual a "já
+## terminou", liberando a Guarnição de volta pra AVAILABLE no mesmo
+## instante em que era designada — violando a trava anti-exploit
+## documentada em COMMAND_CENTER_UI.md ("Só Exércitos livres... podem
+## ser designados") ao permitir reatribuir o mesmo Exército como
+## Guarnição de outra Mina antes mesmo do 1º Ciclo começar. Chamado
 ## rotineiramente por GameRuntime.sync().
 static func release_if_cycle_ended(mina: Mina, now_unix: int) -> void:
 	if mina.guarnicao_army == null:
+		return
+	if mina.cycle_started_unix == 0:
 		return
 	if mina.is_cycle_active(now_unix):
 		return

@@ -11,6 +11,10 @@ Desktop.ini
 *.temp
 *.log
 
+# Generated benchmark/report artifacts (res://reports/, written at
+# runtime by SimulationReportService and by ad-hoc tools/debug/ scripts)
+Game/reports/
+
 # Editor / IDE files
 .vscode/
 .idea/

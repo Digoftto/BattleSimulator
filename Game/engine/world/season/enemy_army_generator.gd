@@ -68,7 +68,8 @@ static func generate(
 	commander_values: Array[CommanderValueResource],
 	id_prefix: String,
 	index: int,
-	force_comum_tier1: bool = false
+	force_comum_tier1: bool = false,
+	rng: RandomNumberGenerator = null
 ) -> EnemyArmyEntry:
 	var entry := EnemyArmyEntry.new()
 	entry.id = "%s_%05d" % [id_prefix, index]
@@ -81,11 +82,11 @@ static func generate(
 
 	entry.commander = _build_commander(
 		category, territory_faction, region, config,
-		commander_restrictions, commander_requirements, commander_targets, commander_effects, commander_values
+		commander_restrictions, commander_requirements, commander_targets, commander_effects, commander_values, rng
 	)
 
 	var soldo_cap: int = _soldo_cap_for_entry(category, entry.commander, region)
-	var composition: Array[CardResource] = build_composition(territory_faction, all_cards, region, soldo_cap, force_comum_tier1)
+	var composition: Array[CardResource] = build_composition(territory_faction, all_cards, region, soldo_cap, force_comum_tier1, rng)
 	entry.cards = ArmyPositioningHeuristic.apply_heuristic(composition)
 	return entry
 
@@ -106,7 +107,7 @@ static func _soldo_cap_for_entry(category: EnemyArmyEntry.Category, commander: C
 ## livremente dentro da faixa da Região (Soldo nunca muda com Tier —
 ## só com Raridade, SOLDO.md — então o Tier é sorteado DEPOIS de achar
 ## uma composição de Raridades válida, sem afetar essa validação).
-static func build_composition(territory_faction: String, all_cards: Array[CardResource], region: int, soldo_cap: int, force_comum_tier1: bool = false) -> Array[CardResource]:
+static func build_composition(territory_faction: String, all_cards: Array[CardResource], region: int, soldo_cap: int, force_comum_tier1: bool = false, rng: RandomNumberGenerator = null) -> Array[CardResource]:
 	var territory_cards: Array[CardResource] = all_cards.filter(func(c: CardResource) -> bool: return c.faction == territory_faction)
 	var secondary_cards: Array[CardResource] = all_cards.filter(func(c: CardResource) -> bool: return c.faction != territory_faction)
 
@@ -123,30 +124,33 @@ static func build_composition(territory_faction: String, all_cards: Array[CardRe
 	while attempts < MAX_COMPOSITION_ATTEMPTS:
 		# ARMY.md, "Unicidade de Composição": nunca duas Cartas com o
 		# mesmo Nome, independente do Tier — sorteio sem reposição.
-		var chosen: Array[CardResource] = _pick_unique_by_name(territory_cards, 6, [])
+		var chosen: Array[CardResource] = _pick_unique_by_name(territory_cards, 6, [], rng)
 		var chosen_names: Array[String] = []
 		for card: CardResource in chosen:
 			chosen_names.append(card.card_name)
-		chosen.append_array(_pick_unique_by_name(secondary_cards, 3, chosen_names))
+		chosen.append_array(_pick_unique_by_name(secondary_cards, 3, chosen_names, rng))
 
 		if chosen.size() == 9 and Soldo.total_for_composition(chosen) <= soldo_cap:
-			return apply_random_tiers(chosen, tier_range)
+			return apply_random_tiers(chosen, tier_range, rng)
 
 		attempts += 1
 
 	# Extremamente improvável dado o catálogo atual, mas nunca deve
 	# travar: cai para a composição mais barata disponível, sempre
 	# válida — ainda respeitando a Unicidade de Composição.
-	return apply_random_tiers(_cheapest_composition(territory_cards, secondary_cards), tier_range)
+	return apply_random_tiers(_cheapest_composition(territory_cards, secondary_cards), tier_range, rng)
 
 
 ## Sorteia até "count" Cartas de "pool", sem repetir Nome entre si nem
 ## com "excluded_names" — sorteio sem reposição (embaralha e consome).
 ## Pode retornar menos que "count" se o pool não tiver Nomes distintos
 ## suficientes; quem chama já trata esse caso (chosen.size() != 9).
-static func _pick_unique_by_name(pool: Array[CardResource], count: int, excluded_names: Array[String]) -> Array[CardResource]:
+static func _pick_unique_by_name(pool: Array[CardResource], count: int, excluded_names: Array[String], rng: RandomNumberGenerator = null) -> Array[CardResource]:
 	var shuffled: Array[CardResource] = pool.duplicate()
-	shuffled.shuffle()
+	if rng != null:
+		_seeded_shuffle(shuffled, rng)
+	else:
+		shuffled.shuffle()
 
 	var result: Array[CardResource] = []
 	var used_names: Array[String] = excluded_names.duplicate()
@@ -163,13 +167,30 @@ static func _pick_unique_by_name(pool: Array[CardResource], count: int, excluded
 ## Duplica cada carta escolhida (nunca modifica o template do
 ## catálogo) e sorteia seu Tier dentro da faixa da Região,
 ## independentemente por carta — mistura livre, PvE.md item 3.
-static func apply_random_tiers(cards: Array[CardResource], tier_range: Array) -> Array[CardResource]:
+static func apply_random_tiers(cards: Array[CardResource], tier_range: Array, rng: RandomNumberGenerator = null) -> Array[CardResource]:
 	var result: Array[CardResource] = []
 	for template: CardResource in cards:
 		var copy: CardResource = template.duplicate()
-		copy.tier = tier_range[0] if tier_range[0] == tier_range[1] else (tier_range[0] + (randi() % (tier_range[1] - tier_range[0] + 1)))
+		if tier_range[0] == tier_range[1]:
+			copy.tier = tier_range[0]
+		else:
+			var roll: int = rng.randi() if rng != null else randi()
+			copy.tier = tier_range[0] + (roll % (tier_range[1] - tier_range[0] + 1))
 		result.append(copy)
 	return result
+
+
+## F-028: mesmo padrão já usado em MiningCycleResolver._seeded_shuffle()
+## — Array.shuffle() sempre usa o RNG global do Godot, sem variante que
+## aceite um RandomNumberGenerator próprio; Fisher-Yates manual via
+## rng.randi_range() é a forma padrão de embaralhar de forma
+## reproduzível a partir de uma seed.
+static func _seeded_shuffle(array: Array, rng: RandomNumberGenerator) -> void:
+	for i in range(array.size() - 1, 0, -1):
+		var j: int = rng.randi_range(0, i)
+		var temp: Variant = array[i]
+		array[i] = array[j]
+		array[j] = temp
 
 
 static func _cheapest_composition(territory_cards: Array[CardResource], secondary_cards: Array[CardResource]) -> Array[CardResource]:
@@ -216,7 +237,8 @@ static func _build_commander(
 	requirements: Array[CommanderRequirementResource],
 	targets: Array[CommanderTargetResource],
 	effects: Array[CommanderEffectResource],
-	values: Array[CommanderValueResource]
+	values: Array[CommanderValueResource],
+	rng: RandomNumberGenerator = null
 ) -> CommanderResource:
 	var patente_options: Array = REGION_PATENTE_OPTIONS[region]
 
@@ -244,7 +266,7 @@ static func _build_commander(
 	var doctrine: CommanderDoctrine
 	var attempts: int = 0
 	while attempts < MAX_RARITY_ATTEMPTS:
-		doctrine = CommanderGenerator.generate(restrictions, requirements, targets, effects, values)
+		doctrine = CommanderGenerator.generate(restrictions, requirements, targets, effects, values, rng)
 		if doctrine.rarity_score >= min_rarity:
 			break
 		attempts += 1
@@ -254,7 +276,8 @@ static func _build_commander(
 	commander.faction = faction
 	commander.doctrine = doctrine
 
-	var chosen_patente: String = patente_options[randi() % patente_options.size()]
+	var patente_roll: int = rng.randi() if rng != null else randi()
+	var chosen_patente: String = patente_options[patente_roll % patente_options.size()]
 	commander.accumulated_xp = CommanderCareer.PATENTE_THRESHOLDS.filter(
 		func(entry: Dictionary) -> bool: return entry["patente"] == chosen_patente
 	)[0]["xp"]

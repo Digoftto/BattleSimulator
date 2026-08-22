@@ -285,12 +285,17 @@ Resolução de Alvo Vazio: Caso a posição espelhada esteja vazia no Combat Sta
 6.5. Suporte
 Fortalecer e sustentar o exército, priorizando cura sobre dano.
 
-Movimento (Regra Própria Exclusiva): Um pelotão Suporte somente avança (Fase de Avanço) quando:
+Movimento (Regra Própria Exclusiva — Cadeia de Bloqueio): Um pelotão Suporte avança (Fase de Avanço) verificando apenas a posição imediatamente atrás dele:
 
-Não existir nenhum pelotão aliado atrás dele; OU
+* Vazia, ou ocupada por uma Máquina de Guerra: nunca bloqueia — a verificação PARA aqui. O que estiver mais atrás na cadeia (mesmo um pelotão de Classe convencional) é irrelevante: a Máquina de Guerra é opaca à cadeia.
+* Ocupada por outro Suporte: a mesma verificação se aplica recursivamente a esse Suporte — é preciso checar também o que está imediatamente atrás DELE. O Suporte é transparente à cadeia, nunca um ponto de parada.
+* Ocupada por um pelotão de qualquer outra Classe (Corpo a Corpo, Barreira, À Distância ou Mago): bloqueia o avanço deste Suporte e de toda a cadeia contígua de Suportes à frente dele.
 
-O único pelotão aliado atrás dele for uma Máquina de Guerra.
-Caso contrário, permanece em sua posição atual.
+Caso bloqueado, o Suporte permanece em sua posição atual; o pelotão bloqueador (de Classe convencional) continua avançando normalmente pela regra geral (5.2.1) e pode ultrapassar a posição do bloco de Suportes que ele mantém parado.
+
+Exemplos: "Suporte → Suporte → Máquina de Guerra" avança normalmente (nenhum elo da cadeia é de Classe convencional). "Suporte → Suporte → Suporte" avança normalmente. "Suporte → Máquina de Guerra → À Distância" avança normalmente — a Máquina de Guerra imediatamente atrás do Suporte não bloqueia, mesmo havendo um pelotão convencional mais atrás na cadeia. "Suporte → Suporte → À Distância" mantém os dois Suportes bloqueados enquanto o À Distância os ultrapassa.
+
+Restrição de Posicionamento Inicial: Um pelotão Suporte nunca pode iniciar a batalha na Posição 5. Esta restrição existe especificamente para prevenir uma interação explorável entre a Penalidade de Reorganização (seção 5.2.2) e a Regra de Movimento acima: como a Penalidade de Reorganização não se aplica a um pelotão que já inicia a batalha na Posição 5, um Suporte que iniciasse ali — bloqueado por um pelotão de Classe convencional atrás dele — poderia travar permanentemente a Posição 5 sem nunca pagar o custo de um turno de reorganização. Um Exército contendo um Suporte posicionado na Posição 5 é inválido para batalha.
 
 Ação (Ataque vs. Cura): O comportamento na Fase de Execução depende da posição:
 

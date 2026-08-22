@@ -134,10 +134,12 @@ static func move_to_training(kingdom: Kingdom, commander: CommanderResource, now
 
 ## Marca o Comandante como Retired — estado terminal. NÃO remove o
 ## Comandante de kingdom.commanders nem aplica nenhum bônus de Legado
-## (isso pertence a um resolver de Legado ainda não implementado — é
-## por isso que "kingdom" não é usado aqui ainda; mantido na
-## assinatura por consistência com os demais métodos deste resolver, e
-## porque o futuro resolver de Legado provavelmente vai precisar dele).
+## (isso pertence exclusivamente a LegacyResolver.retire_administrative(),
+## que reaproveita este método para efetivar a transição de Estado, em
+## vez de escrever administrative_state diretamente — é por isso que
+## "kingdom" não é usado dentro deste método; mantido na assinatura por
+## consistência com os demais métodos deste resolver, e porque
+## LegacyResolver já o utiliza ao chamar este método).
 ## Retorna {"success": bool, "reason": String}. "reason": "already_retired".
 static func retire(_kingdom: Kingdom, commander: CommanderResource) -> Dictionary:
 	if commander.administrative_state == CommanderResource.AdministrativeState.RETIRED:

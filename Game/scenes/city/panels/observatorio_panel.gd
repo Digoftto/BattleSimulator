@@ -122,9 +122,25 @@ func _build_generation_log_section() -> void:
 	for i in range(log.size() - 1, maxi(-1, log.size() - 11), -1):  # últimas 10, mais recente primeiro
 		var entry: Dictionary = log[i]
 		var label := Label.new()
-		label.text = "[%s] %s" % [entry.get("type", ""), JSON.stringify(entry)]
+		label.text = "[%s] %s" % [entry.get("type", ""), _format_log_entry(entry)]
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD
 		_root_vbox.add_child(label)
+
+
+## F-046: cada ferramenta dev que grava no Registro (regional_generator_panel,
+## regional_chief_generator_panel, pve_generator_panel, balance_report_panel)
+## usa um conjunto de chaves diferente — sem um formato único por "type"
+## pra cada uma (fora do escopo desta correção), o formato genérico mais
+## legível é "chave: valor" separado por " | ", nunca a sintaxe crua de
+## JSON.stringify() (chaves entre aspas, sem espaçamento) que antes ia
+## direto pro jogador.
+func _format_log_entry(entry: Dictionary) -> String:
+	var parts: Array[String] = []
+	for key: String in entry:
+		if key == "type":
+			continue
+		parts.append("%s: %s" % [key, str(entry[key])])
+	return " | ".join(parts)
 
 
 func _clear_children(container: Node) -> void:

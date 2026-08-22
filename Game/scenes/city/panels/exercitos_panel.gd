@@ -48,8 +48,8 @@ func _build_static_structure() -> void:
 	_root_vbox.add_child(title)
 
 	var back_button := Button.new()
-	back_button.text = "<- Voltar para a Cidade"
-	back_button.pressed.connect(_on_back_to_city_pressed, CONNECT_DEFERRED)
+	back_button.text = "<- Voltar para o Centro de Comando"
+	back_button.pressed.connect(_on_back_to_command_center_pressed, CONNECT_DEFERRED)
 	_root_vbox.add_child(back_button)
 
 	var create_button := Button.new()
@@ -124,8 +124,8 @@ func _clear_children(container: Node) -> void:
 		child.free()
 
 
-func _on_back_to_city_pressed() -> void:
-	get_tree().change_scene_to_file.call_deferred("res://scenes/city/city_panel.tscn")
+func _on_back_to_command_center_pressed() -> void:
+	get_tree().change_scene_to_file.call_deferred("res://scenes/command_center/command_center_panel.tscn")
 
 
 func _on_create_army_pressed() -> void:

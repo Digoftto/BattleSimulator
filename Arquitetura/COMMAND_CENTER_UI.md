@@ -10,7 +10,7 @@ Este documento define todas as telas, janelas, indicadores e fluxos de interface
 
 Este documento é a fonte única de verdade (*Single Source of Truth*) para:
 
-* A organização das janelas do CdC (PvP, Minas, PvE, Treinamento, Legado, Comandantes);
+* A organização das janelas do CdC (PvP, Minas, PvE, Treinamento, Legado, Comandantes, Exércitos);
 * O fluxo de navegação entre essas janelas;
 * Quais informações cada janela exibe e quais ações o jogador pode tomar nelas.
 
@@ -174,6 +174,12 @@ Ponto de acesso ao Sistema de Legado (`COMMAND_CENTER_LEGACY.md`). Todas as regr
 * Lista todos os Comandantes aposentados (as duas categorias), com busca e filtro por Tipo de Aposentadoria.
 * Por Comandante: ID, Nome, Facção, Patente Final, datas de recrutamento/aposentadoria, estatísticas de carreira, Tipo de Aposentadoria, benefício concedido, título honorífico (se houver).
 * Os 9 pelotões consumidos num Grande Legado Militar **não** aparecem aqui — só o Comandante veterano é imortalizado.
+
+---
+
+# Janela: Exércitos
+
+Ponto de acesso à lista de Exércitos do Reino (`ARMY.md`) — decisão de hierarquia do MVP (F-016/F-017): reaproveita a tela já existente, sem nenhuma alteração de regra de composição, Formação ou disband. O CdC apenas organiza o acesso a essa tela; `ARMY.md` continua sendo o único dono das regras de Exército.
 
 ---
 

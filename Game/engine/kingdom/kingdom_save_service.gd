@@ -131,6 +131,7 @@ static func _kingdom_to_dict(kingdom: Kingdom) -> Dictionary:
 		"cards": _cards_to_array(kingdom.cards),
 		"armies": _armies_to_array(kingdom.armies),
 		"squads": _squads_to_array(kingdom.squads, kingdom.armies),
+		"planos_campanha": _planos_campanha_to_array(kingdom.planos_campanha, kingdom.armies),
 		"resources": kingdom.resources.duplicate(),
 		"regional_commander_registry": kingdom.regional_commander_registry.export_data(),
 		"pending_recruitment_offers": _offers_to_array(kingdom.pending_recruitment_offers),
@@ -218,6 +219,8 @@ static func _commander_to_dict(commander: CommanderResource) -> Dictionary:
 		"total_draws": commander.total_draws,
 		"battle_log": commander.battle_log.duplicate(true),
 		"honorific_title": commander.honorific_title,
+		"bronze_pl": commander.bronze_pl,
+		"bronze_divisao": commander.bronze_divisao,
 	}
 
 
@@ -316,6 +319,35 @@ static func _squads_to_array(squads: Array[Squad], all_armies: Array[Army]) -> A
 			"army_indices": army_indices,
 			"active_index": squad.active_index,
 		})
+	return result
+
+
+## PlanoCampanha.armies referencia Exércitos do Reino exatamente como
+## Squad.armies — mesmo mecanismo de referência por índice já usado em
+## _squads_to_array()/_dict_to_squad(), reaproveitado aqui sem
+## introduzir um padrão novo. battlefield_mapping/defesa_preferencial_index/
+## ordem_de_ataque guardam índices LOCAIS (0/1/2, posição dentro do
+## próprio Plano) — não são referências ao Reino, não precisam do
+## mesmo tratamento.
+static func _plano_campanha_to_dict(plano: PlanoCampanha, all_armies: Array[Army]) -> Dictionary:
+	var army_indices: Array = []
+	for army: Army in plano.armies:
+		army_indices.append(all_armies.find(army))
+	return {
+		"army_indices": army_indices,
+		"battlefield_mapping": plano.battlefield_mapping.duplicate(),
+		"defesa_preferencial_index": plano.defesa_preferencial_index,
+		"ordem_de_ataque": plano.ordem_de_ataque.duplicate(),
+		"liga": plano.liga,
+		"pl": plano.pl,
+		"divisao": plano.divisao,
+	}
+
+
+static func _planos_campanha_to_array(planos: Array[PlanoCampanha], all_armies: Array[Army]) -> Array:
+	var result: Array = []
+	for plano: PlanoCampanha in planos:
+		result.append(_plano_campanha_to_dict(plano, all_armies))
 	return result
 
 
@@ -450,6 +482,10 @@ static func _dict_to_kingdom(data: Dictionary, kingdom: Kingdom) -> void:
 	for entry in data.get("squads", []):
 		kingdom.squads.append(_dict_to_squad(entry, kingdom.armies))
 
+	kingdom.planos_campanha.clear()
+	for entry in data.get("planos_campanha", []):
+		kingdom.planos_campanha.append(_dict_to_plano_campanha(entry, kingdom.armies))
+
 	kingdom.resources = data.get("resources", {}).duplicate()
 	kingdom.regional_commander_registry.import_data(data.get("regional_commander_registry", {}))
 
@@ -510,6 +546,8 @@ static func _dict_to_commander(data: Dictionary) -> CommanderResource:
 		battle_log.append(entry as Dictionary)
 	commander.battle_log = battle_log
 	commander.honorific_title = data.get("honorific_title", "")
+	commander.bronze_pl = data.get("bronze_pl", 0)
+	commander.bronze_divisao = data.get("bronze_divisao", "")
 	return commander
 
 
@@ -724,6 +762,26 @@ static func _dict_to_squad(data: Dictionary, all_armies: Array[Army]) -> Squad:
 	var squad := Squad.new(squad_armies)
 	squad.active_index = data.get("active_index", 0)
 	return squad
+
+
+static func _dict_to_plano_campanha(data: Dictionary, all_armies: Array[Army]) -> PlanoCampanha:
+	var army_indices: Array = data.get("army_indices", [])
+	var plano_armies: Array[Army] = []
+	for index in army_indices:
+		if index >= 0 and index < all_armies.size():
+			plano_armies.append(all_armies[index])
+
+	var plano := PlanoCampanha.new(plano_armies)
+	plano.battlefield_mapping = data.get("battlefield_mapping", {}).duplicate()
+	plano.defesa_preferencial_index = data.get("defesa_preferencial_index", -1)
+	var ordem_de_ataque: Array[int] = []
+	for index in data.get("ordem_de_ataque", []):
+		ordem_de_ataque.append(int(index))
+	plano.ordem_de_ataque = ordem_de_ataque
+	plano.liga = data.get("liga", "")
+	plano.pl = data.get("pl", 0)
+	plano.divisao = data.get("divisao", "")
+	return plano
 
 
 static func _dict_to_mina(data: Dictionary, all_armies: Array[Army]) -> Mina:

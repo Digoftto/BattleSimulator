@@ -67,8 +67,8 @@ func _build_static_structure() -> void:
 	_root_vbox.add_child(title)
 
 	var back_button := Button.new()
-	back_button.text = "<- Voltar para a Cidade"
-	back_button.pressed.connect(_on_back_to_city_pressed, CONNECT_DEFERRED)
+	back_button.text = "<- Voltar para o Centro de Comando"
+	back_button.pressed.connect(_on_back_to_command_center_pressed, CONNECT_DEFERRED)
 	_root_vbox.add_child(back_button)
 
 	# --- Resumo ---
@@ -86,11 +86,16 @@ func _build_static_structure() -> void:
 	# [DEBUG] Gera um Candidato imediatamente, ignorando o cooldown de
 	# 24h — só pra testar a mecânica de Doutrina (Restrição/Requisito/
 	# Efeito) sem precisar esperar tempo real de verdade. Nunca deve
-	# existir fora do modo de desenvolvimento.
-	var debug_button := Button.new()
-	debug_button.text = "[DEBUG] Gerar Candidato Agora"
-	debug_button.pressed.connect(_on_debug_generate_candidate_pressed, CONNECT_DEFERRED)
-	resumo_vbox.add_child(debug_button)
+	# existir fora do modo de desenvolvimento — F-046: antes desta
+	# correção, o botão era sempre adicionado à árvore, também em
+	# builds de produção (nenhuma checagem impedia isso). OS.is_debug_build()
+	# é a forma padrão do próprio Godot de diferenciar isso (true no
+	# Editor/exportação de debug, false numa exportação de release).
+	if OS.is_debug_build():
+		var debug_button := Button.new()
+		debug_button.text = "[DEBUG] Gerar Candidato Agora"
+		debug_button.pressed.connect(_on_debug_generate_candidate_pressed, CONNECT_DEFERRED)
+		resumo_vbox.add_child(debug_button)
 
 	# --- Candidatos ---
 	_add_section_title("Candidatos")
@@ -164,7 +169,11 @@ func _refresh_candidatos(kingdom: Kingdom) -> void:
 
 		var label := Label.new()
 		if candidate != null:
-			label.text = "[Centro de Recrutamento] %s (%s)" % [candidate.commander_name, candidate.faction]
+			# F-009: candidate.commander_name já vem como "Comandante Gerado
+			# (Facção)" (RecruitmentCenterResolver._generate_candidate()) —
+			# reanexar "(%s)" % candidate.faction duplicava a Facção no
+			# rótulo. A Facção já está no nome, não precisa repetir.
+			label.text = "[Centro de Recrutamento] %s" % candidate.commander_name
 		else:
 			# O 1º Slot vazio usa o Ciclo já em andamento; cada Slot
 			# vazio SEGUINTE soma mais um Ciclo inteiro — nunca todos
@@ -402,8 +411,8 @@ func _on_return_to_reserve_pressed(commander: CommanderResource) -> void:
 	refresh()
 
 
-func _on_back_to_city_pressed() -> void:
-	get_tree().change_scene_to_file.call_deferred("res://scenes/city/city_panel.tscn")
+func _on_back_to_command_center_pressed() -> void:
+	get_tree().change_scene_to_file.call_deferred("res://scenes/command_center/command_center_panel.tscn")
 
 
 ## Exibe a Doutrina do Comandante selecionado (COMMANDER_GENERATION.md:

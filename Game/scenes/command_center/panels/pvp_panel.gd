@@ -52,8 +52,8 @@ func _build_static_structure() -> void:
 	_root_vbox.add_child(title)
 
 	var back_button := Button.new()
-	back_button.text = "<- Voltar para a Cidade"
-	back_button.pressed.connect(_on_back_to_city_pressed, CONNECT_DEFERRED)
+	back_button.text = "<- Voltar para o Centro de Comando"
+	back_button.pressed.connect(_on_back_to_command_center_pressed, CONNECT_DEFERRED)
 	_root_vbox.add_child(back_button)
 
 	var scope_note := Label.new()
@@ -94,10 +94,21 @@ func _active_armies(kingdom: Kingdom) -> Array[Army]:
 	return result
 
 
+## F-009: Exércitos sem army_name explícito (ex: formado pelo Kit
+## Inicial) nunca devem aparecer como rótulo vazio na tela — "index" é
+## a posição do Exército dentro da lista sendo exibida no momento
+## (1-based na exibição). Não altera Army.army_name nem o modelo de
+## dados — só o texto mostrado.
+func _display_army_name(army: Army, index: int) -> String:
+	return army.army_name if army.army_name != "" else "Exército %d" % (index + 1)
+
+
 func _refresh_bronze(kingdom: Kingdom) -> void:
 	_clear_children(_bronze_container)
 
-	for army: Army in _active_armies(kingdom):
+	var bronze_armies: Array[Army] = _active_armies(kingdom)
+	for i in range(bronze_armies.size()):
+		var army: Army = bronze_armies[i]
 		var commander: CommanderResource = army.commander
 		var row := VBoxContainer.new()
 		_bronze_container.add_child(row)
@@ -105,10 +116,11 @@ func _refresh_bronze(kingdom: Kingdom) -> void:
 		var info_row := HBoxContainer.new()
 		row.add_child(info_row)
 		var label := Label.new()
+		var display_name: String = _display_army_name(army, i)
 		if commander.bronze_divisao == "":
-			label.text = "%s | Comandante: %s | Não inscrito na Liga Bronze" % [army.army_name, commander.commander_name]
+			label.text = "%s | Comandante: %s | Não inscrito na Liga Bronze" % [display_name, commander.commander_name]
 		else:
-			label.text = "%s | Comandante: %s | Divisão %s | %d PL" % [army.army_name, commander.commander_name, commander.bronze_divisao, commander.bronze_pl]
+			label.text = "%s | Comandante: %s | Divisão %s | %d PL" % [display_name, commander.commander_name, commander.bronze_divisao, commander.bronze_pl]
 		label.custom_minimum_size = Vector2(450, 0)
 		info_row.add_child(label)
 
@@ -147,9 +159,11 @@ func _refresh_planos(kingdom: Kingdom) -> void:
 	create_title.text = "Criar Plano de Campanha (escolha até 3 Exércitos Ativos):"
 	create_vbox.add_child(create_title)
 
-	for army: Army in _active_armies(kingdom):
+	var plano_candidate_armies: Array[Army] = _active_armies(kingdom)
+	for i in range(plano_candidate_armies.size()):
+		var army: Army = plano_candidate_armies[i]
 		var check := CheckBox.new()
-		check.text = "%s (%s)" % [army.army_name, army.commander.commander_name]
+		check.text = "%s (%s)" % [_display_army_name(army, i), army.commander.commander_name]
 		check.button_pressed = _selected_for_new_plano.has(army)
 		check.toggled.connect(_on_army_checkbox_toggled.bind(army), CONNECT_DEFERRED)
 		create_vbox.add_child(check)
@@ -171,8 +185,8 @@ func _build_plano_panel(plano: PlanoCampanha) -> void:
 	panel.add_child(vbox)
 
 	var names: Array[String] = []
-	for army: Army in plano.armies:
-		names.append(army.army_name)
+	for i in range(plano.armies.size()):
+		names.append(_display_army_name(plano.armies[i], i))
 	var header := Label.new()
 	header.text = "Plano: %s" % ", ".join(names)
 	header.add_theme_font_size_override("font_size", 16)
@@ -220,7 +234,7 @@ func _build_plano_panel(plano: PlanoCampanha) -> void:
 	var defesa_option := OptionButton.new()
 	defesa_option.add_item("(nenhum)", -1)
 	for i in range(plano.armies.size()):
-		defesa_option.add_item(plano.armies[i].army_name, i)
+		defesa_option.add_item(_display_army_name(plano.armies[i], i), i)
 	defesa_option.selected = plano.defesa_preferencial_index + 1
 	defesa_option.item_selected.connect(_on_defesa_preferencial_selected.bind(plano), CONNECT_DEFERRED)
 	defesa_row.add_child(defesa_option)
@@ -234,7 +248,7 @@ func _build_plano_panel(plano: PlanoCampanha) -> void:
 		var row := HBoxContainer.new()
 		vbox.add_child(row)
 		var label := Label.new()
-		label.text = "%d. %s" % [pos + 1, plano.armies[army_index].army_name]
+		label.text = "%d. %s" % [pos + 1, _display_army_name(plano.armies[army_index], army_index)]
 		label.custom_minimum_size = Vector2(250, 0)
 		row.add_child(label)
 		var up_button := Button.new()
@@ -264,7 +278,7 @@ func _build_plano_panel(plano: PlanoCampanha) -> void:
 		var option := OptionButton.new()
 		option.add_item("(não mapeado)", -1)
 		for i in range(plano.armies.size()):
-			option.add_item(plano.armies[i].army_name, i)
+			option.add_item(_display_army_name(plano.armies[i], i), i)
 		var current: int = plano.battlefield_mapping.get(battlefield.battlefield_name, -1)
 		option.selected = current + 1
 		option.item_selected.connect(_on_battlefield_mapping_selected.bind(plano, battlefield), CONNECT_DEFERRED)
@@ -377,5 +391,5 @@ func _result_from_name(result_name: String) -> RankingResolver.Result:
 			return RankingResolver.Result.EMPATE
 
 
-func _on_back_to_city_pressed() -> void:
-	get_tree().change_scene_to_file.call_deferred("res://scenes/city/city_panel.tscn")
+func _on_back_to_command_center_pressed() -> void:
+	get_tree().change_scene_to_file.call_deferred("res://scenes/command_center/command_center_panel.tscn")

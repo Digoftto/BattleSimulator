@@ -190,14 +190,17 @@ func spend_fragment(faction: String, amount: int) -> bool:
 ## Núcleo de Energia, Academia — ver Capital.can_building_evolve()).
 ## "A cidade inicia com todas as construções disponíveis no nível 1"
 ## (CAPITAL.md, "Estrutura Inicial"). Custo de evolução da própria
-## Capital ainda não implementado: seus parâmetros (b, x) da Fórmula
-## Geral de Construções estão pendentes de calibração em FORMULAS.md.
+## Capital já implementado via InstitutionalConstructionResolver, com
+## os parâmetros (b, x) vigentes calibrados em BALANCING_SIMULATION.md
+## (Simulação 3, marcada como VIGENTE) e centralizados em FORMULAS.md.
 var capital_level: int = 1
 
 ## Centro de Comando e Academia: nível rastreado desde já (mesma regra
-## de início no nível 1), mas sem lógica de evolução própria ainda —
-## seus parâmetros de custo (Fórmula Geral de Construções) também
-## seguem pendentes de calibração em FORMULAS.md.
+## de início no nível 1). Evolução já implementada via
+## InstitutionalConstructionResolver, com os parâmetros (b, x) vigentes
+## calibrados em BALANCING_SIMULATION.md (Simulação 3, marcada como
+## VIGENTE) e centralizados em FORMULAS.md — Centro de Comando usa
+## b=50, x=225; Academia usa b=50, x=460.
 var command_center_level: int = 1
 
 ## Recursos Administrativos já ativados (COMMAND_CENTER_PROGRESS.md,

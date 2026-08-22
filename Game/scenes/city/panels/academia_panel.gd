@@ -33,6 +33,17 @@ var _produce_card_option: OptionButton = null
 var _selected_upgrade_card_name: String = ""
 var _selected_upgrade_tier: int = 1
 
+## F-046: mensagem visível quando Produzir/Aprimorar/Melhorar Fila é
+## rejeitado — antes só existia um print() no console (o jogador nunca
+## vê), o clique parecia não fazer nada (mesma classe de problema já
+## corrigido em CityPanel, F-009). Diferente de CityPanel, refresh()
+## aqui DESTRÓI e RECONSTRÓI toda a árvore (_clear_children(self) +
+## _build_static_structure()) a cada chamada — por isso a mensagem
+## precisa sobreviver num var persistente da instância (nunca destruído
+## por _clear_children), não só no texto de um Label que seria
+## recriado vazio no próximo refresh().
+var _action_status_text: String = ""
+
 
 func _ready() -> void:
 	if not KingdomState.is_initialized:
@@ -73,6 +84,12 @@ func _build_static_structure() -> void:
 	_add_section_title("Resumo")
 	_resumo_label = Label.new()
 	_root_vbox.add_child(_resumo_label)
+
+	if _action_status_text != "":
+		var action_status_label := Label.new()
+		action_status_label.text = _action_status_text
+		action_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+		_root_vbox.add_child(action_status_label)
 
 	_add_section_title("Mestres")
 	_mestres_container = VBoxContainer.new()
@@ -397,6 +414,9 @@ func _on_produce_pressed() -> void:
 	)
 	if not result["success"]:
 		print("[AcademiaPanel] Produzir falhou: %s" % result["reason"])
+		_action_status_text = "Não foi possível produzir: %s" % result["reason"]
+	else:
+		_action_status_text = ""
 	refresh()
 
 
@@ -414,6 +434,9 @@ func _on_upgrade_pressed() -> void:
 	)
 	if not result["success"]:
 		print("[AcademiaPanel] Aprimorar falhou: %s" % result["reason"])
+		_action_status_text = "Não foi possível aprimorar: %s" % result["reason"]
+	else:
+		_action_status_text = ""
 	refresh()
 
 
@@ -421,6 +444,9 @@ func _on_upgrade_master_queue_pressed(master: AcademyMaster) -> void:
 	var result: Dictionary = AcademyResolver.upgrade_queue_capacity(KingdomState.kingdom, master)
 	if not result["success"]:
 		print("[AcademiaPanel] Melhorar Fila falhou: %s" % result["reason"])
+		_action_status_text = "Não foi possível melhorar a Fila: %s" % result["reason"]
+	else:
+		_action_status_text = ""
 	refresh()
 
 

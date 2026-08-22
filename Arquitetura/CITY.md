@@ -223,18 +223,20 @@ Ela expressa a identidade de cada construção e deverá orientar todas as futur
 
 ### Gestão
 
-* **Arsenal:** Gerenciamento de Comandantes e Exércitos (`COMMANDERS.md`).
+* **Arsenal:** Gerenciamento de Comandantes e Exércitos (`COMMANDERS.md`). Navegação: acessados através do Centro de Comando (`COMMAND_CENTER_UI.md`), não como destinos diretos da Cidade — decisão de hierarquia do MVP (F-016/F-017).
 
 ### Consulta
 
-* **Biblioteca:** Enciclopédia de cartas e dados do jogo (`LIBRARY.md`).
-* **Observatório:** Relatórios, estatísticas e análises gerais (`OBSERVATORY.md`).
+* **Biblioteca:** Enciclopédia de cartas e dados do jogo (`LIBRARY.md`). Navegação: destino direto da Cidade.
+* **Observatório:** Relatórios, estatísticas e análises gerais (`OBSERVATORY.md`). Navegação: destino direto da Cidade.
 
 ### Mundo
 
 * **PvE:** Expansão territorial, Campanhas e Trilhas (`PvE.md`).
 * **PvP:** Ciclo competitivo, arenas e classificações (`RANKING.md`, `MATCHMAKING.md`).
 * **Minas:** Extração e controle de recursos econômicos do mapa (`MINES.md`).
+
+PvE, PvP e Minas permanecem sistemas externos à infraestrutura urbana — nenhum deles é uma construção, nenhum tem nível ou custo de evolução da Cidade. Sua navegação operacional, porém, ocorre através do Centro de Comando (`COMMAND_CENTER_UI.md`, "A organização das janelas do CdC"), não como destinos diretos da Cidade — decisão de hierarquia do MVP (F-016/F-017). O CdC organiza o acesso; as regras de cada sistema continuam pertencendo exclusivamente aos seus próprios documentos.
 
 ---
 
@@ -243,6 +245,8 @@ Ela expressa a identidade de cada construção e deverá orientar todas as futur
 Ferramentas de gestão, consulta e acesso ao mundo não são construções da Cidade.
 
 Elas podem integrar a interface principal do jogo para navegação do jogador, porém não possuem nível, custo de evolução urbana ou impacto direto sobre a infraestrutura da Cidade. O funcionamento e regras dessas telas pertencem estritamente aos seus respectivos documentos de arquitetura.
+
+Biblioteca e Observatório são acessados diretamente pela navegação de nível superior da Cidade. Arsenal (Comandantes, Exércitos) e Mundo (PvE, PvP, Minas) são acessados através do Centro de Comando — ver `COMMAND_CENTER_UI.md`.
 
 ---
 
