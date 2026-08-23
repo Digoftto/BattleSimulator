@@ -3453,6 +3453,12 @@ func _validate_city_panel() -> void:
 	print("  Painel mostra o Nível de Conta e os Recursos? %s (esperado: true)" % str(
 		_panel_contains_text(panel, "Nível de Conta") and _panel_contains_text(panel, "Ferro Negro")
 	))
+	# ART-005: os 3 ícones de recurso (ResourceArtCatalog) devem ter
+	# carregado de verdade, sem que o texto acima (já verificado) tenha
+	# deixado de aparecer.
+	print("  ART-005: os 3 ícones de recurso carregaram de verdade na tela da Cidade? %s (%d texturas na árvore, esperado: >= 3)" % [
+		str(_count_loaded_textures(panel) >= 3), _count_loaded_textures(panel)
+	])
 
 	var capital_before: int = kingdom.capital_level
 	panel._on_evolve_institutional_pressed(InstitutionalConstructionConfig.Building.CAPITAL)

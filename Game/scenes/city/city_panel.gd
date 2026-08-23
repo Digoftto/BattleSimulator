@@ -61,7 +61,11 @@ const BUILDING_REGIONS: Dictionary = {
 }
 
 var _resumo_label: Label
-var _recursos_label: Label
+## ART-005: ícones construídos 1x (nunca mudam) — só o texto de cada
+## Label é atualizado a cada refresh(), mesmo padrão já usado por
+## _resumo_label/_fragmentos_label neste arquivo (diferente de outros
+## painéis do projeto, refresh() aqui NUNCA reconstrói a árvore).
+var _recursos_amount_labels: Dictionary = {}  # resource_name -> Label
 var _fragmentos_label: Label
 ## F-009: mensagem visível quando "Evoluir" é rejeitado (ex: recursos
 ## insuficientes) — antes só existia um print() no console, que o
@@ -186,10 +190,28 @@ func _build_static_structure() -> void:
 	_resumo_label.clip_text = true
 	_resumo_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	status_hbox.add_child(_resumo_label)
-	_recursos_label = Label.new()
-	_recursos_label.clip_text = true
-	_recursos_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	status_hbox.add_child(_recursos_label)
+	# ART-005: ícone real por recurso (RAW_RESOURCES/RESOURCE_ARCANE_CRYSTAL
+	# etc., F-049) em vez de um único Label de texto concatenado —
+	# construído 1x aqui, texto de cada quantidade atualizado em
+	# refresh(). Some sozinho (sem quebrar o texto) se um recurso
+	# específico não tiver ícone integrado.
+	var recursos_hbox := HBoxContainer.new()
+	recursos_hbox.add_theme_constant_override("separation", 4)
+	recursos_hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	status_hbox.add_child(recursos_hbox)
+	for resource: String in RAW_RESOURCES:
+		var icon := TextureRect.new()
+		icon.custom_minimum_size = Vector2(20, 20)
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.texture = preload("res://engine/presentation/resource_art_catalog.gd").texture_for(resource)
+		icon.visible = icon.texture != null
+		recursos_hbox.add_child(icon)
+
+		var amount_label := Label.new()
+		amount_label.clip_text = true
+		recursos_hbox.add_child(amount_label)
+		_recursos_amount_labels[resource] = amount_label
 	_fragmentos_label = Label.new()
 	_fragmentos_label.clip_text = true
 	_fragmentos_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -309,11 +331,9 @@ func refresh() -> void:
 		kingdom.account_level(), kingdom.account_xp, kingdom.generation_points
 	]
 
-	var recursos_lines: Array[String] = []
 	var capacity: int = Deposits.storage_capacity(kingdom.deposito_level)
 	for resource: String in RAW_RESOURCES:
-		recursos_lines.append("%s: %d/%d" % [RAW_RESOURCE_LABELS[resource], kingdom.get_raw_resource(resource), capacity])
-	_recursos_label.text = " | ".join(recursos_lines)
+		_recursos_amount_labels[resource].text = "%s: %d/%d " % [RAW_RESOURCE_LABELS[resource], kingdom.get_raw_resource(resource), capacity]
 
 	var fragment_lines: Array[String] = []
 	for faction: String in FACTIONS:

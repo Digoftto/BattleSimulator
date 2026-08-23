@@ -33,6 +33,8 @@ static func run(ctx: TestRunner.Context) -> bool:
 	print("[ART-004] Validando MineArtCatalog contra Minas reais (Iniciais + Regionais)...")
 	_test_every_initial_mine_resolves_real_art(ctx)
 	_test_every_regional_mine_resource_region_resolves_real_art(ctx)
+	print("[ART-005] Validando ResourceArtCatalog contra os 3 recursos brutos reais...")
+	_test_every_raw_resource_resolves_real_art(ctx)
 	return true
 
 
@@ -248,3 +250,19 @@ static func _test_every_regional_mine_resource_region_resolves_real_art(ctx: Tes
 		str(missing.is_empty()), missing.size(), str(missing)
 	])
 	ctx.check(missing.is_empty(), "[M] Toda combinação real de Facção x Região de Mina deve resolver uma arte que existe de verdade em disco")
+
+
+## Mesmas 3 chaves de CityPanel.RAW_RESOURCES.
+static func _test_every_raw_resource_resolves_real_art(ctx: TestRunner.Context) -> void:
+	var catalog_module = preload("res://engine/presentation/resource_art_catalog.gd")
+	var resources: Array[String] = ["ferro_negro", "cristais_arcanos", "essencia_vital"]
+	var missing: Array[String] = []
+	for resource: String in resources:
+		var path: String = catalog_module.texture_path_for(resource)
+		if path == "" or not ResourceLoader.exists(path):
+			missing.append("%s (caminho: '%s')" % [resource, path])
+
+	print("  [N] Os 3 recursos brutos reais (mesmas chaves de CityPanel.RAW_RESOURCES) resolvem ícone real em disco? %s (%d sem arte: %s)" % [
+		str(missing.is_empty()), missing.size(), str(missing)
+	])
+	ctx.check(missing.is_empty(), "[N] Todo recurso bruto real deve resolver um ícone que existe de verdade em disco")
