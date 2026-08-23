@@ -70,10 +70,11 @@ var _log_label: Label
 var _result_label: Label
 var _continue_button: Button
 var _skip_button: Button
+var _battlefield_texture_rect: TextureRect
 
-## side*10 + position -> {"card_name", "card_class", "hp", "max_hp", "esc", "max_esc", "alive"}
+## side*10 + position -> {"card_name", "card_class", "hp", "max_hp", "esc", "max_esc", "alive", "card"}
 var _live_board: Dictionary = {}
-## side*10 + position -> {"panel", "name_label", "class_label", "hp_label", "esc_label"}
+## side*10 + position -> {"panel", "portrait", "overlay_vbox", "name_label", "class_label", "hp_label", "esc_label"}
 var _position_widgets: Dictionary = {}
 
 var _log_lines: Array[String] = []
@@ -95,6 +96,31 @@ func _build_static_structure() -> void:
 	background.color = Color(0.08, 0.08, 0.10)
 	background.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(background)
+
+	# ART-001: fundo do Campo de Batalha real da batalha, atrás de tudo
+	# (o próprio ColorRect acima continua existindo por baixo — cobre o
+	# caso, hoje raro mas possível, de combat_state.battlefield vir nulo
+	# ou sem arte integrada ainda, ver BattlefieldArtCatalog). STRETCH_KEEP_ASPECT_COVERED
+	# preenche a área sem deformar a imagem original (corta o excesso,
+	# nunca estica). A UI do replay continua inteira por cima
+	# (root_vbox abaixo é adicionado DEPOIS, então desenha na frente).
+	_battlefield_texture_rect = TextureRect.new()
+	_battlefield_texture_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_battlefield_texture_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_battlefield_texture_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	_battlefield_texture_rect.texture = preload("res://engine/presentation/battlefield_art_catalog.gd").texture_for(combat_state.battlefield if combat_state != null else null)
+	_battlefield_texture_rect.visible = _battlefield_texture_rect.texture != null
+	add_child(_battlefield_texture_rect)
+
+	# Painel semi-transparente entre o Battlefield e o conteúdo — sem
+	# isso, o texto/tabuleiro perderia legibilidade sobre uma imagem de
+	# fundo cheia de detalhe (restrição explícita de ART-001 §1: a arte
+	# nunca pode prejudicar a leitura das unidades).
+	var content_backing := ColorRect.new()
+	content_backing.color = Color(0.06, 0.06, 0.08, 0.72)
+	content_backing.set_anchors_preset(Control.PRESET_FULL_RECT)
+	content_backing.visible = _battlefield_texture_rect.visible
+	add_child(content_backing)
 
 	var root_vbox := VBoxContainer.new()
 	root_vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -164,36 +190,70 @@ func _build_side_board(side: int, side_title: String) -> Control:
 	return side_vbox
 
 
+## ART-001: o retrato da carta agora é a representação PRINCIPAL da
+## posição (texto vira apoio, nunca a informação primária) — painel
+## maior (~0,72:1, perto da proporção real dos retratos integrados,
+## ver CardArtCatalog) com o TextureRect preenchendo tudo por baixo
+## (STRETCH_KEEP_ASPECT_COVERED corta o excesso em vez de deformar) e
+## uma faixa semi-transparente ancorada embaixo com
+## Posição/Nome/Classe/HP/ESC — sempre legível por cima de qualquer
+## arte, nunca clipada.
 func _build_position_widget(side: int, position: int) -> Control:
-	var panel := ColorRect.new()
-	panel.color = Color(0.18, 0.18, 0.22)
-	panel.custom_minimum_size = Vector2(150, 90)
+	var panel := Control.new()
+	panel.custom_minimum_size = Vector2(118, 164)
+	panel.clip_contents = true
 
-	var inner_vbox := VBoxContainer.new()
-	inner_vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
-	panel.add_child(inner_vbox)
+	var background := ColorRect.new()
+	background.color = Color(0.18, 0.18, 0.22)
+	background.set_anchors_preset(Control.PRESET_FULL_RECT)
+	panel.add_child(background)
+
+	var portrait := TextureRect.new()
+	portrait.set_anchors_preset(Control.PRESET_FULL_RECT)
+	portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	panel.add_child(portrait)
+
+	var overlay := ColorRect.new()
+	overlay.color = Color(0.04, 0.04, 0.05, 0.78)
+	overlay.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	overlay.offset_top = -62
+	panel.add_child(overlay)
+
+	var overlay_vbox := VBoxContainer.new()
+	overlay_vbox.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	overlay_vbox.offset_top = -62
+	overlay_vbox.offset_left = 4
+	overlay_vbox.offset_right = -4
+	overlay_vbox.add_theme_constant_override("separation", 0)
+	panel.add_child(overlay_vbox)
 
 	var position_label := Label.new()
 	position_label.text = "Posição %d" % position
-	position_label.add_theme_font_size_override("font_size", 11)
-	inner_vbox.add_child(position_label)
+	position_label.add_theme_font_size_override("font_size", 10)
+	overlay_vbox.add_child(position_label)
 
 	var name_label := Label.new()
 	name_label.text = "(vazio)"
-	inner_vbox.add_child(name_label)
+	name_label.add_theme_font_size_override("font_size", 12)
+	name_label.clip_text = true
+	overlay_vbox.add_child(name_label)
 
 	var class_label := Label.new()
-	class_label.add_theme_font_size_override("font_size", 11)
-	inner_vbox.add_child(class_label)
+	class_label.add_theme_font_size_override("font_size", 10)
+	overlay_vbox.add_child(class_label)
 
 	var hp_label := Label.new()
-	inner_vbox.add_child(hp_label)
+	hp_label.add_theme_font_size_override("font_size", 11)
+	overlay_vbox.add_child(hp_label)
 
 	var esc_label := Label.new()
-	inner_vbox.add_child(esc_label)
+	esc_label.add_theme_font_size_override("font_size", 11)
+	overlay_vbox.add_child(esc_label)
 
 	_position_widgets[side * 10 + position] = {
-		"panel": panel,
+		"panel": background,
+		"portrait": portrait,
 		"name_label": name_label,
 		"class_label": class_label,
 		"hp_label": hp_label,
@@ -215,6 +275,7 @@ func _apply_initial_board() -> void:
 			"esc": entry["esc"],
 			"max_esc": entry["max_esc"],
 			"alive": true,
+			"card": entry.get("card"),
 		}
 		_refresh_position_widget(key)
 
@@ -229,6 +290,8 @@ func _refresh_position_widget(key: int) -> void:
 		widgets["hp_label"].text = ""
 		widgets["esc_label"].text = ""
 		widgets["panel"].color = Color(0.18, 0.18, 0.22)
+		widgets["portrait"].texture = null
+		widgets["portrait"].modulate = Color.WHITE
 		return
 
 	var unit: Dictionary = _live_board[key]
@@ -237,6 +300,16 @@ func _refresh_position_widget(key: int) -> void:
 	widgets["hp_label"].text = "HP: %d/%d" % [unit["hp"], unit["max_hp"]]
 	widgets["esc_label"].text = "ESC: %d/%d" % [unit["esc"], unit["max_esc"]]
 	widgets["panel"].color = Color(0.18, 0.18, 0.22) if unit["alive"] else Color(0.30, 0.10, 0.10)
+
+	# ART-001: o retrato só precisa ser CARREGADO uma vez por unidade
+	# (nunca muda enquanto ela existir) — recarregar a cada refresh
+	# (chamado a cada ataque/cura) seria desperdício. "morte/remoção
+	# visual" (ART-001 §5) usa modulate escurecido sobre o mesmo
+	# retrato, nunca troca de imagem nem o remove — a carta morta
+	# continua identificável, só visivelmente fora de combate.
+	if widgets["portrait"].texture == null and unit.get("card") != null:
+		widgets["portrait"].texture = preload("res://engine/presentation/card_art_catalog.gd").texture_for(unit["card"])
+	widgets["portrait"].modulate = Color.WHITE if unit["alive"] else Color(0.42, 0.30, 0.30)
 
 
 func _append_log(line: String) -> void:

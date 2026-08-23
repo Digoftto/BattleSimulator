@@ -145,6 +145,7 @@ func _ready() -> void:
 	runner.register("army_editor_formation_flow", "validate_army_editor_formation_flow", preload("res://tests/unit/test_army_editor_formation_flow.gd").run)
 	runner.register("kingdom_persistence_roundtrip", "validate_kingdom_persistence_roundtrip", preload("res://tests/unit/test_kingdom_persistence_roundtrip.gd").run)
 	runner.register("combat_replay_view", "validate_combat_replay_view", preload("res://tests/unit/test_combat_replay_view.gd").run)
+	runner.register("art_catalogs", "validate_art_catalogs", preload("res://tests/unit/test_art_catalogs.gd").run)
 
 	var suite_filter: String = _arg_value("--suite=")
 	var test_filter: String = _arg_value("--test=")

@@ -118,4 +118,26 @@ static func _test_replay_matches_real_combat_state(ctx: TestRunner.Context) -> v
 	print("  [D] Banner de Resultado (Vitória/Derrota/Empate) e botão Continuar aparecem ao final? %s (texto: '%s')" % [str(expected_result_visible), view._result_label.text])
 	ctx.check(expected_result_visible, "[D] Ao final do replay, o banner de Resultado deve ficar visível junto do botão Continuar, e o botão Pular deve sumir")
 
+	# ART-001: o Battlefield real da batalha (sorteado por CombatEngine.initialize(),
+	# nunca escolhido por esta camada) deve aparecer como fundo.
+	print("  [E] O fundo do Campo de Batalha real (%s) apareceu como textura no CombatReplayView? %s" % [
+		state.battlefield.battlefield_name if state.battlefield != null else "<nulo>", str(view._battlefield_texture_rect.texture != null)
+	])
+	ctx.check(view._battlefield_texture_rect.texture != null, "[E] CombatReplayView deve carregar a arte do Campo de Batalha real da batalha (nunca inventar um Campo próprio)")
+
+	# ART-001: toda posição com unidade VIVA precisa ter um retrato real
+	# carregado — nunca ficar só no texto (a informação principal agora
+	# é a arte, texto é apoio).
+	var all_alive_have_portrait: bool = true
+	var alive_checked: int = 0
+	for key: int in view._live_board.keys():
+		if view._live_board[key]["alive"]:
+			alive_checked += 1
+			var widgets: Dictionary = view._position_widgets.get(key, {})
+			if widgets.is_empty() or widgets["portrait"].texture == null:
+				all_alive_have_portrait = false
+	print("  [F] Toda posição com unidade viva ao final (%d verificadas) tem um retrato real carregado, não só texto? %s" % [alive_checked, str(all_alive_have_portrait)])
+	ctx.check(alive_checked > 0, "[F] Pré-condição: a batalha real precisa terminar com ao menos 1 unidade viva pra este teste fazer sentido")
+	ctx.check(all_alive_have_portrait, "[F] Toda posição com unidade viva deve mostrar o retrato real da carta (CardArtCatalog), nunca só o texto de apoio")
+
 	view.free()

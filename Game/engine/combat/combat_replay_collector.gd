@@ -33,7 +33,12 @@ var replay_events: Array[Dictionary] = []
 ## CombatEngine.initialize() e ANTES de CombatEngine.run() (mesmo
 ## ponto já usado por test_army_editor_formation_flow.gd pra ler a
 ## Formação inicial real). Cada item: {"side", "position", "card_name",
-## "card_class", "hp", "max_hp", "esc", "max_esc"}.
+## "card_class", "hp", "max_hp", "esc", "max_esc", "card"}.
+## "card" (ART-001): a própria CardResource, não só o nome — necessária
+## pra CardArtCatalog resolver o retrato pelo resource_path real da
+## carta (ver card_art_catalog.gd). Puramente aditivo: nenhum campo
+## existente foi removido/renomeado, código anterior a ART-001 que só
+## lê "card_name" etc. continua funcionando sem alteração.
 var initial_board: Array[Dictionary] = []
 
 
@@ -62,6 +67,7 @@ func snapshot_initial_board(state: CombatState) -> void:
 			"max_hp": unit.card.hp,
 			"esc": unit.current_esc,
 			"max_esc": unit.card.esc,
+			"card": unit.card,
 		})
 
 
