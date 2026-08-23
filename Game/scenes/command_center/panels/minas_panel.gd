@@ -81,6 +81,18 @@ func refresh() -> void:
 		var vbox := VBoxContainer.new()
 		panel.add_child(vbox)
 
+		# ART-004: arte real da Mina (recurso + Inicial/Regional já
+		# derivados por MineArtCatalog a partir da própria Mina) — some
+		# sozinha se não houver correspondência, nunca quebra o texto
+		# abaixo dela.
+		var mina_art := TextureRect.new()
+		mina_art.custom_minimum_size = Vector2(0, 140)
+		mina_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		mina_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		mina_art.texture = preload("res://engine/presentation/mine_art_catalog.gd").texture_for(mina)
+		mina_art.visible = mina_art.texture != null
+		vbox.add_child(mina_art)
+
 		var location: String = "Mina Inicial" if mina.is_initial_mine() else "Fase %d (%s, Região %d)" % [mina.adjacent_fase, mina.faction, mina.region]
 		var info_label := Label.new()
 		info_label.text = "%s | Nível estrutural: %d" % [location, mina.structure_level]

@@ -1601,6 +1601,13 @@ func _validate_minas_panel_ui() -> void:
 		_panel_contains_text(panel, "Mina Inicial")
 	))
 
+	# ART-004: arte real da Mina Inicial (Império -> ferro_negro) deve
+	# ter carregado, sem alterar em nada o que acontece a seguir
+	# (designar Guarnição/Iniciar Ciclo — fluxo protegido desde F-045).
+	print("  ART-004: arte da Mina Inicial (Império -> ferro_negro) carregou de verdade no painel? %s" % str(
+		_count_loaded_textures(panel) >= 1
+	))
+
 	var available_armies_for_test: Array[Army] = [test_army]
 	panel._on_army_selected(1, mina, available_armies_for_test)
 	panel._on_assign_guarnicao_pressed(mina)

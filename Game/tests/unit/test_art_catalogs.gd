@@ -30,6 +30,9 @@ static func run(ctx: TestRunner.Context) -> bool:
 	_test_every_trilha_faction_region_resolves_real_art(ctx)
 	_test_every_fase_icon_faction_category_resolves_real_art(ctx)
 	_test_fase_category_matches_real_expedition_state(ctx)
+	print("[ART-004] Validando MineArtCatalog contra Minas reais (Iniciais + Regionais)...")
+	_test_every_initial_mine_resolves_real_art(ctx)
+	_test_every_regional_mine_resource_region_resolves_real_art(ctx)
 	return true
 
 
@@ -208,3 +211,40 @@ static func _test_fase_category_matches_real_expedition_state(ctx: TestRunner.Co
 	expedition.is_waiting_at_acampamento = true
 	print("  [K-d] is_waiting_at_acampamento == true (mesmo na Fase 1000, Chefe Regional) -> categoria: %s (esperado: acampamento)" % catalog_module.fase_category_for_expedition(expedition))
 	ctx.check(catalog_module.fase_category_for_expedition(expedition) == "acampamento", "[K-d] Quando a Expedição está de fato esperando no Acampamento (is_waiting_at_acampamento), a categoria deve ser 'acampamento', prevalecendo sobre o tipo da Fase")
+
+
+## Constrói as 3 Minas Iniciais EXATAMENTE como Kingdom.create_initial_mines()
+## faz de verdade (Mina.new(-1, faction), uma por Facção) — não uma
+## amostra, as 3 reais.
+static func _test_every_initial_mine_resolves_real_art(ctx: TestRunner.Context) -> void:
+	var catalog_module = preload("res://engine/presentation/mine_art_catalog.gd")
+	var factions: Array[String] = ["Império", "Natureza", "Mortos-Vivos"]
+	var missing: Array[String] = []
+	for faction: String in factions:
+		var mina := Mina.new(-1, faction)
+		var path: String = catalog_module.texture_path_for(mina)
+		if path == "" or not ResourceLoader.exists(path):
+			missing.append("Mina Inicial de %s (caminho: '%s')" % [faction, path])
+
+	print("  [L] As 3 Minas Iniciais reais (uma por Facção, Mina.new(-1, faction) — mesma construção de Kingdom.create_initial_mines()) resolvem arte real em disco? %s (%d sem arte: %s)" % [
+		str(missing.is_empty()), missing.size(), str(missing)
+	])
+	ctx.check(missing.is_empty(), "[L] Toda Mina Inicial real deve resolver uma arte que existe de verdade em disco")
+
+
+static func _test_every_regional_mine_resource_region_resolves_real_art(ctx: TestRunner.Context) -> void:
+	var catalog_module = preload("res://engine/presentation/mine_art_catalog.gd")
+	var factions: Array[String] = ["Império", "Natureza", "Mortos-Vivos"]
+	var missing: Array[String] = []
+	for faction: String in factions:
+		for region in [1, 2, 3]:
+			var mina := Mina.new(1500, faction)
+			mina.region = region
+			var path: String = catalog_module.texture_path_for(mina)
+			if path == "" or not ResourceLoader.exists(path):
+				missing.append("%s Região %d (caminho: '%s')" % [faction, region, path])
+
+	print("  [M] As 9 combinações Facção x Região de Mina Regional resolvem arte real em disco (dado disponível, mesmo sem UI de conquista hoje — F-022)? %s (%d sem arte: %s)" % [
+		str(missing.is_empty()), missing.size(), str(missing)
+	])
+	ctx.check(missing.is_empty(), "[M] Toda combinação real de Facção x Região de Mina deve resolver uma arte que existe de verdade em disco")
