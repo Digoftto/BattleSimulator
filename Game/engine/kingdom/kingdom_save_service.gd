@@ -139,6 +139,7 @@ static func _kingdom_to_dict(kingdom: Kingdom) -> Dictionary:
 		"initial_mines": _mines_to_array(kingdom.initial_mines, kingdom.armies),
 		"territory_mines": _territory_mines_to_dict(kingdom.territory_mines, kingdom.armies),
 		"progress_flags": kingdom.progress_flags.duplicate(),
+		"tutorial_step": kingdom.tutorial_step,
 	}
 
 
@@ -518,6 +519,7 @@ static func _dict_to_kingdom(data: Dictionary, kingdom: Kingdom) -> void:
 		kingdom.territory_mines[territory_id] = mines
 
 	kingdom.progress_flags = data.get("progress_flags", {}).duplicate()
+	kingdom.tutorial_step = data.get("tutorial_step", Kingdom.TUTORIAL_STEP_CIDADE)
 
 
 static func _dict_to_commander(data: Dictionary) -> CommanderResource:

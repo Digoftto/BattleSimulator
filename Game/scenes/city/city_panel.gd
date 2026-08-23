@@ -115,6 +115,7 @@ func _ready() -> void:
 
 	_build_static_structure()
 	refresh()
+	_maybe_show_tutorial_hint()
 	print("[CityPanel] Pronto. Nível de Conta: %d" % KingdomState.kingdom.account_level())
 
 
@@ -128,7 +129,36 @@ func _on_starter_kit_chosen(kit_panel: StarterKitPanel) -> void:
 	kit_panel.queue_free()
 	_build_static_structure()
 	refresh()
+	_maybe_show_tutorial_hint()
 	print("[CityPanel] Pronto (após Kit Inicial). Nível de Conta: %d" % KingdomState.kingdom.account_level())
+
+
+## TUT-001, Passo 1/4 (Cidade): mostrado uma única vez, na primeira vez
+## que o jogador vê a Cidade depois do Kit Inicial — nunca reaparece
+## depois (gate duplo: tutorial_step precisa estar exatamente no passo
+## da Cidade, E o tutorial como um todo não pode já estar concluído).
+func _maybe_show_tutorial_hint() -> void:
+	var kingdom: Kingdom = KingdomState.kingdom
+	if kingdom.has_progress_flag("tutorial_concluido") or kingdom.tutorial_step != Kingdom.TUTORIAL_STEP_CIDADE:
+		return
+
+	# Sem anotação de tipo (Variant): TutorialHintBanner é um class_name
+	# novo desta sessão, ainda não resolvível como TIPO num identificador
+	# bare até uma passada de --import (mesma observação de
+	# pve_panel.gd/_play_battle_replays() sobre CombatReplayView).
+	var banner = preload("res://scenes/tutorial/tutorial_hint_banner.gd").new()
+	banner.setup(
+		"Bem-vindo ao seu Reino!",
+		"Esta é a sua Cidade. Vá até o Centro de Comando > Exércitos para ver o Exército que você já formou no Kit Inicial.",
+		"Passo 1 de 4"
+	)
+	banner.continue_pressed.connect(_on_tutorial_hint_continue.bind(banner), CONNECT_DEFERRED)
+	add_child(banner)
+
+
+func _on_tutorial_hint_continue(banner: Control) -> void:
+	KingdomState.kingdom.tutorial_step = Kingdom.TUTORIAL_STEP_EXERCITO
+	banner.queue_free()
 
 
 func _show_loading_indicator() -> void:

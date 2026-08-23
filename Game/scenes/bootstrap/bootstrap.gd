@@ -102,6 +102,7 @@ func _ready() -> void:
 	await _validate_pve_use_existing_army()
 	await _validate_starter_kit()
 	await _validate_city_panel()
+	await _validate_tutorial_flow()
 	_validate_pvp_panel_ui()
 	_validate_academia_panel()
 	_validate_academia_chain_persistence()
@@ -3535,6 +3536,115 @@ func _validate_city_panel() -> void:
 	KingdomState.kingdom = old_kingdom_for_evolve_test
 
 
+## TUT-001: fluxo completo do tutorial mínimo, de ponta a ponta, usando
+## as telas REAIS (nunca uma simulação separada) — NOVO SAVE -> Cidade
+## (Kit Inicial + Passo 1) -> Exércitos (Passo 2) -> PvE (Passo 3,
+## montar Squad com o Exército do Kit Inicial, iniciar Expedição de
+## verdade) -> Tentar Fase Atual (Combate Visual real + Resultado +
+## Passo 4 pós-combate) -> conclusão -> de volta à Cidade, confirmando
+## que o tutorial nunca mais reaparece. Mesmo padrão de "reino isolado,
+## trocado em KingdomState.kingdom" já usado em _validate_starter_kit()/
+## _validate_pve_panel_start_new_expedition().
+func _validate_tutorial_flow() -> void:
+	print("[Tutorial] Validando o fluxo completo do tutorial mínimo (NOVO SAVE -> Cidade -> Exércitos -> PvE -> Combate -> Cidade)...")
+
+	KingdomSaveService.delete_save()
+	var kingdom := Kingdom.new()
+	var old_kingdom: Kingdom = KingdomState.kingdom
+	KingdomState.kingdom = kingdom
+
+	# --- Cidade: Kit Inicial primeiro (nenhuma tela de tutorial antes
+	# disso), depois o Passo 1 do tutorial. ---
+	var city_panel: Control = load("res://scenes/city/city_panel.tscn").instantiate()
+	add_child(city_panel)
+	await get_tree().process_frame
+	await get_tree().process_frame
+
+	var kit_child: StarterKitPanel = null
+	for child in city_panel.get_children():
+		if child is StarterKitPanel:
+			kit_child = child
+	kit_child._on_choose_pressed(kit_child._options[0])
+	await get_tree().process_frame
+
+	print("  [1/6] Cidade mostra o Passo 1 do tutorial logo depois do Kit Inicial? %s (esperado: true)" % str(
+		_panel_contains_text(city_panel, "Passo 1 de 4")
+	))
+	city_panel._on_tutorial_hint_continue(city_panel.get_child(city_panel.get_child_count() - 1))
+	print("  [1/6] 'Continuar' avança o tutorial pro Passo 2 (Exércitos)? %s (esperado: true)" % str(
+		kingdom.tutorial_step == Kingdom.TUTORIAL_STEP_EXERCITO
+	))
+	city_panel.queue_free()
+	await get_tree().process_frame
+
+	# --- Exércitos: Passo 2 — o Exército do Kit Inicial já existe aqui,
+	# sem precisar montar nada novo. ---
+	var exercitos_panel: Control = load("res://scenes/city/panels/exercitos_panel.tscn").instantiate()
+	add_child(exercitos_panel)
+	await get_tree().process_frame
+
+	print("  [2/6] ExercitosPanel mostra o Passo 2 e o Exército do Kit Inicial já aparece na lista? %s, %s (esperado: true, true)" % [
+		str(_panel_contains_text(exercitos_panel, "Passo 2 de 4")), str(kingdom.armies.size() == 1)
+	])
+	exercitos_panel._on_tutorial_hint_continue(exercitos_panel.get_child(exercitos_panel.get_child_count() - 1))
+	print("  [2/6] 'Continuar' avança o tutorial pro Passo 3 (PvE)? %s (esperado: true)" % str(
+		kingdom.tutorial_step == Kingdom.TUTORIAL_STEP_PVE
+	))
+	exercitos_panel.queue_free()
+	await get_tree().process_frame
+
+	# --- PvE: Passo 3 — usa o Exército JÁ FORMADO no Squad (nunca cria
+	# um novo pelo Editor, já que o objetivo aqui é a Expedição/Combate,
+	# não o Editor de Exército em si — isso já é validado por
+	# _validate_pve_panel_start_new_expedition()). ---
+	var pve_panel: Control = load("res://scenes/command_center/panels/pve_panel.tscn").instantiate()
+	add_child(pve_panel)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	await get_tree().process_frame
+
+	print("  [3/6] PvEPanel mostra o Passo 3? %s (esperado: true)" % str(_panel_contains_text(pve_panel, "Passo 3 de 4")))
+
+	var kit_army: Army = kingdom.armies[0]
+	pve_panel._on_use_existing_army_pressed(kit_army)
+	pve_panel._on_start_new_expedition_pressed()
+	print("  [4/6] Expedição real iniciada com o Exército do Kit Inicial (Squad de 1, sem precisar do Editor)? %s (esperado: true)" % str(
+		kingdom.active_expeditions.size() == 1
+	))
+
+	var expedition: ExpeditionRuntime = kingdom.active_expeditions[0]
+	# Ritmo instantâneo só pra este teste automatizado (mesmo mecanismo
+	# de _validate_pve_panel_ui()) — nunca usado em jogo real.
+	pve_panel.replay_speed_override = 0.0
+	await pve_panel._on_attempt_fase_pressed(expedition)
+	print("  [5/6] Combate Visual real reproduzido e Resultado exibido na tela (nunca o RNG/regras alterados pra facilitar)? %s (esperado: true)" % str(
+		_panel_contains_text(pve_panel, "Vitória!") or _panel_contains_text(pve_panel, "Derrota.")
+	))
+	print("  [5/6] Banner pós-combate (Passo 4, Combate+Resultado+Recompensa combinados) apareceu de verdade? %s (esperado: true)" % str(
+		_panel_contains_text(pve_panel, "Passo 4 de 4")
+	))
+
+	pve_panel._on_post_combat_tutorial_hint_continue()
+	print("  [6/6] Tutorial concluído (passo + flag de progresso) depois do fluxo real completo? %s, %s (esperado: true, true)" % [
+		str(kingdom.tutorial_step == Kingdom.TUTORIAL_STEP_CONCLUIDO), str(kingdom.has_progress_flag("tutorial_concluido"))
+	])
+	pve_panel.queue_free()
+	await get_tree().process_frame
+
+	# --- De volta à Cidade: o tutorial concluído nunca mais reaparece. ---
+	var city_panel_again: Control = load("res://scenes/city/city_panel.tscn").instantiate()
+	add_child(city_panel_again)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	print("  [Não-reaparecimento] De volta à Cidade, já concluído -> o banner do tutorial NUNCA mais aparece? %s (esperado: true)" % str(
+		not _panel_contains_text(city_panel_again, "Passo 1 de 4")
+	))
+	city_panel_again.queue_free()
+
+	KingdomState.kingdom = old_kingdom
+	KingdomSaveService.delete_save()
+
+
 ## Validação da Sprint 32.5: executa uma Expedição real de ponta a
 ## ponta — Cidade -> Trilha -> Fase -> EnemyArmySelector -> Combate ->
 ## Resultado -> próxima Fase -> ... — sem nenhuma intervenção manual
@@ -3732,6 +3842,7 @@ func _validate_kingdom_save_load() -> void:
 	original.energy_nucleus_level = 3
 	original.add_fragment("Império", 42)
 	original.set_progress_flag("tutorial_concluido")
+	original.tutorial_step = Kingdom.TUTORIAL_STEP_CONCLUIDO
 
 	var commander := CommanderResource.new()
 	commander.commander_name = "General de Teste"
@@ -3778,8 +3889,9 @@ func _validate_kingdom_save_load() -> void:
 	RecruitmentResolver.purge_expired_offers(loaded, GameClock.now_unix())
 	print("  Purga de expiração pós-carregamento executada (oferta recém-salva não deve ter expirado).")
 
-	print("  Nível do Núcleo: %d (esperado: 3) | Fragmentos Império: %d (esperado: 42) | Flag tutorial: %s (esperado: true)" % [
-		loaded.energy_nucleus_level, loaded.get_fragment("Império"), str(loaded.has_progress_flag("tutorial_concluido"))
+	print("  Nível do Núcleo: %d (esperado: 3) | Fragmentos Império: %d (esperado: 42) | Flag tutorial: %s (esperado: true) | tutorial_step: %d (esperado: %d, TUT-001)" % [
+		loaded.energy_nucleus_level, loaded.get_fragment("Império"), str(loaded.has_progress_flag("tutorial_concluido")),
+		loaded.tutorial_step, Kingdom.TUTORIAL_STEP_CONCLUIDO
 	])
 	print("  Comandantes: %d | Cartas: %d | Exércitos: %d | Squads: %d (esperado: 1, 1, 1, 1)" % [
 		loaded.commanders.size(), loaded.cards.size(), loaded.armies.size(), loaded.squads.size()

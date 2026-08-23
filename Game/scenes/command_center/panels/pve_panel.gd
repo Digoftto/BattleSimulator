@@ -52,6 +52,19 @@ var _loading_label: Label = null
 ## verdade, onde este campo permanece -1.0 (ritmo humano normal).
 var replay_speed_override: float = -1.0
 
+## TUT-001: referência ao banner de dica atualmente na tela (Passo 3 ou
+## Passo 4 — nunca os dois ao mesmo tempo), pra poder liberar o
+## anterior antes de mostrar o próximo (evita dois banners sobrepostos
+## caso o jogador ataque a Fase sem antes dispensar o do Passo 3, já
+## que o banner nunca bloqueia "Tentar Fase Atual" por baixo).
+## Sem anotação de tipo (Variant) de propósito: TutorialHintBanner é um
+## class_name novo desta sessão, cujo identificador só fica resolvível
+## como TIPO depois de uma passada de --import (ver preload() usado em
+## _maybe_show_tutorial_hint()/_maybe_show_post_combat_tutorial_hint() —
+## mesma observação já registrada em TECHNICAL_BACKLOG.md, R-016, e em
+## _play_battle_replays() acima, sobre CombatReplayView).
+var _tutorial_banner = null
+
 
 func _ready() -> void:
 	if not KingdomState.is_initialized:
@@ -78,7 +91,81 @@ func _ready() -> void:
 
 	_build_static_structure()
 	refresh()
+	_maybe_show_tutorial_hint()
 	print("[PvEPanel] Pronto. Expedições ativas: %d" % KingdomState.kingdom.active_expeditions.size())
+
+
+## TUT-001, Passo 3/4 (PvE): mostrado uma única vez, no passo certo do
+## tutorial mínimo — mesma trava dupla já usada em
+## CityPanel/ExercitosPanel._maybe_show_tutorial_hint(). Nunca bloqueia
+## "Iniciar Nova Expedição"/"Tentar Fase Atual" por baixo — o jogador
+## pode agir livremente com ou sem dispensar o banner primeiro.
+func _maybe_show_tutorial_hint() -> void:
+	var kingdom: Kingdom = KingdomState.kingdom
+	if kingdom.has_progress_flag("tutorial_concluido") or kingdom.tutorial_step != Kingdom.TUTORIAL_STEP_PVE:
+		return
+
+	_free_tutorial_banner()
+	_tutorial_banner = preload("res://scenes/tutorial/tutorial_hint_banner.gd").new()
+	_tutorial_banner.setup(
+		"Sua Primeira Expedição",
+		"Escolha um Território, adicione seu Exército ao Squad com 'Usar no Squad' e clique em 'Iniciar Expedição'. Depois, use 'Tentar Fase Atual' para lutar sua primeira batalha.",
+		"Passo 3 de 4"
+	)
+	_tutorial_banner.continue_pressed.connect(_on_tutorial_hint_continue, CONNECT_DEFERRED)
+	add_child(_tutorial_banner)
+
+
+func _on_tutorial_hint_continue() -> void:
+	KingdomState.kingdom.tutorial_step = Kingdom.TUTORIAL_STEP_POS_COMBATE
+	_free_tutorial_banner()
+
+
+func _free_tutorial_banner() -> void:
+	if _tutorial_banner != null:
+		_tutorial_banner.queue_free()
+		_tutorial_banner = null
+
+
+## TUT-001, Passo 4/4 (Combate/Resultado/Recompensa combinados num único
+## momento pós-batalha, conforme a flexibilidade do próprio pedido —
+## nenhuma separação artificial entre "ver o combate", "ver o
+## resultado" e "ver a recompensa", que já acontecem juntos na mesma
+## tela hoje). Mostrado depois da PRIMEIRA "Tentar Fase Atual" real do
+## tutorial, vitória ou derrota (nunca altera CombatEngine/RNG/inimigos
+## para garantir vitória) — clicar "Concluir Tutorial" marca
+## progress_flags["tutorial_concluido"], o mecanismo de conclusão já
+## existente e testado (test_kingdom.gd), então o tutorial nunca mais
+## reaparece em nenhuma tela.
+##
+## Gate aceita tanto o passo 3 (PVE, caso o jogador já tenha lutado sem
+## antes clicar "Continuar" no banner do Passo 3 — o banner nunca
+## bloqueia "Tentar Fase Atual" por baixo) quanto o passo 4 (POS_COMBATE,
+## caminho normal) — sem isso, pular o "Continuar" do Passo 3 faria a
+## primeira batalha real nunca disparar o encerramento do tutorial.
+func _maybe_show_post_combat_tutorial_hint() -> void:
+	var kingdom: Kingdom = KingdomState.kingdom
+	var step: int = kingdom.tutorial_step
+	if kingdom.has_progress_flag("tutorial_concluido") \
+		or (step != Kingdom.TUTORIAL_STEP_PVE and step != Kingdom.TUTORIAL_STEP_POS_COMBATE):
+		return
+
+	_free_tutorial_banner()
+	_tutorial_banner = preload("res://scenes/tutorial/tutorial_hint_banner.gd").new()
+	_tutorial_banner.setup(
+		"Primeira Batalha Concluída",
+		"O resultado acima mostra o que aconteceu e, em caso de vitória, a recompensa (Fragmentos) já creditada ao seu Reino. Volte para a Cidade quando quiser — o resto do Reino já está liberado para você explorar.",
+		"Passo 4 de 4"
+	)
+	_tutorial_banner.continue_pressed.connect(_on_post_combat_tutorial_hint_continue, CONNECT_DEFERRED)
+	add_child(_tutorial_banner)
+
+
+func _on_post_combat_tutorial_hint_continue() -> void:
+	var kingdom: Kingdom = KingdomState.kingdom
+	kingdom.tutorial_step = Kingdom.TUTORIAL_STEP_CONCLUIDO
+	kingdom.set_progress_flag("tutorial_concluido")
+	_free_tutorial_banner()
 
 
 func _show_loading_indicator() -> void:
@@ -437,6 +524,7 @@ func _on_attempt_fase_pressed(expedition: ExpeditionRuntime) -> void:
 		var prefix: String = "Vitória! " if result.victory else "Derrota. "
 		_last_phase_result_text[expedition] = prefix + " ".join(new_lines)
 	refresh()
+	_maybe_show_post_combat_tutorial_hint()
 
 
 ## F-047: reproduz visualmente, um após o outro e na mesma ordem em que

@@ -17,7 +17,35 @@ func _ready() -> void:
 	if not KingdomState.is_initialized:
 		KingdomState.initialize_new_kingdom()
 	refresh()
+	_maybe_show_tutorial_hint()
 	print("[ExercitosPanel] Pronto. Exércitos no Reino: %d" % KingdomState.kingdom.armies.size())
+
+
+## TUT-001, Passo 2/4 (Exército/Formação): mostrado uma única vez, no
+## passo certo do tutorial mínimo — a mesma trava dupla (passo exato +
+## tutorial não concluído) usada em CityPanel._maybe_show_tutorial_hint().
+func _maybe_show_tutorial_hint() -> void:
+	var kingdom: Kingdom = KingdomState.kingdom
+	if kingdom.has_progress_flag("tutorial_concluido") or kingdom.tutorial_step != Kingdom.TUTORIAL_STEP_EXERCITO:
+		return
+
+	# Sem anotação de tipo (Variant): TutorialHintBanner é um class_name
+	# novo desta sessão, ainda não resolvível como TIPO num identificador
+	# bare até uma passada de --import (mesma observação de
+	# pve_panel.gd/_play_battle_replays() sobre CombatReplayView).
+	var banner = preload("res://scenes/tutorial/tutorial_hint_banner.gd").new()
+	banner.setup(
+		"Seu Exército",
+		"Comandante + 9 Cartas, já montados no Kit Inicial. 'Editar Exército' muda a composição; o Editor também deixa ajustar o posicionamento. Volte ao Centro de Comando e abra o PvE para partir para sua primeira batalha.",
+		"Passo 2 de 4"
+	)
+	banner.continue_pressed.connect(_on_tutorial_hint_continue.bind(banner), CONNECT_DEFERRED)
+	add_child(banner)
+
+
+func _on_tutorial_hint_continue(banner: Control) -> void:
+	KingdomState.kingdom.tutorial_step = Kingdom.TUTORIAL_STEP_PVE
+	banner.queue_free()
 
 
 func refresh() -> void:

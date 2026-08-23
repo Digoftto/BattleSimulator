@@ -156,6 +156,23 @@ var regional_commander_registry: RegionalCommanderRegistry = RegionalCommanderRe
 ## se a quantidade/complexidade de flags justificar.
 var progress_flags: Dictionary = {}
 
+## Tutorial mínimo (TUT-001, versão reduzida ao loop principal da
+## versão completa de 15 Etapas descrita em Game/TUTORIAL.md — Etapas
+## 2-14 daquele documento, fora do escopo desta entrega): passo atual,
+## avança conforme o jogador progride pelas telas REAIS do loop
+## principal (Cidade -> Exércitos -> PvE -> pós-combate), nunca por
+## tempo decorrido (mesmo princípio de TUTORIAL.md, "Princípios
+## Permanentes"). A conclusão em si já tinha um mecanismo pronto e
+## testado (progress_flags["tutorial_concluido"], ver
+## test_kingdom.gd/test_kingdom_persistence_roundtrip.gd) — só o passo
+## atual precisava de um campo novo.
+const TUTORIAL_STEP_CIDADE: int = 0
+const TUTORIAL_STEP_EXERCITO: int = 1
+const TUTORIAL_STEP_PVE: int = 2
+const TUTORIAL_STEP_POS_COMBATE: int = 3
+const TUTORIAL_STEP_CONCLUIDO: int = 4
+var tutorial_step: int = TUTORIAL_STEP_CIDADE
+
 ## Fragmentos possuídos pelo jogador, por Facção (RESOURCES.md §3:
 ## "cada Facção possui seu próprio tipo de Fragmento e uma economia
 ## independente"). Nasce nesta Sprint porque RewardResolver é seu
