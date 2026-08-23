@@ -244,7 +244,12 @@ func _build_static_structure() -> void:
 	_contextual_panel = PanelContainer.new()
 	_contextual_panel.visible = false
 	_contextual_panel.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-	_contextual_panel.offset_top = -160
+	# ART-002: offset_top ficou mais negativo (-160 -> -290) só pra
+	# abrir espaço pra ilustração do prédio (~130px de altura) no topo
+	# do painel — offset_bottom/left/right (largura e ancoragem)
+	# continuam exatamente os mesmos de antes, mesmo mecanismo de
+	# layout (PRESET_CENTER_BOTTOM + offsets absolutos) já usado aqui.
+	_contextual_panel.offset_top = -290
 	_contextual_panel.offset_bottom = -20
 	_contextual_panel.offset_left = -220
 	_contextual_panel.offset_right = 220
@@ -338,6 +343,22 @@ func _update_contextual_panel() -> void:
 	var kingdom: Kingdom = KingdomState.kingdom
 	_clear_children(_contextual_content)
 	_contextual_panel.visible = true
+
+	# ART-002: ilustração real do prédio, quando existir uma
+	# (CityBuildingArtCatalog) — reconstruída aqui, não em
+	# _build_static_structure(), porque _clear_children(_contextual_content)
+	# logo acima já apaga qualquer filho anterior a cada troca de
+	# prédio, mesmo padrão já usado por name_label/info_label/buttons_row
+	# abaixo. Some (visible=false) sem quebrar nada se o prédio
+	# selecionado ainda não tiver arte integrada — nunca inventa uma
+	# imagem, só continua mostrando o texto normalmente.
+	var illustration := TextureRect.new()
+	illustration.texture = preload("res://engine/presentation/city_building_art_catalog.gd").texture_for(_selected_building_key)
+	illustration.visible = illustration.texture != null
+	illustration.custom_minimum_size = Vector2(0, 130)
+	illustration.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	illustration.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_contextual_content.add_child(illustration)
 
 	var name_label := Label.new()
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

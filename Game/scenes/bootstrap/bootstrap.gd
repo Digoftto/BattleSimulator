@@ -3438,6 +3438,42 @@ func _validate_city_panel() -> void:
 		str(kingdom.deposito_level > deposito_before), deposito_before, kingdom.deposito_level
 	])
 
+	# ART-002: clicar num prédio (mesmo efeito de _on_hitbox_gui_input —
+	# seta _selected_building_key e chama _update_contextual_panel(),
+	# igual um clique real faria) continua abrindo o painel contextual
+	# com o texto/Nível/botão de sempre, agora com a ilustração real do
+	# prédio por cima. Testa os 7 prédios com arte integrada, um a um,
+	# confirmando que NENHUM caminho de asset está quebrado e que o
+	# texto que já funcionava continua aparecendo.
+	var building_keys_and_expected_text: Dictionary = {
+		"capital": "Capital",
+		"biblioteca": "Biblioteca",
+		"observatorio": "Observatório",
+		"academia": "Academia",
+		"centro_de_comando": "Centro de Comando",
+		"depositos": "Depósitos",
+		"nucleo_de_energia": "Núcleo de Energia",
+	}
+	var all_illustrations_ok: bool = true
+	var all_text_preserved: bool = true
+	for key: String in building_keys_and_expected_text:
+		panel._selected_building_key = key
+		panel._update_contextual_panel()
+		var illustration: TextureRect = null
+		for child in panel._contextual_content.get_children():
+			if child is TextureRect:
+				illustration = child
+				break
+		if illustration == null or illustration.texture == null or not illustration.visible:
+			all_illustrations_ok = false
+			print("  ART-002 MISMATCH: prédio '%s' sem ilustração visível/carregada." % key)
+		if not _panel_contains_text(panel, building_keys_and_expected_text[key]):
+			all_text_preserved = false
+			print("  ART-002 MISMATCH: prédio '%s' perdeu o texto '%s' que já aparecia antes." % [key, building_keys_and_expected_text[key]])
+	print("  ART-002: os 7 prédios da Cidade mostram a ilustração real (nenhum caminho quebrado)? %s | texto/Nível/botão de sempre continua aparecendo? %s (esperado: true, true)" % [
+		str(all_illustrations_ok), str(all_text_preserved)
+	])
+
 	panel.queue_free()
 
 	# F-009: "Evoluir" sem recursos suficientes precisa mostrar algo
