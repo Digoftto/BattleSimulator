@@ -25,8 +25,20 @@ extends Control
 
 signal replay_finished
 
-const DELAY_BETWEEN_EVENTS_SECONDS: float = 0.6
-const DELAY_BETWEEN_TURNS_SECONDS: float = 0.9
+## var (não const): testes automatizados (ver bootstrap.gd,
+## _validate_pve_panel_ui()) zeram este valor ANTES de add_child(view)
+## pra reproduzir todos os eventos instantaneamente, sem depender de
+## tempo real de parede — o padrão humano (0.6s) continua sendo o
+## default real, nunca alterado em jogo de verdade.
+var DELAY_BETWEEN_EVENTS_SECONDS: float = 0.6
+
+## F-047: quando true, pula a espera pelo clique real de "Continuar" e
+## emite replay_finished sozinho assim que o banner de Resultado
+## aparece — usado só por validação automatizada (bootstrap.gd), que
+## não tem um jogador de verdade pra clicar. No jogo real este campo
+## nunca é setado (permanece false): o jogador sempre vê o banner e
+## decide quando prosseguir.
+var auto_continue_when_finished: bool = false
 
 var combat_state: CombatState = null
 ## Tipo real: CombatReplayCollector — sem anotação explícita de
@@ -320,3 +332,6 @@ func _show_result() -> void:
 	_result_label.visible = true
 	_skip_button.visible = false
 	_continue_button.visible = true
+
+	if auto_continue_when_finished:
+		_on_continue_pressed()

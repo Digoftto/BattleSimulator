@@ -109,4 +109,29 @@ static func run(ctx: TestRunner.Context) -> bool:
 	])
 	ctx.check(result_a.opponent_entry == enemy_entry, "opponent_entry do resultado deve ser o mesmo objeto enemy_entry")
 
+	# F-047: result.battle_replays deve ter exatamente 1 item por combate
+	# REAL disputado (result.attempts), na mesma ordem, cada um com um
+	# CombatState/CombatReplayCollector válidos — dado bruto que
+	# CombatReplayView usa pra reproduzir visualmente cada tentativa de
+	# Fase, incluindo o caso (já coberto pelo Cenário b acima) de mais
+	# de 1 combate real na mesma Tentativa de Fase (Formações α/β
+	# perdidas antes da vitória em γ).
+	print("  [F-047] Cenário b (3 tentativas) -> battle_replays.size() == attempts? %s (%d == %d)" % [
+		str(result_b.battle_replays.size() == result_b.attempts), result_b.battle_replays.size(), result_b.attempts
+	])
+	ctx.check(result_b.battle_replays.size() == result_b.attempts, "[F-047] battle_replays deve ter exatamente 1 item por combate real disputado")
+
+	var all_replays_valid: bool = true
+	for entry: Dictionary in result_b.battle_replays:
+		var state: CombatState = entry.get("state")
+		var collector = entry.get("collector")
+		if state == null or collector == null or collector.initial_board.size() != 18:
+			all_replays_valid = false
+	print("  [F-047] Todo item de battle_replays tem CombatState + CombatReplayCollector válidos (snapshot de 18 unidades)? %s" % str(all_replays_valid))
+	ctx.check(all_replays_valid, "[F-047] Cada item de battle_replays deve ter um CombatState real e um CombatReplayCollector com snapshot_initial_board() já chamado (18 unidades)")
+
+	var last_replay_state: CombatState = result_b.battle_replays[result_b.battle_replays.size() - 1]["state"]
+	print("  [F-047] O último item de battle_replays corresponde à tentativa vencedora (winner_side == 0)? %s" % str(last_replay_state.winner_side == 0))
+	ctx.check(last_replay_state.winner_side == 0, "[F-047] O último battle_replays do Cenário b deve ser a batalha realmente vencida (Formação γ)")
+
 	return true

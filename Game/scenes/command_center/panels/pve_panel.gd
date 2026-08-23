@@ -36,11 +36,31 @@ var _last_phase_result_text: Dictionary = {}
 
 var _loading_label: Label = null
 
+## F-047: -1.0 = usa o ritmo humano padrão do CombatReplayView (0.6s
+## por evento). Testes automatizados (bootstrap.gd,
+## _validate_pve_panel_ui()) setam 0.0 aqui antes de disparar "Tentar
+## Fase Atual", pra reproduzir a batalha real instantaneamente em vez
+## de esperar segundos reais de parede — nunca usado em jogo de
+## verdade, onde este campo permanece -1.0 (ritmo humano normal).
+var replay_speed_override: float = -1.0
+
 
 func _ready() -> void:
 	if not KingdomState.is_initialized:
 		KingdomState.initialize_new_kingdom()
 
+	# F-047 (F-020 do TECHNICAL_BACKLOG.md): investigado nesta sessão —
+	# a geração real ao vivo pra um jogador de verdade
+	# (WorldBootstrap._generate_dev_scale_world()) é uma escala pequena
+	# e limitada (DEV_SCALE_COUNT_PER_CATEGORY por Região/Categoria/
+	# Facção), não as ~9000 Fases completas (isso só existe na
+	# ferramenta externa de dev, tools/pve_generator/, nunca em tempo
+	# real). O risco de "travamento percebido" é bem menor do que o
+	# backlog registrava — mantido em apenas 2 frames de espera (contagem
+	# já testada/estável, ver comentário em bootstrap.gd
+	# _validate_pve_panel_ui()) pra não arriscar alterar o timing de uma
+	# corrida já resolvida; corrigida só a mensagem (texto), nunca a
+	# lógica de carregamento.
 	_show_loading_indicator()
 	await get_tree().process_frame
 	await get_tree().process_frame
@@ -61,7 +81,7 @@ func _show_loading_indicator() -> void:
 	add_child(background)
 
 	_loading_label = Label.new()
-	_loading_label.text = "Carregando o Mundo... (só na primeira vez — gera o conteúdo da Temporada)"
+	_loading_label.text = "Carregando o Mundo... (só na primeira vez — pode levar alguns segundos)"
 	_loading_label.set_anchors_preset(Control.PRESET_CENTER)
 	_loading_label.add_theme_font_size_override("font_size", 20)
 	add_child(_loading_label)
@@ -338,8 +358,19 @@ func _clear_children(container: Node) -> void:
 		child.free()
 
 
+## F-047 (F-021 do TECHNICAL_BACKLOG.md): antes retornava o nome cru do
+## enum (ex: "EM_ANDAMENTO") direto pro Label do cabeçalho — corrigido
+## pra um texto legível, sem alterar o enum em si.
 func _status_name(status: ExpeditionRuntime.Status) -> String:
-	return ExpeditionRuntime.Status.keys()[status]
+	match status:
+		ExpeditionRuntime.Status.EM_ANDAMENTO:
+			return "Em andamento"
+		ExpeditionRuntime.Status.CONCLUIDA:
+			return "Concluída"
+		ExpeditionRuntime.Status.ENCERRADA:
+			return "Encerrada"
+		_:
+			return ExpeditionRuntime.Status.keys()[status]
 
 
 ## F-003: torna o resultado da tentativa visível de verdade (antes,
@@ -352,10 +383,45 @@ func _on_attempt_fase_pressed(expedition: ExpeditionRuntime) -> void:
 	var log_count_before: int = expedition.history_log.size()
 	var result: PhaseResult = expedition.attempt_current_fase()
 	if result != null:
+		await _play_battle_replays(result.battle_replays)
 		var new_lines: Array = expedition.history_log.slice(log_count_before)
 		var prefix: String = "Vitória! " if result.victory else "Derrota. "
 		_last_phase_result_text[expedition] = prefix + " ".join(new_lines)
 	refresh()
+
+
+## F-047: reproduz visualmente, um após o outro e na mesma ordem em que
+## aconteceram de verdade, cada combate REAL disputado nesta Tentativa
+## de Fase (result.battle_replays — mais de um quando uma Formação
+## perde e a próxima é tentada automaticamente por PhaseResolver, ver
+## PvE.md). CombatReplayView só REPRESENTA o que CombatEngine já
+## resolveu (via CombatReplayCollector, anexado ANTES de run() em
+## PhaseResolver.resolve()) — o resultado mostrado ao jogador é sempre
+## o Resultado exibido só depois que a última reprodução termina, nunca
+## antes, então o jogador vê a Formação vencedora (ou a derrota final)
+## exatamente como o motor decidiu.
+##
+## instantiate() sem "as CombatReplayView": esse class_name é novo
+## nesta sessão e o cache global de classes do Godot só é regenerado
+## por uma varredura do Editor, que nunca roda numa execução headless —
+## um cast estático pro tipo falharia até essa varredura acontecer
+## (mesma observação já registrada em TECHNICAL_BACKLOG.md, R-016).
+func _play_battle_replays(battle_replays: Array) -> void:
+	for entry: Dictionary in battle_replays:
+		var view = load("res://scenes/combat/combat_replay_view.tscn").instantiate()
+		view.combat_state = entry["state"]
+		view.replay_collector = entry["collector"]
+		if replay_speed_override >= 0.0:
+			view.DELAY_BETWEEN_EVENTS_SECONDS = replay_speed_override
+			# F-047: só em modo de teste automatizado (replay_speed_override
+			# setado) — sem isso, await view.replay_finished nunca
+			# resolveria numa execução headless, já que nada clica o
+			# botão "Continuar" de verdade. Nunca setado em jogo real.
+			view.auto_continue_when_finished = true
+		view.set_anchors_preset(Control.PRESET_FULL_RECT)
+		add_child(view)
+		await view.replay_finished
+		view.queue_free()
 
 
 func _on_resume_pressed(expedition: ExpeditionRuntime) -> void:

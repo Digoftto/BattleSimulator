@@ -1702,7 +1702,17 @@ func _validate_pve_panel_ui() -> void:
 		_panel_contains_text(panel, "Exército 3")
 	))
 
-	panel._on_attempt_fase_pressed(expedition)
+	# F-047: _on_attempt_fase_pressed() agora reproduz visualmente cada
+	# combate real (CombatReplayView) antes de mostrar o Resultado —
+	# precisa de await (senão as checagens abaixo rodariam antes da
+	# reprodução terminar, e panel.queue_free() mais abaixo destruiria
+	# o painel com a corrotina ainda suspensa). O painel real usa o
+	# ritmo humano padrão (0.6s/evento); aqui a validação seta
+	# replay_speed_override = 0.0 no próprio painel ANTES de disparar a
+	# tentativa, senão esta única validação levaria vários segundos
+	# reais de parede.
+	panel.replay_speed_override = 0.0
+	await panel._on_attempt_fase_pressed(expedition)
 	print("  Após 'Tentar Fase Atual' -> Fase avançou de verdade? %s (esperado: true, Fase 2)" % str(expedition.current_fase == 2))
 	print("  Após 'Tentar Fase Atual' -> resultado (Vitória/Derrota) aparece de verdade na tela, não só no log? %s (esperado: true, F-003)" % str(
 		_panel_contains_text(panel, "Vitória!")

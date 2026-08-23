@@ -49,3 +49,15 @@ var enemy_pelotoes_destroyed_by_faction: Dictionary = {}
 
 ## Registro textual estrutural (mesma convenção de CombatState.battle_log).
 var history_log: Array[String] = []
+
+## F-047: um item por combate REAL disputado nesta Tentativa de Fase
+## (mesma ordem de "history_log"/"attempts" — pode ser mais de um
+## quando uma Formação perde e a próxima é tentada automaticamente).
+## Cada item: {"state": CombatState, "collector": CombatReplayCollector}
+## — dado bruto pra uma camada visual (CombatReplayView) reproduzir
+## cada combate exatamente como o motor o resolveu. Nunca usado pela
+## própria resolução de Fase (Recompensa/XP já usam "state" só através
+## de winner_side/enemy_pelotoes_destroyed*, calculados antes deste
+## campo existir) — puramente aditivo, quem não usa apresentação visual
+## pode ignorar completamente.
+var battle_replays: Array = []

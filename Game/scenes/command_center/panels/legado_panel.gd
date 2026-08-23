@@ -15,6 +15,13 @@ extends Control
 
 var _root_vbox: VBoxContainer
 var _resumo_label: Label
+
+## F-047 (F-019): mensagem visível quando Aposentar/Grande Legado é
+## rejeitado — antes só existia um print() no console. Ao contrário de
+## MinasPanel (várias Minas ao mesmo tempo), aqui um único Label serve
+## porque refresh() nunca destrói _action_status_label (só atualiza seu
+## texto, mesmo padrão de _resumo_label/CityPanel._evolve_status_label).
+var _action_status_label: Label
 var _aposentar_container: VBoxContainer
 var _doutrina_label: Label
 var _grande_legado_container: VBoxContainer
@@ -68,6 +75,10 @@ func _build_static_structure() -> void:
 	resumo_panel.add_child(resumo_vbox)
 	_resumo_label = Label.new()
 	resumo_vbox.add_child(_resumo_label)
+
+	_action_status_label = Label.new()
+	_action_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	resumo_vbox.add_child(_action_status_label)
 
 	# --- Aposentar um Comandante ---
 	_add_section_title("Aposentar um Comandante (Legado Administrativo)")
@@ -243,11 +254,44 @@ func _on_attribute_choice_selected(index: int, army: Army, attribute_map: Array[
 	_attribute_choice_by_army[army] = attribute_map[index]
 
 
+## F-047 (F-019): traduz o "reason" técnico dos dois Resolvers de
+## Legado pra uma frase que o jogador entende — nunca o código cru.
+func _legado_failure_message(reason: String) -> String:
+	match reason:
+		"invalid_state":
+			return "Não foi possível concluir: o Comandante não está num estado válido para esta ação."
+		"army_still_assigned":
+			return "Não foi possível aposentar: o Comandante ainda está à frente de um Exército — desvincule-o primeiro."
+		"below_minimum_patente":
+			return "Não foi possível aposentar: o Comandante ainda não atingiu a Patente mínima exigida."
+		"missing_legado_v_destino":
+			return "Escolha um destino (XP, Recursos ou Fragmentos) para o bônus do Legado V antes de aposentar."
+		"cdc_level_too_low":
+			return "O Nível do Centro de Comando ainda não permite criar um Grande Legado Militar."
+		"below_max_patente":
+			return "O Comandante ainda não atingiu a Patente máxima exigida para um Grande Legado Militar."
+		"soldo_not_fully_used":
+			return "O Exército precisa usar todo o Soldo disponível para criar um Grande Legado Militar."
+		"army_incomplete":
+			return "O Exército precisa estar com a Formação completa para criar um Grande Legado Militar."
+		"cards_not_max_tier":
+			return "Todas as Cartas do Exército precisam estar no Tier máximo para criar um Grande Legado Militar."
+		"faction_mismatch":
+			return "A Facção do Exército não corresponde à exigida para este Grande Legado Militar."
+		"invalid_attribute_choice":
+			return "Escolha um atributo válido para o Grande Legado Militar."
+		_:
+			return "Não foi possível concluir (%s)." % reason
+
+
 func _on_retire_administrative_pressed(commander: CommanderResource) -> void:
 	var destino: String = _legado_v_destino_by_commander.get(commander.instance_id, "xp")
 	var result: Dictionary = LegacyResolver.retire_administrative(KingdomState.kingdom, commander, GameClock.now_unix(), destino)
 	if not result["success"]:
 		print("[LegadoPanel] Aposentadoria (Legado Administrativo) falhou: %s" % result["reason"])
+		_action_status_label.text = _legado_failure_message(result["reason"])
+	else:
+		_action_status_label.text = ""
 	refresh()
 
 
@@ -258,6 +302,9 @@ func _on_create_grande_legado_pressed(army: Army) -> void:
 	)
 	if not result["success"]:
 		print("[LegadoPanel] Grande Legado Militar falhou: %s" % result["reason"])
+		_action_status_label.text = _legado_failure_message(result["reason"])
+	else:
+		_action_status_label.text = ""
 	refresh()
 
 

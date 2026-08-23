@@ -17,6 +17,13 @@ var _minas_container: VBoxContainer
 
 var _selected_army_by_mina: Dictionary = {}  # mina -> Army
 
+## F-047 (F-019 do TECHNICAL_BACKLOG.md): mensagem visível quando
+## Designar Guarnição é rejeitado — antes só existia um print() no
+## console, o clique parecia não fazer nada. Por Mina (não um único
+## Label global), mesmo motivo de _selected_army_by_mina: pode haver
+## várias Minas na tela ao mesmo tempo.
+var _mina_status_text: Dictionary = {}  # mina -> String
+
 
 func _ready() -> void:
 	if not KingdomState.is_initialized:
@@ -165,6 +172,12 @@ func refresh() -> void:
 				start_button.pressed.connect(_on_start_cycle_pressed.bind(mina), CONNECT_DEFERRED)
 				action_row.add_child(start_button)
 
+				if _mina_status_text.get(mina, "") != "":
+					var status_label := Label.new()
+					status_label.text = _mina_status_text[mina]
+					status_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+					vbox.add_child(status_label)
+
 	if _minas_container.get_child_count() == 0:
 		var empty_label := Label.new()
 		empty_label.text = "Nenhuma Mina conquistada ainda."
@@ -200,6 +213,21 @@ func _on_army_selected(index: int, mina: Mina, available_armies: Array[Army]) ->
 	_selected_army_by_mina[mina] = available_armies[index - 1]
 
 
+## F-047 (F-019): traduz o "reason" técnico de MineGuarnicaoResolver.assign()
+## (ver docstring do próprio Resolver) pra uma frase que o jogador
+## entende — nunca o código cru ("cycle_active" etc.) na tela.
+func _guarnicao_failure_message(reason: String) -> String:
+	match reason:
+		"not_conquered":
+			return "Não foi possível designar Guarnição: esta Mina ainda não foi conquistada."
+		"cycle_active":
+			return "Não foi possível designar Guarnição: já existe um Ciclo de Mineração ativo nesta Mina."
+		"army_unavailable":
+			return "Não foi possível designar Guarnição: o Exército escolhido já está ocupado em outra função (combate, recuperação, ou já é Guarnição de outra Mina)."
+		_:
+			return "Não foi possível designar Guarnição (%s)." % reason
+
+
 func _on_assign_guarnicao_pressed(mina: Mina) -> void:
 	var army: Army = _selected_army_by_mina.get(mina, null)
 	if army == null:
@@ -207,6 +235,9 @@ func _on_assign_guarnicao_pressed(mina: Mina) -> void:
 	var result: Dictionary = MineGuarnicaoResolver.assign(mina, army, GameClock.now_unix())
 	if not result["success"]:
 		print("[MinasPanel] Designar Guarnição falhou: %s" % result["reason"])
+		_mina_status_text[mina] = _guarnicao_failure_message(result["reason"])
+	else:
+		_mina_status_text.erase(mina)
 	refresh()
 
 

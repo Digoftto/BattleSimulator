@@ -73,9 +73,21 @@ static func resolve(
 			result.attempts += 1
 			army.consume_energy(ENERGY_COST_PER_ATTEMPT)
 
-			var state: CombatState = CombatEngine.run_battle(
+			# F-047: initialize()+run() (em vez do atalho run_battle())
+			# só pra poder anexar um CombatReplayCollector ANTES de
+			# run() — mesma API pública já existente, exposta
+			# exatamente pra isso (ver docstring de
+			# CombatEngine.initialize()). Nenhuma regra/comportamento
+			# de combate muda: initialize()+run() é bit-a-bit o que
+			# run_battle() já fazia por baixo dos panos.
+			var state: CombatState = CombatEngine.initialize(
 				attempt_army, enemy_army, battlefields, abilities_by_name, unit_traits, game_mode
 			)
+			var replay_collector = preload("res://engine/combat/combat_replay_collector.gd").new()
+			replay_collector.attach(state.event_bus)
+			replay_collector.snapshot_initial_board(state)
+			CombatEngine.run(state)
+			result.battle_replays.append({"state": state, "collector": replay_collector})
 
 			var result_text: String = "Vitória" if state.winner_side == 0 else ("Derrota" if state.winner_side == 1 else "Empate")
 			result.history_log.append("Tentativa %d: Exército %d, Formação %s -> %s (Turno %d) | Energia restante: %d/%d" % [

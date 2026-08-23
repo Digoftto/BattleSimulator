@@ -20,6 +20,12 @@ var _planos_container: VBoxContainer
 var _selected_for_new_plano: Array[Army] = []
 var _rng := RandomNumberGenerator.new()
 
+## F-047 (F-019): mensagem visível quando Criar Plano/Sortear Ataque é
+## rejeitado — antes só existia um print() no console. refresh() nunca
+## destrói este Label (só é criado 1x em _build_static_structure()),
+## mesmo padrão de CityPanel._evolve_status_label.
+var _action_status_label: Label
+
 
 func _ready() -> void:
 	if not KingdomState.is_initialized:
@@ -60,6 +66,10 @@ func _build_static_structure() -> void:
 	scope_note.text = "Ligas/Divisões/Pontos de Liga e sorteio de Campo já são reais. Sem Matchmaking de verdade (depende de servidor) — os botões de 'Simular Resultado' aplicam a pontuação sem um adversário real."
 	scope_note.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_root_vbox.add_child(scope_note)
+
+	_action_status_label = Label.new()
+	_action_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	_root_vbox.add_child(_action_status_label)
 
 	_add_section_title("Liga Bronze (qualquer Exército Ativo, independente)")
 	_bronze_container = VBoxContainer.new()
@@ -306,8 +316,10 @@ func _on_create_plano_pressed() -> void:
 	if result["success"]:
 		KingdomState.kingdom.planos_campanha.append(result["plano"])
 		_selected_for_new_plano.clear()
+		_action_status_label.text = ""
 	else:
 		print("[PvPPanel] Criar Plano de Campanha falhou: %s" % result["reason"])
+		_action_status_label.text = "Não foi possível criar o Plano de Campanha: escolha entre 1 e 3 Exércitos."
 	refresh()
 
 
@@ -376,8 +388,10 @@ func _on_sortear_ataque_pressed(plano: PlanoCampanha) -> void:
 	var result: Dictionary = PlanoCampanhaResolver.select_attack(plano, GameDatabase.battlefields, _rng)
 	if not result["success"]:
 		print("[PvPPanel] Sortear Campo falhou: %s" % result["reason"])
+		_action_status_label.text = "Não foi possível sortear o Campo de Batalha: nenhum Exército deste Plano tem Energia disponível."
 	else:
 		print("[PvPPanel] Campo sorteado: %s | Exército atacante: %s" % [result["battlefield"].battlefield_name, result["army"].army_name])
+		_action_status_label.text = "Campo sorteado: %s | Exército atacante: %s" % [result["battlefield"].battlefield_name, result["army"].army_name]
 	refresh()
 
 

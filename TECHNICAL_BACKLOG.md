@@ -57,6 +57,46 @@ This is a **living document**. It is expected to be edited over time as findings
 
 ---
 
+## F-047 — MVP Playable Loop Integration (Combate Visual real no fluxo de PvE)
+
+O objetivo desta etapa era transformar a infraestrutura de Combate Visual (F-046, R-016) num loop jogável de ponta a ponta: Cidade → PvE → Trilha/Fase → Formação → Combate visto pelo jogador → Resultado → Recompensa → Cidade. Resultado:
+
+- **PvE: integrado e validado com execução real headless.** `PhaseResolver.resolve()` agora anexa um `CombatReplayCollector` a cada combate real disputado (`CombatEngine.initialize()` + `run()`, nunca `run_battle()` — mesmo comportamento, só exposto o suficiente pra anexar o Collector) e devolve tudo em `PhaseResult.battle_replays` (1 item por tentativa real, na mesma ordem — pode ser mais de 1 quando uma Formação perde e a próxima é tentada automaticamente). `pve_panel.gd._on_attempt_fase_pressed()` agora reproduz cada item visualmente (`CombatReplayView`, como overlay modal) ANTES de mostrar o texto de Resultado já existente (F-003) — o fluxo textual pré-existente não foi reescrito, só precedido pela apresentação visual. Validado com um teste real em `bootstrap.tscn` (`_validate_pve_panel_ui()`).
+- **Minas: infraestrutura pronta automaticamente, mas sem UI real pra acionar.** `MineConquestResolver.attempt_conquest()` também chama `PhaseResolver.resolve()`, então `battle_replays` já vem preenchido ali também, de graça. PORÉM: uma varredura completa do código confirmou que `MineConquestResolver.attempt_conquest()` **nunca é chamado fora de testes** — nenhum painel real (`minas_panel.gd` gerencia só Minas JÁ conquistadas) tem um botão ou fluxo que dispare a conquista de uma Mina Regional via combate. Isso é uma lacuna PRÉ-EXISTENTE (não introduzida nesta sessão), não um bug novo — registrada como **F-022** abaixo. Não foi construída nenhuma UI nova pra isso (fora do escopo desta etapa, per a regra explícita contra "novo projeto de implementação").
+- **PvP: sem combate real algum para integrar.** Confirmado por leitura direta: `pvp_panel.gd._on_sortear_ataque_pressed()` só sorteia um Campo de Batalha e um Exército atacante (`PlanoCampanhaResolver.select_attack()`) — nenhum `CombatEngine` é chamado. O resultado (V/D/E) é escolhido manualmente pelo jogador em botões "Simular Resultado", já autodocumentado no próprio `scope_note` da tela ("sem Matchmaking de verdade... os botões de 'Simular Resultado' aplicam a pontuação sem um adversário real"). Não há nada pra "integrar visualmente" — registrado como **F-023** abaixo (construir PvP real é, por definição, um projeto de implementação novo, fora do escopo desta etapa).
+- **F-019 resolvido** para Minas/Legado/PvP: mensagens de falha traduzidas (nunca o código técnico cru) substituindo os `print()`-somente antigos.
+- **F-020 investigado e corrigido de forma proporcional:** a preocupação original (geração de ~9000 Fases travando a 1ª carga) não se aplica a um jogador real — `WorldBootstrap._generate_dev_scale_world()` (o caminho que um jogador de verdade percorre) é uma escala pequena e limitada; as ~9000 Fases só existem na ferramenta externa de dev. Corrigida só a mensagem do indicador de carregamento (nunca a lógica/timing, pra não arriscar uma corrida de frames já estabilizada).
+- **F-021 parcialmente resolvido:** texto cru de enum (`EM_ANDAMENTO`) no cabeçalho do PvE traduzido. Demais itens cosméticos já registrados permanecem em aberto.
+
+### Bug real encontrado e corrigido nesta etapa (não um P0/P1 de gameplay — um hang de infraestrutura de teste, mas com uma implicação de design real)
+
+`CombatReplayView._show_result()` só emitia `replay_finished` dentro de `_on_continue_pressed()` — ou seja, dependia de um clique real do jogador no botão "Continuar". Isso é o comportamento CORRETO pro jogo real (deixa o jogador ver o banner e decidir quando prosseguir), mas torna qualquer execução headless automatizada (`bootstrap.tscn`) travada indefinidamente esperando um clique que nunca vem. Resolvido com um campo `auto_continue_when_finished` (default `false`, nunca setado em jogo real) que `pve_panel.gd` liga automaticamente só quando `replay_speed_override` também está ligado (mesmo sinal já usado pra acelerar o ritmo da reprodução em teste) — nunca altera o comportamento visto pelo jogador.
+
+#### F-022 — Conquista de Mina Regional (combate real) não tem nenhum ponto de entrada de UI
+- **Category:** MISSING UI / BACKEND-COMPLETE-FRONTEND-MISSING
+- **Priority:** P2
+- **Status:** Open
+- **Problem:** `MineConquestResolver.attempt_conquest()` (lógica completa, testada) nunca é chamado por nenhum painel real — só por `test_mine_conquest.gd`. `minas_panel.gd` só gerencia Minas já `conquered`; não existe tela/botão que dispare o combate contra a guarnição defensora de uma Mina Regional durante uma Expedição.
+- **Evidence:** F-047, grep repo-wide por `MineConquestResolver\.` — únicas ocorrências fora do próprio arquivo são em `test_mine_conquest.gd`.
+- **Canonical rule/document:** `MINES.md`, "Exército Defensor Inicial (IA)".
+- **User-visible consequence:** Um jogador nunca consegue conquistar uma Mina Regional através da UI atual — só as 3 Minas Iniciais (sem combate) e Minas manualmente marcadas como conquistadas por teste/debug funcionam.
+- **Recommended action:** Desenhar e implementar o ponto de entrada real (provavelmente dentro do fluxo de PvE, "desviar pra Mina" durante a marcha, per `PvE.md`) — escopo maior que uma correção pontual, própria de uma etapa dedicada.
+- **Owner/design approval required:** Provavelmente sim (onde/como o desvio pra Mina se encaixa na UI de PvE é uma decisão de fluxo, não só técnica).
+- **Confidence:** High.
+
+#### F-023 — PvP não tem nenhum sistema de combate real (por design desta entrega, autodocumentado)
+- **Category:** MISSING FEATURE (escopo já delimitado)
+- **Priority:** P4 (não é um bug — é escopo já definido e comunicado ao jogador na própria tela)
+- **Status:** Open (aguardando uma entrega futura de PvP completo)
+- **Problem:** `pvp_panel.gd` só implementa Ranking (PL/Divisão) e sorteio de Campo — resultados de batalha são escolhidos manualmente pelo jogador ("Simular Resultado"), nunca computados por `CombatEngine`. Já autodocumentado no próprio `scope_note` da tela.
+- **Evidence:** F-047, leitura direta de `pvp_panel.gd._on_sortear_ataque_pressed()`/`_on_simulate_*_result_pressed()`.
+- **Canonical rule/document:** N/A — escopo, não regra.
+- **Recommended action:** Nenhuma nesta etapa — implementar PvP real (matchmaking, adversário real, `CombatEngine` de verdade) é um projeto próprio, explicitamente fora do escopo de F-047.
+- **Owner/design approval required:** Yes — quando essa entrega for priorizada.
+- **Confidence:** High.
+
+---
+
 ## OPEN — Prioritized Work
 
 ### P0 — None currently identified
@@ -214,7 +254,7 @@ No data-corruption, active-exploit, broken-core-rule, or development-blocking is
 #### F-019 — Ação rejeitada por um Resolver só aparece no console, nunca na tela (padrão repetido em vários painéis)
 - **Category:** UX GAP
 - **Priority:** P2
-- **Status:** Open
+- **Status:** **Resolved (F-047, R-021)** — mensagens traduzidas adicionadas em `minas_panel.gd`, `legado_panel.gd`, `pvp_panel.gd`.
 - **Problem:** Em `minas_panel.gd` (`_on_assign_guarnicao_pressed`), `legado_panel.gd` (`_on_retire_administrative_pressed`/`_on_create_grande_legado_pressed`), e `pvp_panel.gd` (`_on_create_plano_pressed`/`_on_sortear_ataque_pressed`), quando o Resolver correspondente retorna `{"success": false, "reason": ...}`, o motivo só é escrito via `print()` — o jogador nunca vê nada na tela, o clique parece não fazer nada. `city_panel.gd` (F-009) e `academia_panel.gd` (corrigido nesta sessão, F-046) já resolveram exatamente esse mesmo padrão com um Label de status persistente — a mesma técnica se aplicaria diretamente aqui.
 - **Evidence:** F-046, auditoria de produto (3 forks de leitura paralela cobrindo todos os painéis da Cidade/Centro de Comando).
 - **Canonical rule/document:** N/A (UX, não regra de jogo).
@@ -227,7 +267,7 @@ No data-corruption, active-exploit, broken-core-rule, or development-blocking is
 #### F-020 — Primeira entrada em PvE pode travar a percepção do jogador sem indicação de progresso
 - **Category:** UX GAP / PERCEIVED-HANG RISK
 - **Priority:** P2
-- **Status:** Open
+- **Status:** **Resolved (F-047, R-021), com ressalva** — investigação encontrou que o risco original era menor do que o registrado (a geração real de um jogador é pequena/limitada; ~9000 Fases é exclusivo da ferramenta externa de dev). Corrigida a mensagem do indicador de carregamento; a lógica/timing de carregamento não foi alterada (risco de regredir uma corrida de frames já estabilizada, per bootstrap.gd `_validate_pve_panel_ui()`).
 - **Problem:** `pve_panel.gd` (linhas ~44-49) mostra um Label de carregamento, mas só aguarda 2 `await get_tree().process_frame` antes de chamar `WorldBootstrap.ensure_world_loaded()` de forma síncrona — na primeira visita do jogador ao PvE, isso gera a Temporada inteira (~9000 Fases, ver F-039). O Label de loading renderiza por 2 frames e a UI trava sem indicação de progresso até a geração terminar.
 - **Evidence:** F-046, auditoria de produto (fork do cluster Army/PvE).
 - **Canonical rule/document:** N/A.
@@ -352,6 +392,12 @@ No item in this backlog blocks the four systems finalized this session (PG, Depo
 - **Original problem:** `minas_panel.gd._on_assign_guarnicao_pressed()` chama `refresh() -> GameRuntime.sync()` imediatamente após uma designação bem-sucedida, ANTES de o jogador clicar em "Iniciar Ciclo" (passos 4 e 5, separados, de `MINES.md`). `MineGuarnicaoResolver.release_if_cycle_ended()` tratava "Ciclo nunca iniciado" (`cycle_started_unix == 0`) igual a "Ciclo já terminado", liberando a Guarnição de volta pra `AVAILABLE` nesse mesmo sync — sem nenhuma ação do jogador. Consequência: o mesmo Exército podia ser redesignado como Guarnição de uma SEGUNDA Mina antes do 1º Ciclo sequer começar, violando a trava anti-exploit documentada em `COMMAND_CENTER_UI.md` ("Só Exércitos livres... podem ser designados").
 - **Resolution:** `MineGuarnicaoResolver.release_if_cycle_ended()` (`engine/campaign/mine_guarnicao_resolver.gd`) ganhou uma guarda `if mina.cycle_started_unix == 0: return` — só libera quando um Ciclo REALMENTE começou e depois terminou, nunca quando ainda não começou.
 - **Validation performed:** Regressão nova em `test_mine_guarnicao_and_production.gd` reproduzindo exatamente o cenário real (`GameRuntime.sync()` chamado entre designar e iniciar o Ciclo) — confirma que a Guarnição permanece travada. A checagem pré-existente de liberação real ao fim do Ciclo (`GameRuntime.sync()` depois de `start_cycle()`) continua passando, confirmando que a correção não regrediu o caminho legítimo de liberação.
+- **Date:** 2026-08-22.
+- **Commit:** *(pendente — ver commit desta sessão).*
+
+### R-021 — Combate Visual integrado no fluxo real de PvE, incluindo o feedback de ações rejeitadas em Minas/Legado/PvP (F-019) e mensagem de carregamento do PvE (F-020)
+- **Scope:** F-047 — ver seção "F-047 — MVP Playable Loop Integration" acima pro detalhamento completo. Resumo: `PhaseResolver.resolve()` ganhou `PhaseResult.battle_replays`; `pve_panel.gd` reproduz cada combate real via `CombatReplayView` antes do Resultado textual já existente; corrigido um hang real (`auto_continue_when_finished`) que só se manifestava em execução headless automatizada, nunca no jogo real; F-019 resolvido para Minas/Legado/PvP; F-020 corrigido de forma proporcional (só a mensagem, investigação mostrou que o risco original era menor do que o registrado); F-021 parcialmente resolvido (texto de status do PvE).
+- **Validation performed:** `test_phase_retry.gd` (3 novas asserções: battle_replays.size()==attempts, CombatState/Collector válidos, última tentativa == vencedora); `test_main.tscn` completo (660 passou, 0 falhou, 0 erros); `bootstrap.tscn` completo rodado 2x (1x expôs o hang do "Continuar", 1x confirmando a correção — 0 SCRIPT ERROR, fluxo real "Tentar Fase Atual" -> Fase avança -> Resultado aparece na tela, tudo `true`).
 - **Date:** 2026-08-22.
 - **Commit:** *(pendente — ver commit desta sessão).*
 
@@ -492,8 +538,10 @@ No item in this backlog blocks the four systems finalized this session (PG, Depo
 |---|---|---|---|---|---|
 | Open findings | 0 | 5 | 5 | 4 | 14 |
 
-By category: TOOLING GAP (2), INCOMPLETE IMPLEMENTATION (3), MISSING FEATURE (1), DESIGN DECISION REQUIRED (3, overlapping with F-004/F-010/F-018 above), LOW PRIORITY/TECHNICAL DEBT (3), BLOCKED VALIDATION (1, F-018), UX GAP (2, F-019/F-020, new in F-046), COSMETIC (1, F-021, new in F-046).
+(P2 count still 5: F-019/F-020 resolved this session, but F-022 — Mine conquest has no UI entry point — was newly found and added, keeping the total the same. F-023 — PvP has no real combat system — is P4, tracked in the F-046/F-047 "Adiados" sections above, not in this P0-P3 table.)
 
-Resolved 2026-08-17 session: 10 (R-001 through R-010). Resolved 2026-08-18 session: 3 more (R-011, R-012 — Support blocking-chain movement and War Machine mobility, F-016/F-017; R-013 — Mining Efficiency incremental background calculation, F-003). Resolved 2026-08-22 session (F-045/F-046): 7 more (R-014 — Mine Guarnição anti-exploit lock bug, P1; R-015 — 5 stale bootstrap.gd test checks; R-016 — Combat Visual minimal infrastructure built and validated; R-017 through R-020 — production UX fixes: debug button guard, raw JSON leak, misleading copy, missing action feedback).
+By category: TOOLING GAP (2), INCOMPLETE IMPLEMENTATION (3), MISSING FEATURE (2, F-005 + F-022 new in F-047), DESIGN DECISION REQUIRED (3, overlapping with F-004/F-010/F-018 above), LOW PRIORITY/TECHNICAL DEBT (3), BLOCKED VALIDATION (1, F-018), COSMETIC (1, F-021, new in F-046, partially resolved in F-047).
+
+Resolved 2026-08-17 session: 10 (R-001 through R-010). Resolved 2026-08-18 session: 3 more (R-011, R-012 — Support blocking-chain movement and War Machine mobility, F-016/F-017; R-013 — Mining Efficiency incremental background calculation, F-003). Resolved 2026-08-22 session (F-045/F-046/F-047): 8 more (R-014 — Mine Guarnição anti-exploit lock bug, P1; R-015 — 5 stale bootstrap.gd test checks; R-016 — Combat Visual minimal infrastructure built and validated; R-017 through R-020 — production UX fixes: debug button guard, raw JSON leak, misleading copy, missing action feedback; R-021 — Combat Visual integrated into the real PvE loop, F-019/F-020 fixed, F-021 partially fixed).
 
 **Note on the P1 count above (5):** these are the same 5 items already open before this session (F-001, F-002, F-004, F-005, F-018) — none are new, and none block the current MVP per F-045/F-046's own "Estado atual" section above (P1 = 0 in the sense of "blocks the MVP right now"; these 5 are longer-standing tooling/design-decision items, not fresh regressions). The one genuinely NEW P1 found this session (R-014, Mine Guarnição) was fixed in the same session it was found, so it never accumulates here as "open."
