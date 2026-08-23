@@ -62,8 +62,12 @@ func _build_static_structure() -> void:
 	back_button.pressed.connect(_on_back_to_command_center_pressed, CONNECT_DEFERRED)
 	_root_vbox.add_child(back_button)
 
+	# F-048: reescrito pra deixar claro que isto é uma PRÉVIA (não um bug)
+	# — a versão anterior ("Sem Matchmaking de verdade (depende de
+	# servidor)") lia como uma desculpa técnica, sem dizer que batalhas
+	# de PvP reais chegam numa atualização futura.
 	var scope_note := Label.new()
-	scope_note.text = "Ligas/Divisões/Pontos de Liga e sorteio de Campo já são reais. Sem Matchmaking de verdade (depende de servidor) — os botões de 'Simular Resultado' aplicam a pontuação sem um adversário real."
+	scope_note.text = "Prévia do PvP: Ligas, Divisões e Pontos de Liga já funcionam de verdade. Batalhas contra outros jogadores chegam numa atualização futura — por enquanto, use os botões 'Simular Resultado' abaixo pra testar como sua pontuação mudaria."
 	scope_note.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_root_vbox.add_child(scope_note)
 

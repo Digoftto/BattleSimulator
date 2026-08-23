@@ -40,6 +40,18 @@ var DELAY_BETWEEN_EVENTS_SECONDS: float = 0.6
 ## decide quando prosseguir.
 var auto_continue_when_finished: bool = false
 
+## F-048: qual "side" (0 ou 1) do CombatState corresponde ao Exército
+## do PRÓPRIO jogador — usado só pra rotular o tabuleiro/Resultado em
+## linguagem que o jogador entende ("Seu Exército"/"Inimigo",
+## "Vitória!"/"Derrota.") em vez do termo interno do motor ("Lado 0"/
+## "Lado 1"), que não significa nada pra quem não leu o código. Default
+## 0 porque o único chamador real hoje (PhaseResolver.resolve(), via
+## pve_panel.gd — PvE e conquista de Mina) sempre monta o Exército do
+## jogador como side 0 (CombatEngine.initialize(attempt_army, enemy_army, ...)).
+## Configurável (não hardcoded) pra um futuro chamador com um mapeamento
+## diferente (ex: uma tela de PvP real) poder setar o valor certo.
+var player_side: int = 0
+
 var combat_state: CombatState = null
 ## Tipo real: CombatReplayCollector — sem anotação explícita de
 ## propósito (F-046): esse class_name é novo nesta sessão e o cache
@@ -102,8 +114,8 @@ func _build_static_structure() -> void:
 	boards_hbox.add_theme_constant_override("separation", 24)
 	root_vbox.add_child(boards_hbox)
 
-	boards_hbox.add_child(_build_side_board(0, "Lado 0"))
-	boards_hbox.add_child(_build_side_board(1, "Lado 1"))
+	boards_hbox.add_child(_build_side_board(0, "Seu Exército" if player_side == 0 else "Inimigo"))
+	boards_hbox.add_child(_build_side_board(1, "Inimigo" if player_side == 0 else "Seu Exército"))
 
 	_log_label = Label.new()
 	_log_label.autowrap_mode = TextServer.AUTOWRAP_WORD
@@ -323,11 +335,11 @@ func _apply_death_event(event: Dictionary) -> void:
 func _show_result() -> void:
 	if combat_state == null:
 		return
-	var result_text: String = "Empate"
-	if combat_state.winner_side == 0:
-		result_text = "Vitória do Lado 0"
-	elif combat_state.winner_side == 1:
-		result_text = "Vitória do Lado 1"
+	var result_text: String = "Empate."
+	if combat_state.winner_side == player_side:
+		result_text = "Vitória!"
+	elif combat_state.winner_side != -1:
+		result_text = "Derrota."
 	_result_label.text = "%s (Turno %d)" % [result_text, combat_state.turn]
 	_result_label.visible = true
 	_skip_button.visible = false

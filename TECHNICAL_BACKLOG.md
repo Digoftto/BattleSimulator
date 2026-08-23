@@ -74,8 +74,8 @@ O objetivo desta etapa era transformar a infraestrutura de Combate Visual (F-046
 
 #### F-022 — Conquista de Mina Regional (combate real) não tem nenhum ponto de entrada de UI
 - **Category:** MISSING UI / BACKEND-COMPLETE-FRONTEND-MISSING
-- **Priority:** P2
-- **Status:** Open
+- **Priority:** P5 (rebaixado de P2 pra P5 em F-048 — avaliado objetivamente: o fluxo de Minas funciona completamente sem isso, sem nenhum estado quebrado/enganoso na ausência)
+- **Status:** Open — reclassificado como FUTURO em F-048, não bloqueia o MVP atual.
 - **Problem:** `MineConquestResolver.attempt_conquest()` (lógica completa, testada) nunca é chamado por nenhum painel real — só por `test_mine_conquest.gd`. `minas_panel.gd` só gerencia Minas já `conquered`; não existe tela/botão que dispare o combate contra a guarnição defensora de uma Mina Regional durante uma Expedição.
 - **Evidence:** F-047, grep repo-wide por `MineConquestResolver\.` — únicas ocorrências fora do próprio arquivo são em `test_mine_conquest.gd`.
 - **Canonical rule/document:** `MINES.md`, "Exército Defensor Inicial (IA)".
@@ -94,6 +94,30 @@ O objetivo desta etapa era transformar a infraestrutura de Combate Visual (F-046
 - **Recommended action:** Nenhuma nesta etapa — implementar PvP real (matchmaking, adversário real, `CombatEngine` de verdade) é um projeto próprio, explicitamente fora do escopo de F-047.
 - **Owner/design approval required:** Yes — quando essa entrega for priorizada.
 - **Confidence:** High.
+
+---
+
+## F-048 — MVP Final Player Experience & Release Readiness
+
+**Limitação declarada desta etapa:** este ambiente de execução é headless (sem display) — não foi possível literalmente clicar/assistir o jogo como um jogador humano faria. O substituto mais rigoroso disponível foi aplicado: leitura linha-a-linha da lógica real de renderização de cada tela, cruzada com traces reais de execução headless (`bootstrap.tscn`) que confirmam estado/texto/fluxo de controle — mas NÃO confirmam alinhamento pixel-a-pixel, sobreposição visual real ou legibilidade de fato. Isso é uma limitação de ambiente, não de esforço, e é sinalizada explicitamente em vez de alegar uma verificação visual que não aconteceu.
+
+### Achados reais desta etapa (não capturáveis pelos 660 assertions — nenhum deles testa CONTEÚDO de texto, só estrutura/estado)
+
+1. **`CombatReplayView` vazava terminologia de motor pro jogador — o achado mais importante desta etapa.** O tabuleiro rotulava os dois lados como "Lado 0"/"Lado 1", e — mais grave — o **banner de Resultado** (a informação mais importante de toda a tela) dizia literalmente "Vitória do Lado 0", nunca "Vitória!"/"Derrota.". Um jogador não tem como saber se é o "Lado 0". Corrigido: novo campo `player_side` (default 0, documentado como a suposição válida hoje — `attempt_army` é sempre side 0 em `PhaseResolver.resolve()`) usado pra rotular "Seu Exército"/"Inimigo" e "Vitória!"/"Derrota."/"Empate." em vez do termo interno do motor.
+2. **PvP: a comunicação de "funcionalidade não finalizada" existia, mas lia como desculpa técnica.** "Sem Matchmaking de verdade (depende de servidor)" não deixava claro que PvP real é uma entrega futura, não um bug. Reescrita pra "Prévia do PvP... Batalhas contra outros jogadores chegam numa atualização futura."
+3. Varredura de assets/preload em `scenes/` confirmou 0 referências de textura/imagem quebradas.
+4. Varredura de "[DEBUG]"/placeholders confirmou que o único elemento de debug já encontrado (F-046, R-017 — botão de gerar Candidato) já está corretamente atrás de `OS.is_debug_build()`; nenhum outro elemento de debug novo encontrado.
+
+### Decisão de Release (seção 13 do brief)
+
+- **A) MVP já pode ser considerado jogável?** **SIM**, com as ressalvas explícitas em (C).
+- **B) O loop principal está completo?** **SIM** — Cidade → Centro de Comando → Exército/Formação → PvE → Trilha/Fase → Combate (visual, real) → Resultado → Recompensa → Cidade → retry, todos confirmados funcionando via execução real headless (`bootstrap.tscn`, 0 SCRIPT ERROR) e cobertura de asserção dedicada (Army Editor, persistência, Combate Visual, PhaseResolver).
+- **C) O que ainda impede uma versão jogável?** Nada de concreto identificado nesta etapa além dos itens já listados como P2/P3/P4/P5 abaixo — nenhum bloqueador novo.
+- **D) O que pode ficar para depois:** F-021 (polish cosmético remanescente — ícones de navegação, indicador de aba, empty labels), F-022 (UI de conquista de Mina Regional), F-023 (PvP real).
+- **E) PvP deve ficar fora do MVP?** **Sim** — já tratado como Prévia/futuro nesta etapa, comunicação melhorada; nenhuma implementação nova feita, conforme instruído.
+- **F) Minas Regionais devem ficar fora do MVP?** **Sim** — o fluxo de Minas funciona completamente sem conquista Regional (as 3 Minas Iniciais cobrem Guarnição/Ciclo/Produção do início ao fim, sem nenhum estado quebrado ou enganoso na ausência de Minas Regionais). Reclassificado de "pendente" para **FUTURO** — só deveria ser implementado se/quando o fluxo de desvio-pra-Mina durante a Expedição for desenhado.
+
+**P0 = 0. P1 = 0.**
 
 ---
 

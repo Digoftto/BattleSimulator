@@ -411,6 +411,11 @@ func _play_battle_replays(battle_replays: Array) -> void:
 		var view = load("res://scenes/combat/combat_replay_view.tscn").instantiate()
 		view.combat_state = entry["state"]
 		view.replay_collector = entry["collector"]
+		# F-048: attempt_army (o Exército do jogador) é sempre side 0 —
+		# ver PhaseResolver.resolve(), CombatEngine.initialize(attempt_army,
+		# enemy_army, ...) — explícito aqui (mesmo já sendo o default de
+		# CombatReplayView) pra deixar a suposição visível, não implícita.
+		view.player_side = 0
 		if replay_speed_override >= 0.0:
 			view.DELAY_BETWEEN_EVENTS_SECONDS = replay_speed_override
 			# F-047: só em modo de teste automatizado (replay_speed_override
