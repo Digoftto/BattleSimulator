@@ -587,6 +587,19 @@ func _panel_contains_text(node: Node, text: String) -> bool:
 	return false
 
 
+## ART-003: quantos TextureRect com uma textura de verdade carregada
+## (não só o nó existindo, vazio) aparecem em algum lugar da árvore —
+## usado pra confirmar que arte (retrato, Battlefield, prédio, Trilha,
+## ícone de Fase) realmente renderizou, não só que o painel abriu.
+func _count_loaded_textures(node: Node) -> int:
+	var count: int = 0
+	if node is TextureRect and (node as TextureRect).texture != null:
+		count += 1
+	for child in node.get_children():
+		count += _count_loaded_textures(child)
+	return count
+
+
 ## Acha o primeiro Button real na árvore cujo texto contém "text" —
 ## usado pra testes que emitem o sinal "pressed" de verdade (via
 ## button.emit_signal), não chamando a função do handler direto. Só
@@ -1698,6 +1711,14 @@ func _validate_pve_panel_ui() -> void:
 	print("  Painel mostra o Território e os 2 Exércitos do Squad? %s (esperado: true)" % str(
 		_panel_contains_text(panel, "UI-PvE-Territorio-Teste") and _panel_contains_text(panel, "UI PvE Exército 1") and _panel_contains_text(panel, "UI PvE Exército 2")
 	))
+
+	# ART-003: banner de Trilha (Império, Região 1 — Fase 1) + ícone da
+	# categoria da Fase atual ("comum", Fase 1 não é Chefe nem
+	# Acampamento) devem ter carregado de verdade, sem quebrar o texto
+	# que já funcionava acima.
+	print("  ART-003: arte de Trilha + ícone de Fase (Território Império, Fase 1 = comum) carregaram de verdade no painel? %s (%d texturas carregadas na árvore, esperado: >= 2)" % [
+		str(_count_loaded_textures(panel) >= 2), _count_loaded_textures(panel)
+	])
 	print("  Exército sem army_name (3º da lista) mostra um rótulo de fallback ('Exército 3'), nunca vazio? %s (esperado: true, F-009)" % str(
 		_panel_contains_text(panel, "Exército 3")
 	))

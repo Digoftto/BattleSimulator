@@ -23,6 +23,14 @@ var _nova_expedicao_status_label: Label
 var _existing_armies_container: VBoxContainer
 var _nova_expedicao_iniciar_button: Button
 
+## ART-003: prévia da arte da Trilha (Facção + Região 1, a Região em
+## que toda Expedição nova sempre começa) do Território selecionado
+## no dropdown "Iniciar Nova Expedição" — criada 1x em
+## _build_static_structure() (mesmo padrão de _nova_expedicao_status_label:
+## esta seção não é reconstruída a cada refresh(), só tem seu conteúdo
+## atualizado), atualizada por _refresh_nova_expedicao_status().
+var _nova_expedicao_trilha_art: TextureRect
+
 ## Resultado (texto) da última "Tentativa de Fase" de cada Expedição
 ## (F-003) — {ExpeditionRuntime: String}. Guardado por Expedição (não um
 ## único Label global) porque pode haver mais de uma Expedição ativa ao
@@ -150,6 +158,15 @@ func _build_static_structure() -> void:
 	territory_option.item_selected.connect(_on_new_expedition_territory_selected, CONNECT_DEFERRED)
 	territory_row.add_child(territory_option)
 
+	# ART-003: prévia real da Trilha do Território selecionado — some
+	# (visible=false) se a Facção não tiver arte integrada, nunca
+	# quebra o dropdown/status que já funcionavam.
+	_nova_expedicao_trilha_art = TextureRect.new()
+	_nova_expedicao_trilha_art.custom_minimum_size = Vector2(0, 160)
+	_nova_expedicao_trilha_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_nova_expedicao_trilha_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_root_vbox.add_child(_nova_expedicao_trilha_art)
+
 	_nova_expedicao_status_label = Label.new()
 	_root_vbox.add_child(_nova_expedicao_status_label)
 
@@ -266,6 +283,38 @@ func refresh() -> void:
 		_expedicoes_container.add_child(panel)
 		var vbox := VBoxContainer.new()
 		panel.add_child(vbox)
+
+		# ART-003: banner real da Trilha (Facção + Região ATUAL da Fase
+		# em andamento — Trilha.region_for_fase(), nunca sempre Região 1
+		# como na prévia de "Nova Expedição" acima, já que uma Expedição
+		# em andamento pode estar em qualquer uma das 3 Regiões) mais o
+		# ícone da categoria real da Fase atual (Acampamento/Chefe
+		# Regional/Chefe Normal/comum — PvEArtCatalog.fase_category_for_expedition(),
+		# nunca uma categoria inventada). Some sozinho se a Facção não
+		# tiver arte, sem quebrar o cabeçalho de texto abaixo.
+		var art_row := HBoxContainer.new()
+		art_row.add_theme_constant_override("separation", 10)
+		vbox.add_child(art_row)
+
+		var pve_art_catalog_module = preload("res://engine/presentation/pve_art_catalog.gd")
+		var region: int = expedition.trilha.region_for_fase(expedition.current_fase)
+		var trilha_art := TextureRect.new()
+		trilha_art.custom_minimum_size = Vector2(0, 120)
+		trilha_art.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		trilha_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		trilha_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		trilha_art.texture = pve_art_catalog_module.trilha_texture_for(expedition.territory.faction, region)
+		trilha_art.visible = trilha_art.texture != null
+		art_row.add_child(trilha_art)
+
+		var fase_category: String = pve_art_catalog_module.fase_category_for_expedition(expedition)
+		var fase_icon := TextureRect.new()
+		fase_icon.custom_minimum_size = Vector2(90, 90)
+		fase_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		fase_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		fase_icon.texture = pve_art_catalog_module.fase_icon_texture_for(expedition.territory.faction, fase_category)
+		fase_icon.visible = fase_icon.texture != null
+		art_row.add_child(fase_icon)
 
 		var header := Label.new()
 		header.text = "Território: %s | Fase %d de %d | Status: %s" % [
@@ -449,6 +498,7 @@ func _refresh_nova_expedicao_status() -> void:
 	if _new_expedition_territory == null:
 		_nova_expedicao_status_label.text = "Nenhum Território disponível (Mundo ainda não carregou)."
 		_nova_expedicao_iniciar_button.disabled = true
+		_nova_expedicao_trilha_art.visible = false
 		return
 
 	var required: int = Squad.required_size(KingdomState.kingdom.get_territory_completion_count(_new_expedition_territory.id))
@@ -456,6 +506,10 @@ func _refresh_nova_expedicao_status() -> void:
 		required, _pending_squad_armies.size(), required
 	]
 	_nova_expedicao_iniciar_button.disabled = _pending_squad_armies.size() != required
+
+	# ART-003: toda Expedição nova começa na Região 1 (Trilha.region_for_fase(1) == 1).
+	_nova_expedicao_trilha_art.texture = preload("res://engine/presentation/pve_art_catalog.gd").trilha_texture_for(_new_expedition_territory.faction, 1)
+	_nova_expedicao_trilha_art.visible = _nova_expedicao_trilha_art.texture != null
 
 
 func _on_new_expedition_territory_selected(index: int) -> void:
