@@ -121,6 +121,21 @@ O objetivo desta etapa era transformar a infraestrutura de Combate Visual (F-046
 
 ---
 
+## F-049 — Visual Asset Integration & Production Pipeline
+
+Inventário completo (não implementação) dos assets visuais do jogo, feito antes da fase de produção/integração de arte. Achados principais:
+
+- **170 arquivos `.png` já existem em `Assets/MVP/`** (40 cartas — 1:1 com o catálogo de 39 jogáveis + 1 unidade especial de batalha, confirmado nome-a-nome; 11 Battlefields — as 10 oficiais + 1 template; 49 imagens de Cidade/Construções; 12 de Minas; 9 de Trilhas; 12 de Ícones de Trilha). **Apenas 2 (`City.png`, `INICIALIZAÇÃO.png`) estão de fato integrados** em `Game/assets/` e carregados pelo jogo — taxa de integração ~1%.
+- `CardResource` e `BattlefieldResource` não têm nenhum campo de arte no schema — todo o jogo hoje mostra cartas/Battlefields exclusivamente como texto (nome/Classe/HP/ESC). Não é um bug: é a peça de integração que falta.
+- `Game/docs/production/` (592 arquivos: ART_BIBLE, ASSET_DATABASE, STYLE_GUIDES, PROMPTS, PIPELINES, WORKFLOW) é uma árvore de produção bem estruturada, mas **inteiramente placeholder** ("Template de produção. Conteúdo será definido posteriormente.") — nenhuma dimensão/paleta/convenção estava de fato decidida em lugar nenhum do repositório antes desta etapa. Segue útil como checklist de cobertura (1 ficha por carta/Battlefield/prédio real).
+- Zero referências de asset quebradas (`preload()` varrido em toda `scenes/`). Dois arquivos fora de lugar (`WhatsApp Installer.exe` ×2 dentro de `Assets/MVP/`) — sinalizados, não removidos.
+- Zero componentes de UI reutilizáveis existem — 13 telas reimplementam independentemente os mesmos padrões (botão Voltar, Label de status, estado vazio).
+- Prioridade de integração recomendada (P0): retratos de carta + Battlefield dentro de `CombatReplayView` (maior impacto, infraestrutura já pronta). Pipeline completo de 8 passos e tabelas de mapeamento nome-arquivo publicados como artifact de referência.
+
+Nenhuma alteração de código/regra de jogo nesta etapa — inventário puro. Suíte permanece 660/660, 0 falhas, 0 erros (nada mudou desde F-048).
+
+---
+
 ## OPEN — Prioritized Work
 
 ### P0 — None currently identified
