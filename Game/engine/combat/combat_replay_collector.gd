@@ -33,12 +33,24 @@ var replay_events: Array[Dictionary] = []
 ## CombatEngine.initialize() e ANTES de CombatEngine.run() (mesmo
 ## ponto já usado por test_army_editor_formation_flow.gd pra ler a
 ## Formação inicial real). Cada item: {"side", "position", "card_name",
-## "card_class", "hp", "max_hp", "esc", "max_esc", "card"}.
+## "card_class", "hp", "max_hp", "esc", "max_esc", "card", "unit_id"}.
 ## "card" (ART-001): a própria CardResource, não só o nome — necessária
 ## pra CardArtCatalog resolver o retrato pelo resource_path real da
 ## carta (ver card_art_catalog.gd). Puramente aditivo: nenhum campo
 ## existente foi removido/renomeado, código anterior a ART-001 que só
 ## lê "card_name" etc. continua funcionando sem alteração.
+## "unit_id" (correção de replay visual, 2026-09-02): identidade ESTÁVEL
+## do Pelotão durante toda a batalha — CombatUnit.get_instance_id()
+## (herdado de RefCounted/Object, nunca reescrito por nós, único
+## enquanto o objeto existir). NÃO é CardResource.instance_id: essa
+## propriedade só é atribuída por Kingdom.acquire_card_from_catalog()
+## (cartas do jogador) — Exércitos inimigos gerados por
+## EnemyArmySelector/SeasonPipeline nunca passam por ali, então TODAS
+## as CardResource de um Exército inimigo carregam instance_id=0 (o
+## valor "carta de catálogo, nunca possuída"), o que tornaria esse
+## campo colidente entre unidades inimigas diferentes — get_instance_id()
+## não depende de nenhum desses caminhos de posse e funciona igual para
+## os dois lados.
 var initial_board: Array[Dictionary] = []
 
 
@@ -68,6 +80,7 @@ func snapshot_initial_board(state: CombatState) -> void:
 			"esc": unit.current_esc,
 			"max_esc": unit.card.esc,
 			"card": unit.card,
+			"unit_id": unit.get_instance_id(),
 		})
 
 
@@ -86,6 +99,11 @@ func _on_turn_end(_event_type: CombatEventType.Type, context: CombatContext) -> 
 ## a posição anterior sozinha (mantém o tabuleiro completo em memória
 ## enquanto percorre replay_events em ordem), então só a posição de
 ## destino precisa ser registrada aqui.
+## "unit_id" (correção de replay visual, 2026-09-02): CombatReplayView
+## localizava a unidade de ORIGEM buscando por "card_name" no mesmo
+## lado — ambíguo quando duas unidades do mesmo lado têm o mesmo
+## card_name (comum em Exércitos gerados). "card_name" continua aqui
+## só para o texto do log, nunca mais para localizar a unidade.
 func _on_unit_moved(_event_type: CombatEventType.Type, context: CombatContext) -> void:
 	if context.attacker == null:
 		return
@@ -95,6 +113,7 @@ func _on_unit_moved(_event_type: CombatEventType.Type, context: CombatContext) -
 		"side": context.attacker.side,
 		"card_name": context.attacker.card.card_name if context.attacker.card != null else "",
 		"to_position": context.attacker.position,
+		"unit_id": context.attacker.get_instance_id(),
 	})
 
 
@@ -105,8 +124,11 @@ func _on_after_attack(_event_type: CombatEventType.Type, context: CombatContext)
 		"kind": "attack",
 		"turn": context.turn,
 		"side": context.side,
+		"attacker_unit_id": context.attacker.get_instance_id(),
 		"attacker_card_name": context.attacker.card.card_name if context.attacker.card != null else "",
+		"attacker_card_class": context.attacker.card.card_class if context.attacker.card != null else "",
 		"attacker_position": context.attacker.position,
+		"target_unit_id": context.target.get_instance_id() if context.target != null else -1,
 		"target_card_name": context.target.card.card_name if context.target != null and context.target.card != null else "",
 		"target_position": context.target.position if context.target != null else -1,
 		"target_side": context.target.side if context.target != null else -1,
@@ -118,6 +140,13 @@ func _on_after_attack(_event_type: CombatEventType.Type, context: CombatContext)
 	})
 
 
+## FASE 7 (2026-09-04): "healer_unit_id"/"healer_position"/"target_unit_id"
+## são campos NOVOS, puramente aditivos (nenhum campo existente removido/
+## renomeado) — necessários pra animação de cura (feixe SOURCE -> TARGET,
+## via BattleUnitArtLayer, por unit_id nunca por card_name) e pro log
+## estruturado (SOURCE_POS). Antes desta tarefa, "side"/"context.position"
+## já existiam no CombatContext publicado por CombatEngine._execute_action()
+## (heal_ctx.position = unit.position) — só não eram capturados aqui.
 func _on_after_heal(_event_type: CombatEventType.Type, context: CombatContext) -> void:
 	if context.attacker == null:
 		return
@@ -125,7 +154,10 @@ func _on_after_heal(_event_type: CombatEventType.Type, context: CombatContext) -
 		"kind": "heal",
 		"turn": context.turn,
 		"side": context.side,
+		"healer_unit_id": context.attacker.get_instance_id(),
 		"healer_card_name": context.attacker.card.card_name if context.attacker.card != null else "",
+		"healer_position": context.position,
+		"target_unit_id": context.target.get_instance_id() if context.target != null else -1,
 		"target_card_name": context.target.card.card_name if context.target != null and context.target.card != null else "",
 		"target_position": context.target.position if context.target != null else -1,
 		"target_side": context.target.side if context.target != null else -1,
@@ -143,4 +175,5 @@ func _on_unit_died(_event_type: CombatEventType.Type, context: CombatContext) ->
 		"side": context.attacker.side,
 		"card_name": context.attacker.card.card_name if context.attacker.card != null else "",
 		"position": context.attacker.position,
+		"unit_id": context.attacker.get_instance_id(),
 	})

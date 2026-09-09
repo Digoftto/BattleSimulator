@@ -110,34 +110,41 @@ O Depósito nunca pode ultrapassar o nível da Capital.
 
 # Tabelas de Evolução
 
-## Referência: Fase Reino Jovem (Níveis 1-3)
+## Registro histórico (superado — ver "Armazenamento por Nível (vigente)" abaixo)
 
-A tabela abaixo representa apenas uma referência de calibração da Temporada 1, não substituindo as fórmulas oficiais nem representando uma regra permanente de balanceamento.
+As duas referências abaixo (fator 2, calibrada pela produção da Mina Básica; e uma tentativa intermediária vinculada ao custo da Capital) foram **substituídas** pela decisão do dono do projeto registrada em `Deposits.storage_capacity()` (fator 3 geométrico, níveis 1-7, seguido de Progressão Aritmética a partir do nível 8). Mantidas aqui só como registro histórico — nunca usar estes números para calcular capacidade real.
 
-Nos primeiros 3 níveis, a capacidade de armazenamento de cada Depósito é calibrada para acompanhar exatamente a produção diária das Minas Básicas correspondentes (ver MINES.md, "Mina Inicial") — ou seja, a capacidade nestes níveis representa aproximadamente 1 dia de produção máxima da mina básica daquele recurso.
+### Referência histórica 1: Fase Reino Jovem (fator 2, Níveis 1-3)
 
-| Nível | Produção/Hora da Mina Básica | Produção/Dia | Armazenamento (referência) |
+| Nível | Produção/Hora da Mina Básica | Produção/Dia | Armazenamento (referência histórica) |
 | --- | --- | --- | --- |
 | 1 | 1 | 24 | 24 |
 | 2 | 2 | 48 | 48 |
 | 3 | 4 | 96 | 96 |
 
-Esta relação é **proposital**: a capacidade do Depósito nesta fase inicial não é definida de forma independente — ela acompanha deliberadamente a produção da mina básica, para que o jogador raramente perca recursos por excesso de armazenamento nos primeiros dias de jogo (ver COMMAND_CENTER.md, "Economia I — Reino Jovem").
+### Referência histórica 2: vinculada ao custo da Capital
 
-A partir do nível 4 (quando as minas básicas já atingiram seu teto e a economia passa a depender das minas das trilhas de PvE — "Economia II — Reino em Expansão"), a capacidade dos Depósitos deixa de seguir essa relação fixa e passa a ser calibrada de forma independente, conforme a produção das minas regionais (ver MINES.md).
+130% do custo por Recurso de Construção que a Capital precisa para evoluir do nível "level" para "level + 1" (Capital divide seu custo igualmente entre os 3 Recursos — CITY.md/FORMULAS.md). Ex.: Capital exigindo 300 no total (100 de cada recurso) para o Nível N ⇒ Depósito no Nível N-1 armazenaria 130 de cada recurso.
 
 Os custos oficiais de evolução encontram-se centralizados em `FORMULAS.md`.
 
-## Armazenamento por Nível
+## Armazenamento por Nível (vigente)
 
-A tabela abaixo é única para o Depósito — o valor de Armazenamento aplica-se simultaneamente aos três recursos (Ferro Negro, Cristais Arcanos, Essência Vital).
+A tabela abaixo é única para o Depósito — o valor de Armazenamento aplica-se simultaneamente aos três recursos (Ferro Negro, Cristais Arcanos, Essência Vital). Fonte real: `Deposits.storage_capacity()` — progressão geométrica de fator 3 nos Níveis 1-7 (começando em 24), seguida de Progressão Aritmética a partir do Nível 8 (mesmo incremento do último salto geométrico, 11.664, evitando crescimento descontrolado).
 
 | Nível | Armazenamento (cada um dos 3 recursos) |
 | --- | --- |
 | 1 | 24 |
-| 2 | 48 |
-| 3 | 96 |
-| 4+ | ? |
+| 2 | 72 |
+| 3 | 216 |
+| 4 | 648 |
+| 5 | 1.944 |
+| 6 | 5.832 |
+| 7 | 17.496 |
+| 8 | 29.160 |
+| 9 | 40.824 |
+| 10 | 52.488 |
+| 11+ | +11.664 por nível (Progressão Aritmética) |
 
 ---
 

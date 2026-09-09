@@ -136,6 +136,51 @@ Nenhuma alteração de código/regra de jogo nesta etapa — inventário puro. S
 
 ---
 
+## F-050 — Command Center / World Map Gate Architecture Reorganization
+
+Reorganização de responsabilidade/entrada, por decisão explícita do usuário (confirmada após auditoria apontar o conflito com a decisão anterior citada como "F-016/F-017" em `CITY.md`/`COMMAND_CENTER_UI.md`, que fazia do Centro de Comando a porta de entrada única de PvP/PvE/Minas, e marcava o World Map Gate como decorativo/sem hitbox em `city_panel.gd`). Confirmada como reversão deliberada dessa hierarquia, não um bug.
+
+**Auditoria (achados antes de qualquer alteração):**
+- "Campo de Testes" (sistema onde o jogador testaria seus Exércitos) **não existe** em nenhum documento (`Arquitetura/`, `Fundation/`) nem no código — nem sob esse nome, nem sob outro. Registrado como lacuna aberta em `COMMAND_CENTER.md`; nenhuma mecânica foi criada nesta etapa.
+- PvE, PvP e Minas já viviam fisicamente como sub-cenas do Centro de Comando (`Game/scenes/command_center/panels/{pve,pvp,minas}_panel.tscn`), roteadas por `command_center_panel.gd`.
+- World Map Gate não tinha nenhuma cena — apenas uma menção decorativa na arte da Cidade, explicitamente sem hitbox.
+- PvE e Minas têm resolvers/engine reais (`CombatEngine`, `expedition_runtime.gd`, `mining_cycle_resolver.gd`). **PvP não tem combate real implementado** (`pvp_panel.gd` só sorteia Campo/Exército; o resultado é escolhido manualmente pelo jogador em "Simular Resultado" — já autodocumentado como F-023, adiado, fora do escopo desta reorganização).
+
+**O que foi feito:**
+- Criada `Game/scenes/world_map_gate/world_map_gate_panel.gd` + `.tscn` — mesmo estilo "sem arte" de `command_center_panel.gd` (ColorRect + Botões nativos), encaminhando para as 3 cenas já existentes (`pve_panel.tscn`/`pvp_panel.tscn`/`minas_panel.tscn`, caminho de arquivo inalterado — nenhum sistema duplicado).
+- `command_center_panel.gd`: removidas as entradas "PvE"/"PvP"/"Minas" de `PANEL_SCENES`; adicionada uma entrada "World Map Gate" apontando para a nova cena.
+- `pve_panel.gd`/`pvp_panel.gd`/`minas_panel.gd`: botão "Voltar" atualizado de "Centro de Comando" para "World Map Gate" (rótulo + cena de destino) — nenhuma outra linha alterada nesses 3 arquivos.
+- `exercitos_panel.gd`: texto do tutorial ("Volte ao Centro de Comando e abra o PvE...") atualizado para citar o World Map Gate no meio do caminho.
+- Documentação: `CITY.md` ("Mundo", "Interfaces Fora da Cidade"), `COMMAND_CENTER.md` (nota de esclarecimento + "Relação com Outros Sistemas" + lacuna do Campo de Testes registrada), `COMMAND_CENTER_UI.md` (as 3 janelas PvP/Minas/PvE removidas — relocadas, não reescritas), novo `WORLD_MAP_GATE.md` (SSoT das 3 janelas relocadas), `PROJECT_INDEX.md` (nova entrada de ownership + registro da decisão revertida).
+- **Não alterado, deliberadamente (fora do escopo desta etapa):** nenhuma arte, nenhum hotspot visual sobre `city_panel.gd` (World Map Gate continua "decorativo, sem hitbox" na Cidade — alcançado por ora só através do botão no Centro de Comando, mesmo padrão já usado para "Exércitos"/`ARMY.md`); nenhuma regra de combate/recompensa/progressão/economia de PvE, PvP ou Minas; nenhum resolver.
+
+**Validação:** suíte nativa (`Game/tests/test_main.gd`) não testa navegação de cena — só lógica (state machines, timers, formação) — não afetada por esta mudança. `bootstrap.gd` instancia `pve_panel.tscn`/`pvp_panel.tscn`/`minas_panel.tscn` diretamente por caminho de arquivo em ~10 validações; caminho de arquivo não mudou, então essas validações permanecem intactas. Não foi possível abrir o editor Godot neste ambiente para um teste de clique real; recomenda-se percorrer manualmente City → Centro de Comando → World Map Gate → PvE/PvP/Minas → Voltar antes de considerar a etapa encerrada.
+
+**Date:** 2026-08-30.
+
+---
+
+## F-051 — World Map Gate: Correção de Localização Física (City, não Command Center)
+
+Correção do F-050: naquela etapa, o World Map Gate ganhou a responsabilidade documental sobre PvE/PvP/Minas, mas sua própria localização física ficou provisoriamente dentro do Centro de Comando (um botão em `command_center_panel.gd`) — decisão explicitamente marcada como incorreta e corrigida agora, por pedido do dono do projeto.
+
+**Decisão corrigida:** o World Map Gate é uma localização própria da Cidade (grupo "Consulta" de `CITY.md`, mesmo padrão de Biblioteca/Observatório — sem Nível/Evoluir, só Abrir), nunca uma janela do Centro de Comando.
+
+**O que foi feito:**
+- `city_panel.gd`: adicionada a região `world_map_gate` a `BUILDING_REGIONS`/`BUILDING_SCENES`, com hitbox sobre o portão físico (torres gêmeas + arco) já desenhado em `City.png`, na base da praça central, abaixo da fonte. Retângulo calibrado por inspeção visual direta (a varredura de cor automática não convergiu — o portão está cercado de outros elementos azuis na arte, como bandeiras e o domo do Núcleo de Energia); primeira aproximação, sujeita a ajuste após inspeção no editor.
+- `command_center_panel.gd`: removida a entrada "World Map Gate" de `PANEL_SCENES` — o CdC não referencia mais essa cena em nenhum nível.
+- `world_map_gate_panel.gd`: botão "Voltar" (rótulo + destino) trocado de "Centro de Comando" para "Voltar para a Cidade" (`city_panel.tscn`).
+- `exercitos_panel.gd`: texto do tutorial atualizado ("Volte à Cidade, abra o World Map Gate...").
+- Documentação: `CITY.md` (World Map Gate movido de "Mundo" para "Consulta", como destino direto), `COMMAND_CENTER.md` (removido de "Relação com Outros Sistemas", nota de esclarecimento corrigida), `COMMAND_CENTER_UI.md` (nota de reorganização atualizada), `WORLD_MAP_GATE.md` ("Acesso Atual" reescrito), `PROJECT_INDEX.md`.
+
+**Não alterado:** nenhuma cena, regra ou dado de PvE/PvP/Minas; nenhum resolver; a cena `world_map_gate_panel.tscn` em si (só seu ponto de entrada mudou); a arte própria do World Map Gate (`WORLD MAP GATE.png`) continua não integrada — a tela permanece no estilo funcional sem asset.
+
+**Validação:** mesma suíte/mesma ressalva do F-050 — `test_main.gd` não testa navegação de cena; `bootstrap.gd` não referencia `command_center_panel.gd`/`world_map_gate_panel.gd` diretamente (só os 3 painéis internos por caminho de arquivo, inalterado). Não foi possível testar o clique real no hitbox novo neste ambiente — recomenda-se validar no editor que o retângulo cai sobre o portão antes de fechar a etapa.
+
+**Date:** 2026-08-30.
+
+---
+
 ## OPEN — Prioritized Work
 
 ### P0 — None currently identified

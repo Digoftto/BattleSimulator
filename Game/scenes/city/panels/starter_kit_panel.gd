@@ -33,22 +33,24 @@ extends Control
 
 signal kit_chosen
 
-## Cópia byte-idêntica de Assets/MVP/INICIALIZAÇÃO.png trazida para
+## Cópia byte-idêntica de Assets/MVP/INICIALIZAÇÃO_3.png trazida para
 ## dentro da árvore do projeto (mesmo motivo de Game/assets/art/City.png,
 ## F-025: preload() via res:// funciona também numa build exportada,
-## nunca depende de caminho absoluto do sistema de arquivos).
-const STARTER_TEXTURE: Texture2D = preload("res://assets/art/INICIALIZAÇÃO.png")
+## nunca depende de caminho absoluto do sistema de arquivos). Substitui
+## a arte anterior (INICIALIZAÇÃO.png) apenas como composição visual —
+## mesma resolução 1536x1024, nenhuma mudança de lógica/dados.
+const STARTER_TEXTURE: Texture2D = preload("res://assets/art/INICIALIZAÇÃO_3.png")
 const STARTER_IMAGE_ASPECT_RATIO: float = 1536.0 / 1024.0
 
 ## Fração (0.0-1.0) do retângulo dos 3 botões "Escolher X" já
 ## desenhados na imagem, na ordem em que aparecem
-## (StarterKitResolver.FACTIONS) — calibrado por inspeção direta da
-## imagem, mesmo método já usado em CityPanel.BUILDING_REGIONS
-## (F-022/F-023).
+## (StarterKitResolver.FACTIONS) — recalibrado por inspeção direta da
+## nova imagem (INICIALIZAÇÃO_3.png), mesmo método já usado em
+## CityPanel.BUILDING_REGIONS (F-022/F-023).
 const CHOICE_BUTTON_REGIONS: Array[Rect2] = [
-	Rect2(0.049, 0.870, 0.283, 0.060),  # Império
-	Rect2(0.367, 0.870, 0.283, 0.060),  # Natureza
-	Rect2(0.657, 0.870, 0.283, 0.060),  # Mortos-Vivos
+	Rect2(0.0664, 0.8574, 0.2578, 0.0830),  # Império
+	Rect2(0.3809, 0.8584, 0.2246, 0.0811),  # Natureza
+	Rect2(0.6836, 0.8584, 0.2155, 0.0811),  # Mortos-Vivos
 ]
 
 var _options: Array[Dictionary] = []

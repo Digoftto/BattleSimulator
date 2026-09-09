@@ -106,3 +106,77 @@ For non-trivial changes, use `bs-audit` to verify:
 - MVP scope.
 
 The goal is a codebase that implements the architecture, not a codebase that silently becomes the architecture.
+
+## 10. Visual / UI work
+
+When the task concerns graphics, UI, layout, typography, Battle Art, assets, visual composition, or presentation, load the `bs-visual` Skill before editing.
+
+The visual task must be treated separately from gameplay logic and data unless the requested change explicitly requires both.
+
+### 10.1 Asset vs. runtime responsibility
+
+Keep a strict separation between visual assets and dynamic game/UI behavior.
+
+Assets provide visual content such as:
+- characters and units;
+- buildings and structures;
+- icons and symbols;
+- textures and backgrounds;
+- Battle Art views.
+
+Godot/runtime systems provide dynamic behavior such as:
+- position and movement;
+- scale and perspective;
+- rotation and orientation selection;
+- visibility and state;
+- dynamic text and numeric values;
+- animation and effects;
+- responsive layout.
+
+Do not bake dynamic information into PNGs or other static images when the information can change during gameplay.
+
+### 10.2 Dynamic typography
+
+Dynamic game information must remain real UI text/resources in Godot, not pre-rendered images.
+
+Use project-provided font resources for thematic typography. Prefer a readable fantasy/medieval visual identity over excessive decorative effects.
+
+Where appropriate, separate typography roles such as title, body text, and numeric/status information so that readability is preserved at gameplay scale.
+
+### 10.3 Visual scope discipline
+
+For visual tasks:
+- identify whether the problem is an asset, layout, typography, transparency, scale, perspective, or runtime behavior before editing;
+- do not solve a visual problem by changing unrelated gameplay systems;
+- do not redesign approved visual elements unless explicitly requested;
+- make the smallest change that addresses the stated visual problem;
+- preserve existing responsive behavior and hitbox relationships unless the task explicitly concerns them;
+- do not modify combat rules, card data, economy, or other unrelated systems.
+
+### 10.4 HUD and overlays
+
+When UI is placed over artwork or a map, do not introduce opaque or dark backing panels unless explicitly requested or required for legibility.
+
+Prefer transparent composition, thematic typography, subtle text shadow/outline, and restrained decorative elements when they preserve the artwork underneath.
+
+Dynamic values such as XP, levels, currency, resources, counters, names, health, shield, and damage must remain dynamic UI elements.
+
+### 10.5 Battle Art
+
+Battlefield unit assets must be designed for the actual battlefield camera and tile geometry, not as isolated card portraits.
+
+When a unit requires directional representation, provide the required distinct views (for example front, back, left, and right) as separate assets. Runtime code is responsible for selecting the appropriate view based on battlefield direction/orientation.
+
+Preserve alpha transparency around the subject. Do not use background-removal methods that erase light-colored parts of the character or otherwise damage the silhouette.
+
+The asset must remain readable at the intended battlefield scale and must fit inside one occupied battlefield tile unless the documented unit size explicitly requires otherwise.
+
+### 10.6 Visual validation
+
+Claude is not required to create screenshots for visual tasks unless the user explicitly requests screenshots or automated visual evidence.
+
+After implementation, perform only the relevant technical checks available in the project and report what was verified. Do not spend tokens generating screenshot artifacts merely to demonstrate visual changes.
+
+The user will inspect the result directly in Godot and provide visual feedback for subsequent iterations.
+
+Do not treat technical success as proof of visual success. The visual acceptance decision belongs to the user's direct inspection unless an automated visual criterion has been explicitly defined.

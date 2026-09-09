@@ -229,6 +229,7 @@ Ela expressa a identidade de cada construção e deverá orientar todas as futur
 
 * **Biblioteca:** Enciclopédia de cartas e dados do jogo (`LIBRARY.md`). Navegação: destino direto da Cidade.
 * **Observatório:** Relatórios, estatísticas e análises gerais (`OBSERVATORY.md`). Navegação: destino direto da Cidade.
+* **World Map Gate:** Ponto de entrada para PvE, PvP e Minas (`WORLD_MAP_GATE.md`). Navegação: destino direto da Cidade — hitbox próprio sobre o portão físico já desenhado na arte (`city_panel.gd`), nunca através do Centro de Comando.
 
 ### Mundo
 
@@ -236,7 +237,7 @@ Ela expressa a identidade de cada construção e deverá orientar todas as futur
 * **PvP:** Ciclo competitivo, arenas e classificações (`RANKING.md`, `MATCHMAKING.md`).
 * **Minas:** Extração e controle de recursos econômicos do mapa (`MINES.md`).
 
-PvE, PvP e Minas permanecem sistemas externos à infraestrutura urbana — nenhum deles é uma construção, nenhum tem nível ou custo de evolução da Cidade. Sua navegação operacional, porém, ocorre através do Centro de Comando (`COMMAND_CENTER_UI.md`, "A organização das janelas do CdC"), não como destinos diretos da Cidade — decisão de hierarquia do MVP (F-016/F-017). O CdC organiza o acesso; as regras de cada sistema continuam pertencendo exclusivamente aos seus próprios documentos.
+PvE, PvP e Minas permanecem sistemas externos à infraestrutura urbana — nenhum deles é uma construção, nenhum tem nível ou custo de evolução da Cidade. Sua navegação operacional ocorre através do **World Map Gate** (`WORLD_MAP_GATE.md`), uma localização própria da Cidade (grupo Consulta, acima) — nunca através do Centro de Comando, em nenhum nível. Essa é a decisão final de hierarquia: revertida uma primeira vez do Centro de Comando (que antes era a porta de entrada única desses 3 sistemas, decisão então citada como "F-016/F-017") para o World Map Gate, e corrigida uma segunda vez para que o World Map Gate fosse, ele mesmo, uma localização física da Cidade — nunca uma janela de outra construção. O World Map Gate organiza o acesso; as regras de cada sistema continuam pertencendo exclusivamente aos seus próprios documentos.
 
 ---
 
@@ -246,7 +247,7 @@ Ferramentas de gestão, consulta e acesso ao mundo não são construções da Ci
 
 Elas podem integrar a interface principal do jogo para navegação do jogador, porém não possuem nível, custo de evolução urbana ou impacto direto sobre a infraestrutura da Cidade. O funcionamento e regras dessas telas pertencem estritamente aos seus respectivos documentos de arquitetura.
 
-Biblioteca e Observatório são acessados diretamente pela navegação de nível superior da Cidade. Arsenal (Comandantes, Exércitos) e Mundo (PvE, PvP, Minas) são acessados através do Centro de Comando — ver `COMMAND_CENTER_UI.md`.
+Biblioteca, Observatório e World Map Gate são acessados diretamente pela navegação de nível superior da Cidade. Arsenal (Comandantes, Exércitos) é acessado através do Centro de Comando (`COMMAND_CENTER_UI.md`). Mundo (PvE, PvP, Minas) é acessado através do World Map Gate (`WORLD_MAP_GATE.md`), que por sua vez é ele mesmo um destino direto da Cidade, nunca uma janela do Centro de Comando.
 
 ---
 

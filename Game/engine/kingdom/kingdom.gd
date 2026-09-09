@@ -131,6 +131,16 @@ var squads: Array[Squad] = []
 ## Expedições ativas do jogador (PvE.md).
 var active_expeditions: Array[ExpeditionRuntime] = []
 
+## Dado cru de Expedições salvas ainda não reconstruídas (F-020):
+## KingdomSaveService._dict_to_kingdom() roda antes do Mundo carregar
+## (WorldBootstrap.ensure_world_loaded()), então não pode construir
+## ExpeditionRuntime de verdade ali (depende de Trilha/Season, que só
+## existem depois). Só populado por KingdomSaveService, só consumido e
+## esvaziado por ExpeditionPersistenceResolver.hydrate_pending() (chamado
+## uma única vez por KingdomState._load_or_create_kingdom(), logo após o
+## load). Nunca tocado em nenhum outro lugar.
+var _pending_expedition_saves: Array[Dictionary] = []
+
 ## territory_id -> quantas vezes a Trilha daquele Território já foi
 ## concluída inteiramente (PvE.md, "Exigências Estritas de Composição
 ## de Squad": 1ª conclusão exige Squad de 1 Exército, 1º Replay exige
@@ -476,6 +486,47 @@ var raw_resources: Dictionary = {}  # nome do recurso -> int
 
 func get_raw_resource(resource: String) -> int:
 	return raw_resources.get(resource, 0)
+
+
+## Reserva Antecipada de Evolução (DEPOSITS.md, "Reserva Antecipada de
+## Evolução") — Recursos de Construção já transferidos do Depósito
+## (SupplyChainResolver) para uma construção elegível específica
+## (Capital, Centro de Comando, Academia, Núcleo de Energia), mas ainda
+## não gastos numa evolução efetiva. InstitutionalConstructionResolver.
+## evolve() consome daqui primeiro, antes de tocar em raw_resources.
+## Preso à construção: nunca retorna ao Depósito, nunca é redirecionado
+## pra outra (DEPOSITS.md, "Regras da Transferência").
+## building_key (String — ver InstitutionalConstructionResolver.building_key())
+## -> {resource_name: int}
+var building_reserved_resources: Dictionary = {}
+
+
+func get_building_reserved(building_key: String, resource: String) -> int:
+	if not building_reserved_resources.has(building_key):
+		return 0
+	return building_reserved_resources[building_key].get(resource, 0)
+
+
+## Credita "amount" de "resource" na reserva de "building_key" — usado
+## exclusivamente por SupplyChainResolver.transfer_resource() (a
+## transferência em si já deduziu de raw_resources antes de chamar
+## isto; Kingdom nunca decide sozinho quando transferir, só guarda o
+## estado, mesmo padrão de spend_raw_resource()/credit_raw_resource()).
+func add_building_reserved(building_key: String, resource: String, amount: int) -> void:
+	if not building_reserved_resources.has(building_key):
+		building_reserved_resources[building_key] = {}
+	var bucket: Dictionary = building_reserved_resources[building_key]
+	bucket[resource] = bucket.get(resource, 0) + amount
+
+
+## Gasta "amount" da reserva de "building_key" (chamado só por
+## InstitutionalConstructionResolver.evolve(), ao efetivar a evolução) —
+## nunca deixa o saldo negativo, mesmo padrão de spend_raw_resource().
+func spend_building_reserved(building_key: String, resource: String, amount: int) -> bool:
+	if get_building_reserved(building_key, resource) < amount:
+		return false
+	building_reserved_resources[building_key][resource] -= amount
+	return true
 
 
 ## Gasta "amount" de "resource" se houver saldo suficiente. Retorna
@@ -887,6 +938,18 @@ func start_expedition(expedition: ExpeditionRuntime) -> Dictionary:
 
 	active_expeditions.append(expedition)
 	return {"success": true, "reason": ""}
+
+
+## Restaura uma Expedição já salva por uma sessão anterior direto em
+## active_expeditions (F-020, ExpeditionPersistenceResolver.hydrate_pending()).
+## Ao contrário de start_expedition(), nunca valida a Trava de Edição:
+## um Exército recém-reconstruído do save nunca está comprometido em
+## outra Expedição/Guarnição ainda nesta sessão (active_expeditions está
+## sendo populado agora, uma a uma, pela primeira vez após o load) —
+## rejeitar aqui só destruiria progresso real do jogador sem nenhum
+## cenário legítimo de conflito.
+func restore_expedition(expedition: ExpeditionRuntime) -> void:
+	active_expeditions.append(expedition)
 
 
 func set_progress_flag(flag_name: String, value: bool = true) -> void:

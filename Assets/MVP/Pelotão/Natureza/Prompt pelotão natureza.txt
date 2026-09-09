@@ -1,0 +1,344 @@
+BATTLE SIMULATOR — BATTLE ART
+FACÇÃO NATUREZA
+PRODUÇÃO INDIVIDUAL DE UNIDADE
+
+==================================================
+REGRA FUNDAMENTAL — NOVA UNIDADE
+==================================================
+
+A IMAGEM/CARTA ENVIADA JUNTO DESTE PROMPT É A ÚNICA
+REFERÊNCIA DE IDENTIDADE PARA A UNIDADE DESTE TURNO.
+
+IGNORE COMPLETAMENTE AS UNIDADES PRODUZIDAS
+ANTERIORMENTE NESTA CONVERSA.
+
+NÃO use personagens anteriores como referência de:
+
+- aparência
+- anatomia
+- pose
+- equipamentos
+- armas
+- proporções
+- materiais
+- cores
+- enquadramento específico
+- identidade visual
+
+Cada nova imagem enviada representa UMA NOVA UNIDADE.
+
+A cada nova execução deste prompt, comece a unidade
+novamente a partir da carta fornecida naquele turno.
+
+==================================================
+OBJETIVO
+==================================================
+
+CONVERTER A ARTE DA CARTA FORNECIDA EM UM
+BATTLE ART BASE DA UNIDADE.
+
+Não criar uma nova interpretação livre.
+
+Não criar uma nova ilustração de carta.
+
+Não reproduzir a carta.
+
+Não reproduzir moldura, texto ou interface.
+
+A unidade deve parecer um asset individual retirado
+do universo da carta e preparado para ser utilizado
+diretamente no Battlefield.
+
+==================================================
+REFERÊNCIA PRINCIPAL — CARTA ATUAL
+==================================================
+
+A CARTA FORNECIDA NESTE TURNO É A AUTORIDADE MÁXIMA
+PARA A IDENTIDADE DA UNIDADE.
+
+Preservar rigorosamente tudo que define a unidade,
+incluindo, quando aplicável:
+
+- aparência
+- anatomia
+- silhueta
+- rosto
+- cabelo
+- corpo
+- roupas
+- armadura
+- armas
+- equipamentos
+- acessórios
+- materiais
+- cores
+- elementos naturais
+- características especiais
+- elementos mágicos
+- detalhes próprios da unidade
+
+Se a unidade for humana, preservar sua identidade humana.
+
+Se a unidade for criatura, preservar sua anatomia de criatura.
+
+Se a unidade for vegetal, preservar sua natureza vegetal.
+
+Se a unidade for animal, preservar sua natureza animal.
+
+Se a unidade for uma criatura fantástica, preservar sua
+forma e características fantásticas.
+
+NÃO forçar todas as unidades para o mesmo tipo de corpo.
+
+NÃO transformar criaturas em humanos.
+
+NÃO transformar humanos em criaturas.
+
+NÃO adicionar equipamentos que não pertençam à unidade.
+
+==================================================
+IDENTIDADE — FACÇÃO NATUREZA
+==================================================
+
+A unidade pertence à FACÇÃO NATUREZA.
+
+A estética da Natureza deve permanecer evidente,
+mas sempre respeitando a identidade específica apresentada
+na carta atual.
+
+Priorizar, quando presentes na referência:
+
+- madeira
+- casca
+- raízes
+- cipós
+- folhas
+- fibras
+- couro natural
+- materiais orgânicos
+- vegetação
+- pedras naturais
+- elementos artesanais
+- formas orgânicas
+- verdes e tons naturais
+- elementos mágicos ligados à natureza
+
+IMPORTANTE:
+
+Não aplicar automaticamente todos esses elementos.
+
+Utilize somente aquilo que for coerente com a unidade
+apresentada na carta.
+
+A carta atual determina o que realmente pertence
+àquela unidade.
+
+==================================================
+BATTLE ART — APRESENTAÇÃO
+==================================================
+
+A unidade deve ser convertida para o padrão visual
+de um ASSET DE BATTLEFIELD.
+
+Não é uma carta.
+
+Não é uma arte promocional.
+
+Não é uma ilustração de cenário.
+
+É um Battle Art Base individual.
+
+A apresentação deve transmitir que a unidade está
+pronta para ser colocada diretamente no campo de batalha.
+
+==================================================
+CÂMERA E PERSPECTIVA
+==================================================
+
+Utilizar o PADRÃO TÉCNICO DE CÂMERA já estabelecido
+para os Battle Arts do projeto.
+
+Preservar a lógica de:
+
+- perspectiva
+- distância da câmera
+- escala da unidade
+- enquadramento
+- proporção dentro do canvas
+- leitura tridimensional
+- posição da unidade no espaço
+- visualização de Battlefield
+
+IMPORTANTE:
+
+A câmera é uma característica do SISTEMA DE BATTLE ART,
+não da unidade anterior.
+
+Não copiar a pose ou o enquadramento específico de
+qualquer personagem produzido anteriormente.
+
+A unidade atual deve ser enquadrada de maneira compatível
+com os Battle Arts aprovados, independentemente de ser
+humana, animal, vegetal ou criatura.
+
+==================================================
+POSE / APRESENTAÇÃO DA UNIDADE
+==================================================
+
+Adaptar a unidade para uma apresentação clara de
+Battle Art Base.
+
+A pose deve ser natural e legível.
+
+Não criar uma cena de ação exagerada.
+
+Não criar uma composição cinematográfica.
+
+Não criar interação com outros personagens.
+
+Não criar cenário.
+
+Não inventar uma situação narrativa.
+
+A unidade deve estar completamente visível.
+
+Nenhuma parte importante deve ser cortada.
+
+Quando a unidade possuir armas, asas, raízes, caudas,
+galhos, tentáculos, estandartes ou outros elementos
+importantes, preservar sua leitura completa sempre que
+possível.
+
+==================================================
+FUNDO
+==================================================
+
+FUNDO 100% TRANSPARENTE.
+
+O resultado final deve conter SOMENTE A UNIDADE.
+
+Remover completamente qualquer cenário existente
+na carta.
+
+Não reproduzir:
+
+- floresta
+- castelo
+- campo de batalha
+- céu
+- chão
+- pedras do cenário
+- árvores do cenário
+- arquitetura
+- objetos ambientais
+- fumaça
+- partículas ambientais
+- elementos decorativos
+- texto
+- moldura
+- HUD
+- interface
+
+Somente a unidade isolada em fundo transparente.
+
+==================================================
+CONSISTÊNCIA ENTRE UNIDADES
+==================================================
+
+As unidades da FACÇÃO NATUREZA devem compartilhar:
+
+- mesma linguagem de Battle Art
+- mesma lógica de câmera
+- mesma escala visual
+- mesma qualidade de renderização
+- mesma qualidade de iluminação
+- mesma apresentação de asset
+
+PORÉM:
+
+Não padronizar artificialmente a anatomia ou o design.
+
+Cada unidade deve continuar sendo fiel à sua própria carta.
+
+A consistência deve vir da APRESENTAÇÃO DO BATTLE ART,
+e não da transformação de todas as unidades em personagens
+semelhantes.
+
+==================================================
+SAÍDA OBRIGATÓRIA
+==================================================
+
+ENTREGAR EXATAMENTE UMA IMAGEM.
+
+UM ÚNICO ASSET.
+
+UMA ÚNICA UNIDADE.
+
+Não gerar:
+
+- múltiplas versões
+- alternativas
+- variações
+- três imagens
+- quatro imagens
+- personagens repetidos
+- contact sheet
+- spritesheet
+- montagem
+- comparação
+- imagens lado a lado
+
+Entregar 1 arquivo PNG individual com fundo transparente.
+
+==================================================
+NÃO MODIFICAR A IDENTIDADE DA CARTA
+==================================================
+
+Não substituir a unidade por uma interpretação genérica
+da Facção Natureza.
+
+Não usar outra unidade como modelo.
+
+Não reutilizar características de personagens anteriores.
+
+Não reutilizar armas de personagens anteriores.
+
+Não reutilizar poses de personagens anteriores.
+
+Não reutilizar equipamentos de personagens anteriores.
+
+A unidade deve ser reconhecível como a MESMA UNIDADE
+apresentada na carta enviada neste turno.
+
+==================================================
+CONTROLE FINAL
+==================================================
+
+Antes de entregar, verificar:
+
+[ ] A unidade foi baseada exclusivamente na carta atual.
+[ ] Nenhum personagem anterior foi utilizado como identidade.
+[ ] A identidade da unidade foi preservada.
+[ ] A anatomia foi preservada.
+[ ] Os equipamentos foram preservados.
+[ ] As armas foram preservadas.
+[ ] A estética da Natureza foi preservada.
+[ ] A unidade não foi artificialmente transformada em humano.
+[ ] A unidade não foi artificialmente transformada em criatura.
+[ ] A câmera segue o padrão de Battle Art.
+[ ] A escala é compatível com os Battle Arts.
+[ ] A perspectiva é compatível com os Battle Arts.
+[ ] O enquadramento é compatível com os Battle Arts.
+[ ] A unidade está completamente visível.
+[ ] O fundo é 100% transparente.
+[ ] Não existe cenário.
+[ ] Não existe texto.
+[ ] Não existe moldura.
+[ ] Não existe HUD.
+[ ] Existe somente UMA unidade.
+[ ] Existe somente UMA imagem final.
+
+Se qualquer item falhar, corrija antes da entrega.
+
+PRODUZA SOMENTE O BATTLE ART BASE DA UNIDADE
+APRESENTADA NA CARTA ENVIADA NESTE TURNO.

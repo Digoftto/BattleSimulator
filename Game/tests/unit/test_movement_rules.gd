@@ -56,27 +56,50 @@ static func run(ctx: TestRunner.Context) -> bool:
 	ctx.check(unit_at_9 != null and unit_at_9.card.card_class == "Máquina de Guerra", "A) Máquina de Guerra deve ocupar a Posição 9 mesmo não sendo a última carta do Array")
 
 	# --- B: Máquina de Guerra pode avançar após o início do combate ---
-	# Bloqueador na Posição 3 (frente da Coluna C) de propósito, pra
-	# isolar exatamente 1 passo de avanço — sem ele, "avança até a
-	# posição livre mais próxima" (5.2.1) levaria a MdG direto até a
-	# Posição 3 na mesma Fase, o que também está correto, mas testaria
-	# duas coisas ao mesmo tempo.
+	# ATUALIZADO (auditoria de movimentação, 2026-09-01): a expectativa
+	# original ("bloqueador fixo na Posição 3, frente da antiga Coluna C,
+	# MdG para na Posição 4") só fazia sentido sob o modelo de 3 colunas
+	# independentes, corrigido por não ser o que COMBAT_RULES.md 5.2.1
+	# realmente define (uma ÚNICA sequência espacial 9→8→7→...→1, "sem
+	# limitar a movimentação a uma posição por unidade", nunca 3 trilhos
+	# paralelos — ver CombatBoard.ADVANCE_ORDER). Sob a sequência única, o
+	# "bloqueador" na Posição 3 NÃO é fixo — ele mesmo é uma Classe
+	# convencional (Barreira) sujeita à regra geral (5.2.1) e, com a
+	# Posição 2 e a Posição 1 livres, também avança até a posição mais
+	# avançada disponível na mesma Fase. Reformulado: o bloqueador agora
+	# começa JÁ na Posição 1 (única posição sem nada à frente dela na
+	# sequência, portanto genuinamente fixo), e o teste passa a validar
+	# exatamente o achado da auditoria — a MdG atravessa numa única Fase o
+	# que antes eram fronteiras de coluna (Posição 9, antiga Coluna C, até
+	# a Posição 2, antiga Coluna B), parando só ao encontrar o bloqueador
+	# genuinamente fixo na Posição 1.
 	var mdg_state := CombatState.new()
 	var mdg_card: CardResource = _build_combat_card("Teste-MdG", "Máquina de Guerra", 100, 100, 20)
-	var mdg_unit := CombatUnit.new(mdg_card, 0, 9)  # Posição 4 (coluna C) livre de propósito
-	var mdg_blocker := CombatUnit.new(_build_combat_card("Teste-Bloqueador", "Barreira", 50, 100, 50), 0, 3)
+	var mdg_unit := CombatUnit.new(mdg_card, 0, 9)
+	var mdg_blocker := CombatUnit.new(_build_combat_card("Teste-Bloqueador", "Barreira", 50, 100, 50), 0, 1)
 	mdg_state.units = [mdg_unit, mdg_blocker]
-	print("  B) Máquina de Guerra pode avançar (posição 4 livre)? %s (esperado: true)" % str(
+	print("  B) Máquina de Guerra pode avançar (posição 8 livre)? %s (esperado: true)" % str(
 		CombatEngine._can_advance(mdg_state, mdg_unit)
 	))
-	ctx.check(CombatEngine._can_advance(mdg_state, mdg_unit) == true, "B) Máquina de Guerra deve poder avançar com a posição 4 livre")
+	ctx.check(CombatEngine._can_advance(mdg_state, mdg_unit) == true, "B) Máquina de Guerra deve poder avançar com a posição 8 livre")
 	CombatEngine._movement_phase(mdg_state)
-	print("     Avançou de 9 para 4 de verdade (parou ali por causa do bloqueador na Posição 3)? %s (posição atual: %d, esperado: 4)" % [
-		str(mdg_unit.position == 4), mdg_unit.position
+	print("     Avançou de 9 para 2 de verdade, atravessando a antiga fronteira de Coluna (parou ali por causa do bloqueador genuinamente fixo na Posição 1)? %s (posição atual: %d, esperado: 2)" % [
+		str(mdg_unit.position == 2), mdg_unit.position
 	])
-	ctx.check(mdg_unit.position == 4, "B) Máquina de Guerra deve avançar de 9 para 4 e parar no bloqueador da Posição 3 (obtido: %d)" % mdg_unit.position)
+	ctx.check(mdg_unit.position == 2, "B) Máquina de Guerra deve avançar de 9 até a Posição 2 numa única Fase e parar no bloqueador da Posição 1 (obtido: %d)" % mdg_unit.position)
+	ctx.check(mdg_blocker.position == 1, "B) Bloqueador já iniciava na Posição 1 (nada à frente dela) e deve permanecer ali")
 
-	# --- C-H: Cadeia de Bloqueio do Suporte (Coluna A: 1 frente, 6 meio, 7 fundo) ---
+	# --- C-H: Cadeia de Bloqueio do Suporte, na sequência espacial única
+	# (ADVANCE_ORDER: ...,7,6,5,...). ATUALIZADO (auditoria de
+	# movimentação do Suporte, 2026-09-01): E, F, G e H usavam a Posição 1
+	# como o elo mais à frente da cadeia de 3 unidades — válido sob a
+	# antiga adjacência de Coluna A (1-6-7), mas a Posição 1 NÃO é mais
+	# adjacente à Posição 6 na sequência única (a real "posição atrás" de
+	# 1 agora é a Posição 2 — CombatBoard.support_position_behind()).
+	# Remapeado para 5-6-7 (consecutivos em ADVANCE_ORDER nos dois
+	# modelos), preservando exatamente a mesma intenção de cada teste. C e
+	# D já usavam só 6-7, que continuam adjacentes sob a sequência única
+	# (por isso não precisaram mudar).
 	var chain_state := CombatState.new()
 
 	var c_support := CombatUnit.new(_build_combat_card("C-Suporte", "Suporte", 30, 80, 10), 0, 6)
@@ -95,7 +118,7 @@ static func run(ctx: TestRunner.Context) -> bool:
 	))
 	ctx.check(CombatEngine._can_advance(chain_state, d_support_1) == true, "D) Suporte -> Suporte deve avançar normalmente")
 
-	var e_support_1 := CombatUnit.new(_build_combat_card("E-Suporte-1", "Suporte", 30, 80, 10), 0, 1)
+	var e_support_1 := CombatUnit.new(_build_combat_card("E-Suporte-1", "Suporte", 30, 80, 10), 0, 5)
 	var e_support_2 := CombatUnit.new(_build_combat_card("E-Suporte-2", "Suporte", 30, 80, 10), 0, 6)
 	var e_machine := CombatUnit.new(_build_combat_card("E-MdG", "Máquina de Guerra", 100, 100, 20), 0, 7)
 	chain_state.units = [e_support_1, e_support_2, e_machine]
@@ -104,7 +127,7 @@ static func run(ctx: TestRunner.Context) -> bool:
 	))
 	ctx.check(CombatEngine._can_advance(chain_state, e_support_1) == true, "E) Suporte -> Suporte -> Máquina de Guerra deve avançar normalmente (recursão através do Suporte, terminador opaco na Máquina de Guerra)")
 
-	var f_support_1 := CombatUnit.new(_build_combat_card("F-Suporte-1", "Suporte", 30, 80, 10), 0, 1)
+	var f_support_1 := CombatUnit.new(_build_combat_card("F-Suporte-1", "Suporte", 30, 80, 10), 0, 5)
 	var f_support_2 := CombatUnit.new(_build_combat_card("F-Suporte-2", "Suporte", 30, 80, 10), 0, 6)
 	var f_support_3 := CombatUnit.new(_build_combat_card("F-Suporte-3", "Suporte", 30, 80, 10), 0, 7)
 	chain_state.units = [f_support_1, f_support_2, f_support_3]
@@ -113,7 +136,7 @@ static func run(ctx: TestRunner.Context) -> bool:
 	))
 	ctx.check(CombatEngine._can_advance(chain_state, f_support_1) == true, "F) Suporte -> Suporte -> Suporte deve avançar normalmente")
 
-	var g_support_1 := CombatUnit.new(_build_combat_card("G-Suporte-1", "Suporte", 30, 80, 10), 0, 1)
+	var g_support_1 := CombatUnit.new(_build_combat_card("G-Suporte-1", "Suporte", 30, 80, 10), 0, 5)
 	var g_support_2 := CombatUnit.new(_build_combat_card("G-Suporte-2", "Suporte", 30, 80, 10), 0, 6)
 	var g_ranged := CombatUnit.new(_build_combat_card("G-Distancia", "À Distância", 80, 70, 10), 0, 7)
 	chain_state.units = [g_support_1, g_support_2, g_ranged]
@@ -127,7 +150,7 @@ static func run(ctx: TestRunner.Context) -> bool:
 	))
 	ctx.check(CombatEngine._can_advance(chain_state, g_ranged) == true, "G) À Distância nunca é bloqueado pela regra de Classe do Suporte")
 
-	var h_support := CombatUnit.new(_build_combat_card("H-Suporte", "Suporte", 30, 80, 10), 0, 1)
+	var h_support := CombatUnit.new(_build_combat_card("H-Suporte", "Suporte", 30, 80, 10), 0, 5)
 	var h_machine := CombatUnit.new(_build_combat_card("H-MdG", "Máquina de Guerra", 100, 100, 20), 0, 6)
 	var h_ranged := CombatUnit.new(_build_combat_card("H-Distancia", "À Distância", 80, 70, 10), 0, 7)
 	chain_state.units = [h_support, h_machine, h_ranged]
@@ -164,12 +187,22 @@ static func run(ctx: TestRunner.Context) -> bool:
 	ctx.check(army_a.has_support_at_position_5() == false, "I) Exército sem Suporte na Posição 5 não deve gerar falso positivo")
 
 	# --- J: pelotão convencional que CHEGA na Posição 5 via movimento perde a ação ---
-	# Bloqueador na Posição 2 (frente da Coluna B) de propósito, pelo
-	# mesmo motivo do Teste B — isola a chegada exatamente na Posição 5.
+	# ATUALIZADO (auditoria de movimentação, 2026-09-01): um único
+	# bloqueador na "frente da antiga Coluna B" não isola mais nada sob a
+	# sequência espacial única (5.2.1/CombatBoard.ADVANCE_ORDER) — esse
+	# bloqueador é ele mesmo uma Classe convencional e avançaria embora,
+	# abrindo caminho pra além da Posição 5. A única forma de manter uma
+	# posição genuinamente fixa nesse modelo é encadear pelotões desde a
+	# Posição 1 (a única sem nada à frente dela) até a posição que se
+	# quer travar — por isso a Posição 4 só fica realmente bloqueada com
+	# uma corrente inteira ocupando 1, 2 e 3.
 	var j_state := CombatState.new()
-	var j_ranged := CombatUnit.new(_build_combat_card("J-Distancia", "À Distância", 80, 70, 10), 0, 8)  # Coluna B: 2,5,8
-	var j_blocker := CombatUnit.new(_build_combat_card("J-Bloqueador", "Barreira", 50, 100, 50), 0, 2)
-	j_state.units = [j_ranged, j_blocker]
+	var j_ranged := CombatUnit.new(_build_combat_card("J-Distancia", "À Distância", 80, 70, 10), 0, 6)
+	var j_front_1 := CombatUnit.new(_build_combat_card("J-Frente-1", "Corpo a Corpo", 50, 50, 10), 0, 1)
+	var j_front_2 := CombatUnit.new(_build_combat_card("J-Frente-2", "Corpo a Corpo", 50, 50, 10), 0, 2)
+	var j_front_3 := CombatUnit.new(_build_combat_card("J-Frente-3", "Corpo a Corpo", 50, 50, 10), 0, 3)
+	var j_blocker := CombatUnit.new(_build_combat_card("J-Bloqueador", "Barreira", 50, 100, 50), 0, 4)
+	j_state.units = [j_ranged, j_front_1, j_front_2, j_front_3, j_blocker]
 	CombatEngine._movement_phase(j_state)
 	print("  J) Pelotão convencional que chega na Posição 5 via movimento entra em Reorganização (perde a ação no turno)? %s (posição: %d, esperado: true, 5)" % [
 		str(j_ranged.position == 5 and j_ranged.is_reorganizing_this_turn), j_ranged.position

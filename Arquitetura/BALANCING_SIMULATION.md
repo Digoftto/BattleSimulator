@@ -305,6 +305,62 @@ Fórmula: $C(n) = 20 \times (50 + n^2 + xn)$.
 
 ---
 
+# Simulação 4 — Correção do Pool Global de PG (FASE 21.3.2)
+
+## Objetivo da Simulação
+
+A Simulação 2 (Etapa 2, "Consequências e Observações de Design") já registrava, como limitação conhecida e não corrigida: *"a alocação de PG é tratada aqui como se cada Trilha tivesse seu próprio orçamento de 1,3 PG/dia... se as 3 Trilhas competem pelo mesmo 1,3 PG/dia (não 1,3 cada), os níveis calculados nesta simulação ficam otimistas por um fator de até 3x."* `GENERATION_POINTS.md` confirma: PG é um único recurso global do Reino, nunca um orçamento por Trilha. A auditoria da FASE 21 (item C.10) reabriu esse ponto explicitamente. Esta simulação refaz a Etapa 1 da Simulação 2 com essa correção, e propaga o impacto para os orçamentos das Construções Institucionais (Simulação 2/3).
+
+Esta correção também é habilitada, pela primeira vez, pela FASE 21.3.1: antes dela, `MineEvolutionResolver` recusava qualquer evolução de Mina Regional — os níveis "atingidos" na Simulação 2/Etapa 1 (Mina 500 no Nível 27, por exemplo) eram, até esta fase, **matematicamente simulados mas impossíveis de alcançar em jogo**. A generalização do resolver torna esses números finalmente reais, o que torna a correção do pool de PG abaixo relevante de verdade (não apenas teórica).
+
+## Método
+
+Reaproveita exatamente o cronograma de conquista de Minas da Simulação 2/Etapa 1 (mesmos dias de conquista, mesma regra "PG dividido igualmente entre as Minas já conquistadas daquela Trilha") e as mesmas fórmulas reais de código (`MineEconomy.upgrade_cost_pg()`/`base_production_per_hour()`), mas com uma simulação dia-a-dia (acúmulo incremental de PG por Mina, evoluindo assim que o custo do próximo nível é atingido) em vez do método de cálculo da Etapa 1 original (não documentado passo-a-passo). **Nota de transparência:** essa diferença de método reproduz a Mina "500" no Nível 31 (não 27) para o cenário "1,3 PG/dia dedicados a 1 Trilha" — uma diferença de ~13% em relação ao número já publicado na Simulação 2, atribuível ao método de acúmulo dia-a-dia aqui usado vs. o método original (não documentado). Não invalida a correção proposta abaixo, que depende das **proporções relativas** entre cenários, não do valor absoluto de um método específico.
+
+Três cenários de alocação do único pool global (1,3 PG/dia, `Arquitetura/FORMULAS.md`, "Progressão da Conta"), refletindo como um jogador real provavelmente distribui PG entre até 3 Trilhas simultâneas:
+
+| Cenário | PG/dia efetivo para ESTA Trilha | Interpretação |
+|---|---:|---|
+| Conservador | 0,433 (1,3 ÷ 3) | Jogador progride as 3 Trilhas ao mesmo tempo, dividindo igualmente |
+| Médio | 0,65 (1,3 ÷ 2) | Jogador foca 2 das 3 Trilhas por vez |
+| Acelerado | 1,3 (1,3 ÷ 1) | Jogador foca 1 Trilha por vez (idêntico à premissa original da Simulação 2) |
+
+## Resultado — Produção de Recursos de Construção por Trilha, aos 180 dias
+
+| Cenário | Produção/dia desta Trilha | % do valor assumido pela Simulação 2 |
+|---|---:|---:|
+| Conservador | 6.312 | 50,8% |
+| Médio | 7.992 | 64,3% |
+| Acelerado (= premissa original) | 12.432 | 100% |
+
+**Achado central:** mesmo no cenário mais otimista de foco total numa única Trilha por vez ("Acelerado"), o valor bate com a Simulação 2 apenas porque essa é exatamente a mesma premissa (foco exclusivo). Qualquer jogador que realmente progrida em mais de uma Trilha ao mesmo tempo — o comportamento mais provável, já que o World Map Gate expõe as 3 Trilhas desde o início — produz **metade a dois terços** dos Recursos de Construção que a Simulação 2/Etapa 2 assumiu ao derivar o total de 77.400/dia e os orçamentos das 4 Construções Institucionais.
+
+## Impacto no Payback das Construções Institucionais (Simulação 3, valores `b`/`x` VIGENTES)
+
+Como o custo acumulado de cada nível é fixo (`C(n) = 20×(50+n²+xn)`, `b`/`x` inalterados) e o "dia estimado" é `custo acumulado ÷ orçamento diário`, o dia estimado escala linearmente com o inverso da razão de produção acima (Conservador: ×1,969; Médio: ×1,555):
+
+| Nível | Capital (vigente) | Capital (Conservador) | Capital (Médio) | Núcleo de Energia (vigente) | Núcleo (Conservador) | Núcleo (Médio) |
+|---:|---:|---:|---:|---:|---:|---:|
+| 10 | dia 55,0 | dia 108,3 | dia 85,5 | dia 54,4 | dia 107,1 | dia 84,6 |
+| 15 | dia 121,6 | dia 239,4 | dia 189,1 | dia 120,0 | dia 236,3 | dia 186,6 |
+| 20 | dia 214,9 | dia 423,1 | dia 334,2 | dia 211,5 | dia 416,4 | dia 328,9 |
+
+(Centro de Comando e Academia escalam pela mesma razão — omitidos por brevidade, mesma conclusão.)
+
+**Consequência:** sob o cenário Conservador (o mais realista para um jogador que já usa o World Map Gate para alternar entre Trilhas, comportamento que o próprio jogo incentiva), nenhuma das 4 Construções Institucionais atinge o Nível 15 dentro de uma única Temporada de 180 dias (MINES.md/SEASONS.md) — o Nível 15 só chega por volta do dia 236-240, quase uma Temporada e meia depois. Mesmo no cenário Médio, o Nível 15 (dia ~187-192) ultrapassa ligeiramente os 180 dias da Temporada.
+
+## Decisão necessária (não aplicada nesta auditoria)
+
+Esta simulação **não altera** `b`/`x` nem qualquer valor vigente — apenas quantifica o efeito de uma premissa que já estava sinalizada como incorreta. Três caminhos possíveis, cada um uma decisão de design genuína (nenhum foi escolhido aqui):
+
+1. **Aceitar o ritmo mais lento** como o real ritmo do MVP (Temporada de 180 dias não é "terminar todas as Construções no Nível 20", e sim "progredir de forma plausível") — nenhuma mudança de valor necessária, só uma expectativa realista a comunicar (ex: tutorial/UI) em vez de mudar números.
+2. **Recalibrar `x`** das 4 Construções Institucionais para baixo, usando o orçamento corrigido (Conservador ou Médio) como nova base — impacto direto em `FORMULAS.md`/`CAPITAL.md`/`ACADEMY.md`/`COMMAND_CENTER_PROGRESS.md`/`ENERGY_NUCLEUS.md`, e exigiria uma nova rodada de "tentativa e erro" como a Simulação 3 fez.
+3. **Revisar a divisão de PG entre Minas e Depósito** (hoje 80%/20%, Simulação 2) ou entre Trilhas — mudança de comportamento esperado do jogador, não de fórmula.
+
+**DECISÃO DO USUÁRIO NECESSÁRIA** antes de qualquer uma das três. Nenhuma foi aplicada.
+
+---
+
 # Referências
 
 * **ENERGY.md / ENERGY_NUCLEUS.md:** Energia, consumo, recuperação, Núcleo.

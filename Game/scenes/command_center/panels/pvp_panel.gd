@@ -58,7 +58,7 @@ func _build_static_structure() -> void:
 	_root_vbox.add_child(title)
 
 	var back_button := Button.new()
-	back_button.text = "<- Voltar para o Centro de Comando"
+	back_button.text = "<- Voltar para o World Map Gate"
 	back_button.pressed.connect(_on_back_to_command_center_pressed, CONNECT_DEFERRED)
 	_root_vbox.add_child(back_button)
 
@@ -410,4 +410,4 @@ func _result_from_name(result_name: String) -> RankingResolver.Result:
 
 
 func _on_back_to_command_center_pressed() -> void:
-	get_tree().change_scene_to_file.call_deferred("res://scenes/command_center/command_center_panel.tscn")
+	get_tree().change_scene_to_file.call_deferred("res://scenes/world_map_gate/world_map_gate_panel.tscn")

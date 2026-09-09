@@ -54,6 +54,16 @@ func initialize_new_kingdom() -> void:
 func _load_or_create_kingdom() -> Kingdom:
 	var candidate := Kingdom.new()
 	if KingdomSaveService.has_save() and KingdomSaveService.load_into(candidate):
+		# F-020: Expedições salvas dependem de Trilha/Território/Catálogo
+		# (conteúdo do MUNDO, não do Reino) — só podem virar
+		# ExpeditionRuntime de verdade depois que o Mundo estiver
+		# carregado (KingdomSaveService só grava dado cru — ver seu
+		# próprio docstring). Guard de vazio evita o custo de carregar o
+		# Mundo neste ponto do boot para o caso comum (save sem
+		# Expedição ativa).
+		if not candidate._pending_expedition_saves.is_empty():
+			WorldBootstrap.ensure_world_loaded()
+			ExpeditionPersistenceResolver.hydrate_pending(candidate)
 		return candidate
 	return _initialize_fresh_kingdom(candidate)
 

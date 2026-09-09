@@ -7,10 +7,16 @@ extends RefCounted
 ##
 ## Escopo: salva tudo que é permanente do Reino — Comandantes, Cartas,
 ## Exércitos, Squads, Recursos, Minas, Fila de Recrutamento, Registro de
-## Comandantes Regionais, Flags de Progresso. NÃO salva uma Expedição em
-## andamento — ela depende de Trilha/Temporada/Catálogo (conteúdo do
-## Mundo, não do Reino); retomar de onde parou numa Expedição fica para
-## uma Sprint própria.
+## Comandantes Regionais, Flags de Progresso, e (F-020) Expedições
+## ativas. Expedição depende de Trilha/Temporada/Catálogo (conteúdo do
+## Mundo, não do Reino) — que ainda não está carregado no momento em que
+## esta classe roda (KingdomState._load_or_create_kingdom() chama
+## load_into() ANTES de WorldBootstrap.ensure_world_loaded()). Por isso
+## _dict_to_kingdom() apenas empilha o dado cru em
+## Kingdom._pending_expedition_saves; a reconstrução real de
+## ExpeditionRuntime é responsabilidade de
+## ExpeditionPersistenceResolver.hydrate_pending(), chamada depois que o
+## Mundo estiver garantidamente carregado.
 ##
 ## Simplificação conhecida (v1): Cartas e Comandantes não têm um
 ## identificador único hoje — cada ocorrência é salva por valor
@@ -127,9 +133,10 @@ static func _kingdom_to_dict(kingdom: Kingdom) -> Dictionary:
 		"structural_xp_unlocked": kingdom.structural_xp_unlocked.duplicate(),
 		"generation_points": kingdom.generation_points,
 		"raw_resources": kingdom.raw_resources.duplicate(),
+		"building_reserved_resources": kingdom.building_reserved_resources.duplicate(true),
 		"commanders": _commanders_to_array(kingdom.commanders),
 		"cards": _cards_to_array(kingdom.cards),
-		"armies": _armies_to_array(kingdom.armies),
+		"armies": _armies_to_array(kingdom.armies, kingdom.commanders, kingdom.cards),
 		"squads": _squads_to_array(kingdom.squads, kingdom.armies),
 		"planos_campanha": _planos_campanha_to_array(kingdom.planos_campanha, kingdom.armies),
 		"resources": kingdom.resources.duplicate(),
@@ -138,6 +145,12 @@ static func _kingdom_to_dict(kingdom: Kingdom) -> Dictionary:
 		"expired_recruitment_notifications": kingdom.expired_recruitment_notifications.duplicate(),
 		"initial_mines": _mines_to_array(kingdom.initial_mines, kingdom.armies),
 		"territory_mines": _territory_mines_to_dict(kingdom.territory_mines, kingdom.armies),
+		# F-020: Expedições ainda em memória (não hidratadas) somadas às
+		# já ativas — na prática, uma das duas listas está sempre vazia
+		# em jogo real (ver docstring de Kingdom._pending_expedition_saves);
+		# a soma é só uma rede de segurança para um caller que salve sem
+		# passar pelo fluxo normal de KingdomState.
+		"active_expeditions": _expeditions_to_array(kingdom.active_expeditions, kingdom.armies) + kingdom._pending_expedition_saves.duplicate(true),
 		"progress_flags": kingdom.progress_flags.duplicate(),
 		"tutorial_step": kingdom.tutorial_step,
 	}
@@ -278,19 +291,54 @@ static func _cards_to_array(cards: Array[CardResource]) -> Array:
 	return result
 
 
-static func _army_to_dict(army: Army) -> Dictionary:
+## Comandante/Cartas do Exército são salvos por REFERÊNCIA (índice) a
+## Kingdom.commanders/Kingdom.cards sempre que o objeto realmente
+## pertence a um dos dois — nunca mais por cópia de conteúdo nesse caso
+## (era o bug real: duas ocorrências do mesmo objeto, uma em
+## Kingdom.cards e outra dentro de Army.cards, voltavam do disco como
+## duas INSTÂNCIAS diferentes de conteúdo igual; Army.cards.has(carta)/
+## Army.commander == comandante — comparações por identidade usadas em
+## toda a tela do Editor e em Kingdom.disband_army() — paravam de bater
+## depois de qualquer save/load, ver auditoria desta etapa). Mesmo
+## mecanismo de referência por índice já usado por Squad.armies/
+## PlanoCampanha.armies/Mina.guarnicao_army (all_armies.find()).
+##
+## Quando o objeto NÃO está em Kingdom.commanders/Kingdom.cards
+## (fixture de teste que monta um Army isolado sem registrar seus
+## componentes no Reino — ex: CampaignTestFixtures.build_campaign_test_army(),
+## já testado por bootstrap.gd/_validate_kingdom_save_load() esperando
+## o conteúdo completo de volta), cai para o formato de conteúdo
+## completo de sempre — nunca perde o dado por não achar índice.
+static func _card_ref(card: CardResource, all_cards: Array[CardResource]) -> Dictionary:
+	var index: int = all_cards.find(card)
+	if index >= 0:
+		return {"i": index}
+	return {"d": _card_to_dict(card)}
+
+
+static func _card_refs(cards: Array[CardResource], all_cards: Array[CardResource]) -> Array:
+	var result: Array = []
+	for card: CardResource in cards:
+		result.append(_card_ref(card, all_cards))
+	return result
+
+
+static func _commander_ref(commander: CommanderResource, all_commanders: Array[CommanderResource]) -> Dictionary:
+	var index: int = all_commanders.find(commander)
+	if index >= 0:
+		return {"i": index}
+	return {"d": _commander_to_dict(commander)}
+
+
+static func _army_to_dict(army: Army, all_commanders: Array[CommanderResource], all_cards: Array[CardResource]) -> Dictionary:
 	var formations_dict: Dictionary = {}
 	for formation_name: String in army.formations:
-		formations_dict[formation_name] = _cards_to_array(army.formations[formation_name])
-
-	var commander_data: Variant = null
-	if army.commander != null:
-		commander_data = _commander_to_dict(army.commander)
+		formations_dict[formation_name] = _card_refs(army.formations[formation_name], all_cards)
 
 	return {
 		"army_name": army.army_name,
-		"commander": commander_data,
-		"cards": _cards_to_array(army.cards),
+		"commander_ref": _commander_ref(army.commander, all_commanders) if army.commander != null else null,
+		"card_refs": _card_refs(army.cards, all_cards),
 		"formations": formations_dict,
 		"formation_priority": army.formation_priority.duplicate(),
 		"max_energy": army.max_energy,
@@ -299,10 +347,10 @@ static func _army_to_dict(army: Army) -> Dictionary:
 	}
 
 
-static func _armies_to_array(armies: Array[Army]) -> Array:
+static func _armies_to_array(armies: Array[Army], all_commanders: Array[CommanderResource], all_cards: Array[CardResource]) -> Array:
 	var result: Array = []
 	for army: Army in armies:
-		result.append(_army_to_dict(army))
+		result.append(_army_to_dict(army, all_commanders, all_cards))
 	return result
 
 
@@ -407,6 +455,50 @@ static func _territory_mines_to_dict(territory_mines: Dictionary, all_armies: Ar
 	return result
 
 
+## Expedição salva por dado plano (F-020): Trilha/Território/Catálogo
+## nunca são serializados aqui — são reconstruídos a partir de
+## "season_id"/"territory_id" por ExpeditionPersistenceResolver, quando
+## o Mundo já estiver carregado. squad.armies referenciado por índice em
+## all_armies, mesmo mecanismo já usado por _squads_to_array()/_mina_to_dict().
+## fase_history usa chaves String (str(fase)) porque JSON sempre grava
+## chaves de Dictionary como String — convertidas de volta a int só na
+## reconstrução (ExpeditionPersistenceResolver).
+static func _expedition_to_dict(expedition: ExpeditionRuntime, all_armies: Array[Army]) -> Dictionary:
+	var army_indices: Array = []
+	for army: Army in expedition.squad.armies:
+		army_indices.append(all_armies.find(army))
+
+	var fase_history_dict: Dictionary = {}
+	for fase: int in expedition.fase_history:
+		fase_history_dict[str(fase)] = expedition.fase_history[fase]
+
+	return {
+		"season_id": expedition.season_catalog.season_id,
+		"territory_id": expedition.territory.id,
+		"expedition_seed": expedition.expedition_seed,
+		"current_fase": expedition.current_fase,
+		"last_acampamento_fase": expedition.last_acampamento_fase,
+		"status": expedition.status,
+		"acampamento_policy": expedition.acampamento_policy,
+		"energy_recovery_threshold_percent": expedition.energy_recovery_threshold_percent,
+		"is_waiting_at_acampamento": expedition.is_waiting_at_acampamento,
+		"last_tick_unix": expedition.last_tick_unix,
+		"history_log": expedition.history_log.duplicate(),
+		"fase_history": fase_history_dict,
+		"squad": {
+			"army_indices": army_indices,
+			"active_index": expedition.squad.active_index,
+		},
+	}
+
+
+static func _expeditions_to_array(expeditions: Array[ExpeditionRuntime], all_armies: Array[Army]) -> Array:
+	var result: Array = []
+	for expedition: ExpeditionRuntime in expeditions:
+		result.append(_expedition_to_dict(expedition, all_armies))
+	return result
+
+
 # ------------------------------------------------------------------
 # Dictionary -> Kingdom
 # ------------------------------------------------------------------
@@ -466,6 +558,7 @@ static func _dict_to_kingdom(data: Dictionary, kingdom: Kingdom) -> void:
 	kingdom.academy_pending_chain_tasks = pending_chain_tasks
 	kingdom.generation_points = data.get("generation_points", 0)
 	kingdom.raw_resources = data.get("raw_resources", {}).duplicate()
+	kingdom.building_reserved_resources = data.get("building_reserved_resources", {}).duplicate(true)
 
 	kingdom.commanders.clear()
 	for entry in data.get("commanders", []):
@@ -477,7 +570,16 @@ static func _dict_to_kingdom(data: Dictionary, kingdom: Kingdom) -> void:
 
 	kingdom.armies.clear()
 	for entry in data.get("armies", []):
-		kingdom.armies.append(_dict_to_army(entry))
+		kingdom.armies.append(_dict_to_army(entry, kingdom.commanders, kingdom.cards))
+
+	# GAP FUNCIONAL corrigido nesta etapa: saves anteriores à correção
+	# acima podiam ficar com Comandantes/Cartas presos em EM_EXERCITO
+	# sem nenhum Army real em Kingdom.armies (Kingdom.disband_army()
+	# rodando sobre uma cópia órfã em vez do objeto real — ver
+	# docstring de _card_indices()). Nunca inventa uma regra nova: só
+	# aplica a regra que ARMY.md sempre teve (EM_EXERCITO == pertence a
+	# um Army de verdade) a um estado que já a violava.
+	_repair_orphaned_ownership(kingdom)
 
 	kingdom.squads.clear()
 	for entry in data.get("squads", []):
@@ -517,6 +619,14 @@ static func _dict_to_kingdom(data: Dictionary, kingdom: Kingdom) -> void:
 		for entry in territory_mines_data[territory_id]:
 			mines.append(_dict_to_mina(entry, kingdom.armies))
 		kingdom.territory_mines[territory_id] = mines
+
+	# F-020: só empilha o dado cru — Trilha/Temporada (Mundo) ainda não
+	# está carregado neste ponto. ExpeditionPersistenceResolver.hydrate_pending()
+	# reconstrói ExpeditionRuntime de verdade depois, quando o Mundo já
+	# estiver garantido (KingdomState._load_or_create_kingdom()).
+	kingdom._pending_expedition_saves.clear()
+	for entry: Dictionary in data.get("active_expeditions", []):
+		kingdom._pending_expedition_saves.append(entry)
 
 	kingdom.progress_flags = data.get("progress_flags", {}).duplicate()
 	kingdom.tutorial_step = data.get("tutorial_step", Kingdom.TUTORIAL_STEP_CIDADE)
@@ -730,19 +840,74 @@ static func _dict_to_cards_array(data: Array) -> Array[CardResource]:
 	return result
 
 
-static func _dict_to_army(data: Dictionary) -> Army:
+## Resolve um "ref" ({"i": índice} ou {"d": conteúdo completo}, ver
+## _card_ref()/_commander_ref() no lado de salvar) de volta pro objeto
+## real — a MESMA instância de Kingdom.cards quando "i" está presente
+## (o caso normal de qualquer Exército real do jogador), ou uma cópia
+## nova reconstruída do conteúdo quando "d" está presente (Army isolado
+## de teste, cujo Comandante/Cartas nunca pertenceram a nenhum Kingdom).
+static func _card_from_ref(ref: Dictionary, all_cards: Array[CardResource]) -> CardResource:
+	if ref.has("i"):
+		var index: int = ref.get("i", -1)
+		if index >= 0 and index < all_cards.size():
+			return all_cards[index]
+		return null
+	if ref.has("d"):
+		return _dict_to_card(ref["d"])
+	return null
+
+
+static func _cards_from_refs(refs: Array, all_cards: Array[CardResource]) -> Array[CardResource]:
+	var result: Array[CardResource] = []
+	for ref in refs:
+		if ref is Dictionary:
+			var card: CardResource = _card_from_ref(ref, all_cards)
+			if card != null:
+				result.append(card)
+	return result
+
+
+static func _commander_from_ref(ref: Dictionary, all_commanders: Array[CommanderResource]) -> CommanderResource:
+	if ref.has("i"):
+		var index: int = ref.get("i", -1)
+		if index >= 0 and index < all_commanders.size():
+			return all_commanders[index]
+		return null
+	if ref.has("d"):
+		return _dict_to_commander(ref["d"])
+	return null
+
+
+## "commander_ref"/"card_refs" é o formato atual (ver _card_ref()/
+## _commander_ref() no lado de salvar). "commander"/"cards" (cópia de
+## conteúdo completa, sem nenhuma referência) é só compatibilidade com
+## saves gravados ANTES desta correção — nunca apagados/invalidados, só
+## não recomendados (reintroduzem a mesma perda de identidade que a
+## correção resolve para saves NOVOS).
+static func _dict_to_army(data: Dictionary, all_commanders: Array[CommanderResource], all_cards: Array[CardResource]) -> Army:
 	var army := Army.new()
 	army.army_name = data.get("army_name", "")
 
-	var commander_data: Variant = data.get("commander", null)
-	if commander_data != null:
-		army.commander = _dict_to_commander(commander_data)
+	if data.has("commander_ref"):
+		var commander_ref: Variant = data.get("commander_ref")
+		if commander_ref is Dictionary:
+			army.commander = _commander_from_ref(commander_ref, all_commanders)
+	else:
+		var commander_data: Variant = data.get("commander", null)
+		if commander_data != null:
+			army.commander = _dict_to_commander(commander_data)
 
-	army.cards = _dict_to_cards_array(data.get("cards", []))
+	if data.has("card_refs"):
+		army.cards = _cards_from_refs(data.get("card_refs", []), all_cards)
+	else:
+		army.cards = _dict_to_cards_array(data.get("cards", []))
 
 	var formations_data: Dictionary = data.get("formations", {})
 	for formation_name: String in formations_data:
-		army.formations[formation_name] = _dict_to_cards_array(formations_data[formation_name])
+		if data.has("card_refs"):
+			army.formations[formation_name] = _cards_from_refs(formations_data[formation_name], all_cards)
+		else:
+			army.formations[formation_name] = _dict_to_cards_array(formations_data[formation_name])
 
 	var priority: Array = data.get("formation_priority", [])
 	if not priority.is_empty():
@@ -752,6 +917,35 @@ static func _dict_to_army(data: Dictionary) -> Army:
 	army.current_energy = data.get("current_energy", 0)
 	army.last_energy_sync_unix = data.get("last_energy_sync_unix", 0)
 	return army
+
+
+## Repara estado ORFÃO já persistido por saves anteriores à correção
+## acima: um Comandante/Carta marcado EM_EXERCITO que não pertence a
+## NENHUM Army real de Kingdom.armies (Kingdom.disband_army() operando
+## sobre a cópia órfã de um Exército recarregado liberava só a cópia,
+## nunca o objeto real de Kingdom.commanders/Kingdom.cards — o Army
+## ainda saía de Kingdom.armies corretamente, só a Carta/Comandante
+## ficavam presos). Critério objetivo, nunca uma regra nova: EM_EXERCITO
+## sem nenhum Army que o contenha É uma inconsistência por definição
+## (ARMY.md nunca previu esse terceiro estado).
+static func _repair_orphaned_ownership(kingdom: Kingdom) -> void:
+	var commanders_in_use: Dictionary = {}
+	var cards_in_use: Dictionary = {}
+	for army: Army in kingdom.armies:
+		if army.commander != null:
+			commanders_in_use[army.commander] = true
+		for card: CardResource in army.cards:
+			cards_in_use[card] = true
+
+	for commander: CommanderResource in kingdom.commanders:
+		if commander.ownership_status == CommanderResource.OwnershipStatus.EM_EXERCITO and not commanders_in_use.has(commander):
+			push_warning("KingdomSaveService: Comandante '%s' (RG %d) estava EM_EXERCITO sem nenhum Army real em Kingdom.armies — corrigido para LIVRE." % [commander.commander_name, commander.instance_id])
+			commander.ownership_status = CommanderResource.OwnershipStatus.LIVRE
+
+	for card: CardResource in kingdom.cards:
+		if card.ownership_status == CardResource.OwnershipStatus.EM_EXERCITO and not cards_in_use.has(card):
+			push_warning("KingdomSaveService: Carta '%s' (RG %d) estava EM_EXERCITO sem nenhum Army real em Kingdom.armies — corrigida para LIVRE." % [card.card_name, card.instance_id])
+			card.ownership_status = CardResource.OwnershipStatus.LIVRE
 
 
 static func _dict_to_squad(data: Dictionary, all_armies: Array[Army]) -> Squad:

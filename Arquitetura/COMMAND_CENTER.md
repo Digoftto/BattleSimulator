@@ -41,13 +41,15 @@ permaneçam independentes entre si.
 
 # Missão
 
-O CdC possui cinco responsabilidades principais.
+O CdC possui sete responsabilidades principais.
 
 1. Criar novos Cargos de Comando.
 2. Administrar o recrutamento de comandantes.
 3. Desenvolver comandantes através do treinamento.
 4. Administrar o sistema de Legado.
 5. Registrar permanentemente a história militar do Reino.
+6. Organizar o acesso à montagem e preparação militar dos Exércitos do Reino — o CdC organiza esse acesso, nunca redefine as regras de Formação, Soldo ou Energia (`ARMY.md` continua sendo o único dono das regras de Exército).
+7. Organizar o acesso ao Campo de Prova, ferramenta de preparação tática vinculada ao Exército (`CAMPO_DE_PROVA.md`) — nunca uma construção independente, nunca um destino do World Map Gate.
 
 ---
 
@@ -64,7 +66,7 @@ O Centro de Comando não:
 
 Sua função é exclusivamente administrativa.
 
-> **Nota de esclarecimento (`COMMAND_CENTER_UI.md`):** essa exclusividade administrativa se refere às *regras* de PvP, PvE e Minas — que continuam soberanas em seus respectivos documentos (`RANKING.md`, `PvE.md`, `MINES.md`). O CdC funciona como a **interface operacional** através da qual o jogador organiza e aciona a utilização de seus Comandantes e Exércitos nesses modos. Ele organiza o acesso; nunca decide a regra.
+> **Nota de esclarecimento (`WORLD_MAP_GATE.md`):** essa exclusividade administrativa se refere às *regras* de PvP, PvE e Minas — que continuam soberanas em seus respectivos documentos (`RANKING.md`, `PvE.md`, `MINES.md`). É o **World Map Gate**, não o CdC, quem funciona como a interface operacional através da qual o jogador organiza e aciona a utilização de seus Comandantes e Exércitos nesses 3 modos. O World Map Gate é uma localização própria da Cidade (`CITY.md`) — o CdC não organiza, direta nem indiretamente, o acesso a ele.
 
 ---
 
@@ -313,9 +315,8 @@ O Centro de Comando interage diretamente com:
 
 * Capital;
 * Sistema de Comandantes;
-* PvP;
-* PvE;
-* Minas;
+* Sistema de Exércitos (`ARMY.md`) — o CdC organiza o acesso à montagem/preparação, sem redefinir suas regras;
+* Campo de Prova (`CAMPO_DE_PROVA.md`) — ferramenta de preparação tática vinculada ao Exército, organizada dentro deste fluxo;
 * Sistema de Progressão;
 * Economia;
 * Legado.

@@ -9,6 +9,14 @@ extends RefCounted
 
 var victory: bool = false
 
+## Por que a Tentativa de Fase terminou em derrota (victory == false).
+## NONE quando victory == true. Reflete o motivo do último Exército
+## percorrido: COMBAT_LOSS se ele perdeu combate real com Energia
+## disponível, ENERGY_EXHAUSTED se ficou sem Energia antes de esgotar
+## suas Formações. Escrito exclusivamente por PhaseResolver.resolve().
+enum DefeatReason { NONE, COMBAT_LOSS, ENERGY_EXHAUSTED }
+var defeat_reason: DefeatReason = DefeatReason.NONE
+
 ## Índice (em squad.armies) do Exército que obteve a vitória, ou -1 se
 ## nenhum venceu.
 var winning_army_index: int = -1

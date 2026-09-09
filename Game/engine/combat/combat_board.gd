@@ -56,7 +56,11 @@ static func front_neighbor(position: int) -> int:
 
 
 ## Retorna as posições "atrás" (mais ao fundo) da posição informada, na
-## mesma coluna — usado pela exceção de movimento da Classe Suporte (5.2.3).
+## MESMA COLUNA — geometria própria da habilidade "Sacrifício de Carne"
+## (ABILITIES.md/CARD_CATALOG.md: "Pelotão aliado imediatamente atrás na
+## mesma coluna"), que define sua Classe de alvo dessa forma
+## independentemente de como a Fase de Avanço move as unidades. NÃO usar
+## para a Cadeia de Bloqueio do Suporte (6.5) — ver support_position_behind().
 static func positions_behind(position: int) -> Array[int]:
 	var column: Array = column_of(position)
 	var index: int = column.find(position)
@@ -64,3 +68,20 @@ static func positions_behind(position: int) -> Array[int]:
 	for i in range(index + 1, column.size()):
 		behind.append(column[i])
 	return behind
+
+
+## Retorna a posição imediatamente ATRÁS de "position" na sequência
+## espacial única de avanço (ADVANCE_ORDER, COMBAT_RULES.md 5.2.1), ou -1
+## se não houver nenhuma (Posição 9 é o fundo absoluto da sequência —
+## nada pode estar "atrás" dela). Usada exclusivamente pela Cadeia de
+## Bloqueio do Suporte (6.5), que verifica "a posição imediatamente atrás
+## dele" dentro da MESMA Fase de Avanço de 5.2.1 (5.2.3: a regra do
+## Suporte é uma exceção que sobrescreve a regra geral, nunca um
+## mecanismo geométrico independente) — não confundir com
+## positions_behind()/column_of() acima, que continuam corretos para
+## "Sacrifício de Carne" (regra própria, deliberadamente por coluna).
+static func support_position_behind(position: int) -> int:
+	var index: int = ADVANCE_ORDER.find(position)
+	if index <= 0:
+		return -1
+	return ADVANCE_ORDER[index - 1]

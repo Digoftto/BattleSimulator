@@ -1,5 +1,7 @@
 # CAMPO DE PROVA
 
+> **A especificação canônica está em `Arquitetura/CAMPO_DE_PROVA.md`.** Este arquivo permanece aqui como registro histórico da concepção original (não-canônico, `PROJECT_INDEX.md`); a decisão de acesso (Centro de Comando, dentro do fluxo de Exércitos) e o estado real de implementação vivem exclusivamente no documento promovido.
+
 ## Objetivo
 
 O Campo de Prova é uma ferramenta de preparação tática onde o jogador observa o

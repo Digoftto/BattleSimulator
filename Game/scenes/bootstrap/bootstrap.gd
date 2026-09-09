@@ -1070,8 +1070,7 @@ func _validate_battle_history_shows_formations() -> void:
 
 	var panel: Control = load("res://scenes/command_center/panels/comandantes_panel.tscn").instantiate()
 	add_child(panel)
-	panel._selected_history_commander = commander
-	panel._refresh_historico()
+	panel._on_view_history_pressed(commander)
 
 	var text_dump: String = _dump_all_labels(panel)
 	print("  Mostra as cartas do próprio Exército (ex: 'Aliado 1')? %s | Mostra as do inimigo (ex: 'Inimigo 1')? %s (esperado: true, true)" % [
@@ -1598,8 +1597,12 @@ func _validate_minas_panel_ui() -> void:
 	var panel: Control = panel_scene.instantiate()
 	add_child(panel)
 
+	# FASE 17: minas_panel.gd passou a nomear a Mina Inicial pela sua
+	# identidade real (INITIAL_MINE_NAMES, DL_MINES.md) em vez do texto
+	# genérico "Mina Inicial" — "mina" aqui é Império (Mina.new(-1,
+	# "Império")), então o nome real é "Mina de Ferro Negro".
 	print("  Painel mostra a Mina conquistada? %s (esperado: true)" % str(
-		_panel_contains_text(panel, "Mina Inicial")
+		_panel_contains_text(panel, "Mina de Ferro Negro")
 	))
 
 	# ART-004: arte real da Mina Inicial (Império -> ferro_negro) deve
@@ -1666,12 +1669,14 @@ func _validate_minas_panel_ui() -> void:
 	panel.queue_free()
 
 
-## Validação FUNCIONAL (sem renderização) da janela de PvE: injeta uma
-## Expedição real (mesmo padrão de _validate_expedition_runtime), com
-## Squad de 2 Exércitos — confirma que a tela mostra Território/Fase/
-## Squad, que "Tentar Fase Atual" avança de verdade, que os botões de
-## reordenar a Ordem de Substituição só funcionam quando parado num
-## Acampamento, e que "Continuar" retoma a marcha de verdade.
+## Validação FUNCIONAL (sem renderização) da janela de PvE — F-020:
+## injeta uma Expedição real (mesmo padrão de _validate_expedition_runtime),
+## com Squad de 3 Exércitos — confirma que a tela SELECTION lista a
+## Expedição, que entrar no Mapa (TRILHA_MAP) já dispara a 1ª tentativa
+## automática sozinha (sem clique manual — ExpeditionTickResolver, F-020
+## decisão 9), que o overlay de Acampamento mostra o Squad e "Continuar
+## Expedição", que reordenar só funciona parado no Acampamento, e que
+## "Continuar" retoma a marcha de verdade.
 func _validate_pve_panel_ui() -> void:
 	print("[UI] Validando PvEPanel (funcional, sem renderização)...")
 
@@ -1716,45 +1721,37 @@ func _validate_pve_panel_ui() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 
-	print("  Painel mostra o Território e os 2 Exércitos do Squad? %s (esperado: true)" % str(
-		_panel_contains_text(panel, "UI-PvE-Territorio-Teste") and _panel_contains_text(panel, "UI PvE Exército 1") and _panel_contains_text(panel, "UI PvE Exército 2")
+	print("  Painel (SELECTION) lista a Expedição injetada, com 'Ver Trilha'? %s (esperado: true)" % str(
+		_panel_contains_text(panel, "UI-PvE-Territorio-Teste") and _panel_contains_text(panel, "Ver Trilha")
 	))
 
-	# ART-003: banner de Trilha (Império, Região 1 — Fase 1) + ícone da
-	# categoria da Fase atual ("comum", Fase 1 não é Chefe nem
-	# Acampamento) devem ter carregado de verdade, sem quebrar o texto
-	# que já funcionava acima.
-	print("  ART-003: arte de Trilha + ícone de Fase (Território Império, Fase 1 = comum) carregaram de verdade no painel? %s (%d texturas carregadas na árvore, esperado: >= 2)" % [
+	# F-020: entrar no Mapa já dispara a 1ª tentativa automática sozinha
+	# (ExpeditionTickResolver, dentro de GameRuntime.sync() -> refresh()) —
+	# last_tick_unix == 0 na criação faz a 1ª sincronização tentar
+	# imediatamente, sem nenhum clique manual.
+	panel._on_view_expedition_pressed(expedition)
+	await get_tree().process_frame
+
+	# ART-003: banner de Trilha + ícones de Fase da janela virtualizada
+	# devem ter carregado de verdade, sem quebrar a listagem acima.
+	print("  ART-003: arte de Trilha + ícones de Fase carregaram de verdade no Mapa? %s (%d texturas carregadas na árvore, esperado: >= 2)" % [
 		str(_count_loaded_textures(panel) >= 2), _count_loaded_textures(panel)
 	])
-	print("  Exército sem army_name (3º da lista) mostra um rótulo de fallback ('Exército 3'), nunca vazio? %s (esperado: true, F-009)" % str(
-		_panel_contains_text(panel, "Exército 3")
-	))
-
-	# F-047: _on_attempt_fase_pressed() agora reproduz visualmente cada
-	# combate real (CombatReplayView) antes de mostrar o Resultado —
-	# precisa de await (senão as checagens abaixo rodariam antes da
-	# reprodução terminar, e panel.queue_free() mais abaixo destruiria
-	# o painel com a corrotina ainda suspensa). O painel real usa o
-	# ritmo humano padrão (0.6s/evento); aqui a validação seta
-	# replay_speed_override = 0.0 no próprio painel ANTES de disparar a
-	# tentativa, senão esta única validação levaria vários segundos
-	# reais de parede.
-	panel.replay_speed_override = 0.0
-	await panel._on_attempt_fase_pressed(expedition)
-	print("  Após 'Tentar Fase Atual' -> Fase avançou de verdade? %s (esperado: true, Fase 2)" % str(expedition.current_fase == 2))
-	print("  Após 'Tentar Fase Atual' -> resultado (Vitória/Derrota) aparece de verdade na tela, não só no log? %s (esperado: true, F-003)" % str(
-		_panel_contains_text(panel, "Vitória!")
+	print("  Ao entrar no Mapa, a 1ª tentativa automática já aconteceu sozinha (sem clique manual, F-020 decisão 9)? %s (esperado: true, Fase 2)" % str(
+		expedition.current_fase == 2
 	))
 
 	# Força um Acampamento com Política "Aguardar Ordem", pra testar
-	# reordenar o Squad e o botão "Continuar" de forma determinística
+	# reordenar o Squad e "Continuar Expedição" de forma determinística
 	# (sem depender de calcular em qual Fase real cairia um Acampamento).
 	expedition.acampamento_policy = ExpeditionRuntime.AcampamentoPolicy.AGUARDAR_ORDEM
 	expedition.establish_acampamento()
-	panel.refresh()
-	print("  No Acampamento -> painel mostra 'Continuar'? %s (esperado: true)" % str(
-		_panel_contains_text(panel, "Continuar")
+	panel._open_camp_overlay(expedition)
+	print("  Overlay de Acampamento mostra o Território e os 3 Exércitos do Squad? %s (esperado: true, F-009: 3º sem army_name mostra 'Exército 3')" % str(
+		_panel_contains_text(panel, "UI PvE Exército 1") and _panel_contains_text(panel, "UI PvE Exército 2") and _panel_contains_text(panel, "Exército 3")
+	))
+	print("  Overlay de Acampamento mostra 'Continuar Expedição'? %s (esperado: true)" % str(
+		_panel_contains_text(panel, "Continuar Expedição")
 	))
 
 	panel._on_move_army_pressed(expedition, 0, 1)
@@ -1762,8 +1759,8 @@ func _validate_pve_panel_ui() -> void:
 		expedition.squad.armies[0] == army_2
 	))
 
-	panel._on_resume_pressed(expedition)
-	print("  Após 'Continuar' -> Expedição não está mais aguardando? %s (esperado: true)" % str(
+	panel._on_camp_continue_pressed(expedition)
+	print("  Após 'Continuar Expedição' -> Expedição não está mais aguardando? %s (esperado: true)" % str(
 		not expedition.is_waiting_at_acampamento
 	))
 
@@ -2102,22 +2099,55 @@ func _validate_academia_panel() -> void:
 	else:
 		print("  (não achou uma tarefa não iniciada pra cancelar — todos os Mestres já estavam ocupados de novo)")
 
-	# --- A tela em si ---
-	var panel: Control = load("res://scenes/city/panels/academia_panel.tscn").instantiate()
-	add_child(panel)
+	# --- As telas em si (hub + Salão dos Artífices) ---
+	# A Academia deixou de ser uma tela única de texto (era
+	# academia_panel.gd antes desta tarefa) e virou um hub visual
+	# (academia_v1.png + 3 hotspots) com 3 telas próprias, cada uma
+	# usando sua arte-template oficial (academia_artifice.png/
+	# academia_metamorfo.png/academia_upgrade.png) — mesmo padrão do
+	# Depósito/Núcleo de Energia. As checagens abaixo migram para a
+	# mesma divisão: o hub só precisa expor os 3 hotspots; os campos de
+	# Produção (_selected_produce_card/_produce_quantity) agora vivem em
+	# academia_producao_panel.gd — sem botão "Prever" nem _preview_label
+	# (a arte-template não desenha um botão de prever; o preview
+	# recalcula automaticamente a cada refresh()).
+	var hub_panel: Control = load("res://scenes/city/panels/academia_panel.tscn").instantiate()
+	add_child(hub_panel)
 
-	print("  Painel mostra o Nível da Academia e os Fragmentos? %s (esperado: true)" % str(
-		_panel_contains_text(panel, "Nível da Academia") and _panel_contains_text(panel, "Fragmentos")
+	var hotspot_names: Array[String] = ["Hotspot_Producao", "Hotspot_Aprimoramento", "Hotspot_Evolucao"]
+	var all_hotspots_found: bool = true
+	for hotspot_name: String in hotspot_names:
+		if hub_panel.find_child(hotspot_name, true, false) == null:
+			all_hotspots_found = false
+			print("  ACADEMIA MISMATCH: hotspot '%s' não encontrado no hub." % hotspot_name)
+	print("  Hub da Academia mostra os 3 hotspots (Produção/Aprimoramento/Evolução)? %s (esperado: true)" % str(all_hotspots_found))
+
+	hub_panel.queue_free()
+
+	# academia_producao_panel.gd passou a usar academia_artifice.png
+	# (arte-template com molduras/rótulos/caixas já desenhados) como
+	# fundo — "Nível da Academia"/"Fragmentos" eram Labels de texto do
+	# painel genérico anterior e não existem mais como Controls (agora
+	# são texto fixo NA PRÓPRIA ARTE, fora do alcance de
+	# _panel_contains_text()). A checagem migra para: a arte carregou
+	# de verdade (ART-003) e o preview automático (sem botão "Prever" —
+	# a arte não desenha um; recalcula a cada refresh()) realmente
+	# preenche um valor de verdade.
+	var producao_panel: Control = load("res://scenes/city/panels/academia_producao_panel.tscn").instantiate()
+	add_child(producao_panel)
+
+	print("  Salão dos Artífices carregou a arte-template de verdade? %s (%d texturas, esperado: >= 1)" % [
+		str(_count_loaded_textures(producao_panel) >= 1), _count_loaded_textures(producao_panel)
+	])
+
+	producao_panel._selected_produce_card = GameDatabase.get_card("Arqueiro Imperial")
+	producao_panel._produce_quantity = 2
+	producao_panel.refresh()
+	print("  Preview automático no Salão dos Artífices preenche o custo de verdade (2x Comum = 100 Fragmentos)? %s (esperado: true)" % str(
+		_panel_contains_text(producao_panel, "100")
 	))
 
-	panel._selected_produce_card = GameDatabase.get_card("Arqueiro Imperial")
-	panel._produce_quantity = 2
-	panel._on_preview_pressed()
-	print("  Botão 'Prever' na tela preenche o resultado de verdade? %s (esperado: true)" % str(
-		panel._preview_label.text != ""
-	))
-
-	panel.queue_free()
+	producao_panel.queue_free()
 
 
 ## Validação FUNCIONAL: uma cadeia de Produção Automática de verdade,
@@ -3612,13 +3642,14 @@ func _validate_tutorial_flow() -> void:
 		kingdom.active_expeditions.size() == 1
 	))
 
+	# F-020: a marcha agora é automática — _on_start_new_expedition_pressed()
+	# já entra direto no Mapa e chama refresh() (-> GameRuntime.sync() ->
+	# ExpeditionTickResolver), que já tentou a Fase 1 sozinha, sem clique
+	# manual (last_tick_unix == 0 na criação -> tenta imediatamente).
+	# Nunca o RNG/regras alterados pra facilitar.
 	var expedition: ExpeditionRuntime = kingdom.active_expeditions[0]
-	# Ritmo instantâneo só pra este teste automatizado (mesmo mecanismo
-	# de _validate_pve_panel_ui()) — nunca usado em jogo real.
-	pve_panel.replay_speed_override = 0.0
-	await pve_panel._on_attempt_fase_pressed(expedition)
-	print("  [5/6] Combate Visual real reproduzido e Resultado exibido na tela (nunca o RNG/regras alterados pra facilitar)? %s (esperado: true)" % str(
-		_panel_contains_text(pve_panel, "Vitória!") or _panel_contains_text(pve_panel, "Derrota.")
+	print("  [5/6] A 1ª tentativa já aconteceu sozinha, sem clique manual (marcha automática, F-020)? %s (esperado: true, Fase avançou ou aguardando no Acampamento)" % str(
+		expedition.current_fase > 1 or expedition.is_waiting_at_acampamento
 	))
 	print("  [5/6] Banner pós-combate (Passo 4, Combate+Resultado+Recompensa combinados) apareceu de verdade? %s (esperado: true)" % str(
 		_panel_contains_text(pve_panel, "Passo 4 de 4")

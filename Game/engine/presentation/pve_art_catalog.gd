@@ -81,3 +81,23 @@ static func fase_category_for_expedition(expedition: ExpeditionRuntime) -> Strin
 			return "chefe_normal"
 		_:
 			return "comum"
+
+
+## Deriva "fase_category" para uma Fase QUALQUER da Trilha (não só a
+## atual de uma Expedição) — necessário pro Mapa de Trilha (F-020), que
+## mostra uma janela de Fases ao redor da atual, não só ela. Ao
+## contrário de fase_category_for_expedition() (que usa o ESTADO
+## is_waiting_at_acampamento), aqui não existe "estado" pra uma Fase que
+## não é a atual — usa diretamente Trilha.chefe_type()/is_acampamento(),
+## com a mesma prioridade: Chefe (Normal ou Regional) sempre prevalece
+## sobre Acampamento na mesma Fase (PvE.md — mesma prioridade que
+## Trilha.chefe_type() já aplica entre si).
+static func fase_category_for_fase_number(trilha: Trilha, fase: int) -> String:
+	match trilha.chefe_type(fase):
+		"regional":
+			return "chefe_regional"
+		"normal":
+			return "chefe_normal"
+	if trilha.is_acampamento(fase):
+		return "acampamento"
+	return "comum"

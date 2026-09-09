@@ -153,6 +153,8 @@ validate against SSoT
 - Academy → `Arquitetura/ACADEMY.md`
 - Command Center progression → `Arquitetura/COMMAND_CENTER_PROGRESS.md`
 - PvE → `Arquitetura/PvE.md` and referenced subsystem owners
+- World Map Gate (navigation entry point for PvE/PvP/Mines) → `Arquitetura/WORLD_MAP_GATE.md`
+- Campo de Prova (Army test/preparation tool, accessed via Command Center → Exércitos) → `Arquitetura/CAMPO_DE_PROVA.md`
 - PvP matchmaking → `Arquitetura/MATCHMAKING.md`
 - Ranking → `Arquitetura/RANKING.md`
 - Seasons → `Arquitetura/SEASONS.md`
@@ -176,6 +178,12 @@ validate against SSoT
 ## Resolved decision record
 
 PG scope/ownership previously had conflicting statements across economic systems ("Prestígio Global", "PdG", and a false Mines/Deposits-exclusivity claim). This has been resolved by the project owner: PG is one shared global infrastructure resource (`Pontos de Geração`), not exclusive to any system. Current consumers: Mines, Deposits, Command Center, Academy — the list may grow. SSoT: `Arquitetura/GENERATION_POINTS.md`.
+
+Command Center previously owned the navigation entry point for PvP/PvE/Mines (decision then cited as "F-016/F-017" in `CITY.md`/`COMMAND_CENTER_UI.md`). This has been explicitly reversed by the project owner: the World Map Gate is now that entry point; the Command Center no longer defines those 3 windows. No PvP/PvE/Mines rule, resolver, or save data changed — only navigation ownership. SSoT: `Arquitetura/WORLD_MAP_GATE.md`.
+
+**Second correction:** the World Map Gate's own physical location was initially left reachable only through a button inside the Command Center (a provisional, incorrect placement). The project owner clarified the World Map Gate must be its own City location (a direct hitbox in `city_panel.gd`, same "Consulta" group as Biblioteca/Observatório), never a Command Center window in any form. This has been fixed: `city_panel.gd` now has a `world_map_gate` region over the gate structure already present in `City.png`; `command_center_panel.gd` no longer references it at all. No PvE/PvP/Mines scene, rule, or resolver changed — only the entry point's physical location.
+
+A player-facing "test my Army" system (informally requested as "Campo de Testes") was initially searched for and not found under that name. It was later located as `Ideias/CAMPO_DE_PROVA.md` (a non-canonical proposal) and has since been promoted to `Arquitetura/CAMPO_DE_PROVA.md` — the project owner explicitly decided it belongs to the Command Center, inside the Army preparation flow (Command Center → Exércitos → Editor de Exército → Campo de Prova), never as a World Map Gate destination. No functionality has been implemented — see that document's "Estado de Implementação" section for exactly what exists vs. what remains conceptual. A documentation tension was flagged when `COMMAND_CENTER.md`'s "Missão" (then 5 responsibilities, scoped entirely to Commander administration) did not list Exércitos or Campo de Prova — this has since been resolved: the Missão now lists 7 responsibilities, explicitly adding "organizar o acesso" to Exércitos and to Campo de Prova (never redefining `ARMY.md`'s or `CAMPO_DE_PROVA.md`'s own rules). `CAMPO_DE_PROVA.md`'s own "tensão documental registrada" paragraph still describes the pre-fix state and was intentionally left untouched (out of scope for that correction pass) — a small follow-up update there would bring it in sync.
 
 ## Legacy and audit files
 

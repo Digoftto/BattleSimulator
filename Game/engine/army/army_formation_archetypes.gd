@@ -54,6 +54,7 @@ static func _offensive(base_cards: Array[CardResource]) -> Array[CardResource]:
 	leftovers.append_array(ranged)
 	leftovers.append_array(remaining)
 	_fill_remaining(result, leftovers)
+	_avoid_support_at_position_5(result)
 	return result
 
 
@@ -78,6 +79,7 @@ static func _defensive(base_cards: Array[CardResource]) -> Array[CardResource]:
 	leftovers.append_array(casters)
 	leftovers.append_array(remaining)
 	_fill_remaining(result, leftovers)
+	_avoid_support_at_position_5(result)
 	return result
 
 
@@ -106,6 +108,7 @@ static func _balanced(base_cards: Array[CardResource]) -> Array[CardResource]:
 	leftovers.append_array(back_line)
 	leftovers.append_array(remaining)
 	_fill_remaining(result, leftovers)
+	_avoid_support_at_position_5(result)
 	return result
 
 
@@ -131,7 +134,29 @@ static func _dispersion(base_cards: Array[CardResource]) -> Array[CardResource]:
 	leftovers.append_array(ranged)
 	leftovers.append_array(remaining)
 	_fill_remaining(result, leftovers)
+	_avoid_support_at_position_5(result)
 	return result
+
+
+## GAP ARQUITETURAL CORRIGIDO NESTA ETAPA (rastreado como TECHNICAL_BACKLOG.md
+## F-018, ver Army.has_support_at_position_5()): _fill_remaining() nunca
+## checava Classe ao despejar sobras nas posições vazias — um Suporte podia
+## cair na Posição 5 (índice 4), estruturalmente inválida para batalha
+## (COMBAT_RULES.md 6.5, "Restrição de Posicionamento Inicial": previne a
+## Cadeia de Bloqueio + Penalidade de Reorganização se anularem
+## mutuamente). Correção mínima, chamada ao final de cada Arquétipo: se a
+## Posição 5 ficou com um Suporte, troca com a primeira posição "do meio"
+## disponível (nunca a Posição 1 — já é a escolha deliberada de cada
+## Arquétipo — nem a Posição 9, reservada à Máquina de Guerra).
+static func _avoid_support_at_position_5(result: Array[CardResource]) -> void:
+	if result[4] == null or result[4].card_class != "Suporte":
+		return
+	for i in [1, 2, 3, 5, 6, 7]:
+		if result[i] != null and result[i].card_class != "Suporte":
+			var temp: CardResource = result[4]
+			result[4] = result[i]
+			result[i] = temp
+			return
 
 
 static func _new_empty_board() -> Array[CardResource]:

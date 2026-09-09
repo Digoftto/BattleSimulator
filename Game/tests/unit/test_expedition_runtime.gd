@@ -65,7 +65,11 @@ static func run(ctx: TestRunner.Context) -> bool:
 		losing_squad, trilha, territory, catalog, registry, 778,
 		GameDatabase.battlefields, GameDatabase.abilities_by_name, GameDatabase.unit_traits
 	)
-	expedition_2.current_fase = 50
+	# F-020: Fase 50 é o 2º Acampamento desta Trilha e, desde a decisão 8
+	# (Acampamento comum sem combate), nunca mais dispara uma tentativa
+	# real — usar Fase 51 (comum, não-Acampamento) para exercitar a
+	# derrota de verdade.
+	expedition_2.current_fase = 51
 	expedition_2.attempt_current_fase()  # derrota total esperada
 	print("  Após derrota total -> Fase atual: %d (esperado: %d, o último Acampamento)" % [
 		expedition_2.current_fase, expedition_2.last_acampamento_fase

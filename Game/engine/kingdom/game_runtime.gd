@@ -73,6 +73,13 @@ static func start_new_expedition(
 	if not result["success"]:
 		return {"success": false, "reason": result["reason"], "expedition": expedition}
 
+	# F-020: primeiro call site de produção real de Minas Regionais
+	# (antes só chamado em testes) — determinístico por expedition_seed,
+	# o mesmo já usado para EnemyArmySelector, e idempotente por
+	# territory_id (Kingdom.generate_territory_mines() nunca regenera se
+	# já existir), então nunca corrompe uma Trilha já em progresso.
+	kingdom.generate_territory_mines(territory_id, territory.faction, trilha, expedition_seed)
+
 	# Energia pertence ao Exército, nunca ao Reino (ENERGY.md) — mas sua
 	# Energia Máxima depende do nível do Núcleo do Reino, que Army não
 	# consulta sozinho. Este é o único ponto que conhece Kingdom e
@@ -104,6 +111,11 @@ const BACKGROUND_EFFICIENCY_THREAD_COUNT: int = 2
 
 
 static func sync(kingdom: Kingdom, now_unix: int) -> void:
+	# F-020, Ritmo da Expedição: dispara no máximo 1 tentativa automática
+	# por Expedição ativa, sem catch-up (decisão 10) — ver
+	# ExpeditionTickResolver.
+	ExpeditionTickResolver.sync(kingdom, now_unix)
+
 	RecruitmentResolver.purge_expired_offers(kingdom, now_unix)
 
 	for army: Army in kingdom.armies:

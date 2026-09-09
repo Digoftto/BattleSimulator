@@ -48,9 +48,15 @@ static func resolve(
 	enemy_army.commander = enemy_entry.commander
 	enemy_army.cards = enemy_entry.cards
 
+	var last_army_defeat_reason: PhaseResult.DefeatReason = PhaseResult.DefeatReason.COMBAT_LOSS
+
 	while not squad.is_exhausted():
 		var army: Army = squad.active_army()
 		var army_index: int = squad.active_index
+		# Reiniciado a cada Exército: reflete apenas o motivo do ÚLTIMO
+		# Exército percorrido quando o Squad inteiro se esgota
+		# (result.defeat_reason, abaixo).
+		last_army_defeat_reason = PhaseResult.DefeatReason.COMBAT_LOSS
 
 		for formation_name: String in army.formation_priority:
 			var attempt_army: Army = _build_attempt_army(army, formation_name)
@@ -68,6 +74,7 @@ static func resolve(
 				result.history_log.append("Exército %d sem Energia suficiente para a Formação %s — considerado esgotado." % [
 					army_index + 1, formation_name
 				])
+				last_army_defeat_reason = PhaseResult.DefeatReason.ENERGY_EXHAUSTED
 				break
 
 			result.attempts += 1
@@ -111,6 +118,7 @@ static func resolve(
 		squad.advance_to_next_army()
 
 	result.victory = false
+	result.defeat_reason = last_army_defeat_reason
 	result.history_log.append("Todos os Exércitos do Squad esgotaram todas as Formações ou sua Energia. Fase não conquistada.")
 	return result
 

@@ -7,6 +7,13 @@ extends RefCounted
 ## Academia), contagem de Mestres desbloqueados por Nível, e custo em
 ## PG para melhorar a capacidade de fila de cada Mestre individual.
 
+## Nível Máximo da Academia (ACADEMY.md, "Progressão da Academia") —
+## mesmo papel de EnergyNucleus.MAX_LEVEL. Não fazia parte do código
+## antes desta tarefa (increment_academy_level() não tinha teto);
+## InstitutionalConstructionResolver.evolve() agora bloqueia a Academia
+## neste nível (ver ali).
+const MAX_LEVEL: int = 120
+
 ## Custo em Fragmentos para produzir 1 carta Tier I de cada raridade
 ## (RESOURCES.md, VRP — Valor de Referência de Produção).
 const FRAGMENT_COST: Dictionary = {

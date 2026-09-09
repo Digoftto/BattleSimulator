@@ -44,13 +44,21 @@ static func deposit_level_for_resource(kingdom: Kingdom, resource: String) -> in
 	return 0
 
 
+## Traduz uma Mina (Inicial ou Regional) para o Region correspondente
+## deste enum — única fonte dessa tradução (F-021.3.1: antes só existia
+## inline dentro de base_production_for_mina(); MineEvolutionResolver
+## precisa exatamente da mesma tradução para calcular o custo de
+## evolução de uma Mina Regional, nunca uma segunda cópia).
+static func region_for_mina(mina: Mina) -> Region:
+	if mina.is_initial_mine():
+		return Region.MINA_INICIAL
+	return [Region.REGIAO_1, Region.REGIAO_2, Region.REGIAO_3][mina.region - 1]
+
+
 ## Produção Base por hora de "mina", já resolvendo Mina Inicial vs.
 ## Regional a partir dos próprios dados da Mina (region == 0 = Inicial).
 static func base_production_for_mina(mina: Mina) -> int:
-	if mina.is_initial_mine():
-		return base_production_per_hour(Region.MINA_INICIAL, mina.structure_level)
-	var region: Region = [Region.REGIAO_1, Region.REGIAO_2, Region.REGIAO_3][mina.region - 1]
-	return base_production_per_hour(region, mina.structure_level)
+	return base_production_per_hour(region_for_mina(mina), mina.structure_level)
 ## (FORMULAS.md, "Produção das Minas"):
 ## - Mina Inicial: progressão geométrica P(n) = 2^(n-1), nível máximo 4
 ##   (MINES.md, "Mina Inicial").

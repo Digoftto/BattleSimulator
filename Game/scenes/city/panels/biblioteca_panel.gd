@@ -1,420 +1,273 @@
 extends Control
 ## BibliotecaPanel (LIBRARY.md)
 ##
-## Enciclopédia de Cartas: filtros, lista, página de detalhe (Cabeçalho,
-## Coleção, Atributos por Tier, Habilidades, Origem/Receita,
-## Relacionamentos, Favoritos), Comparação, Estatísticas da Biblioteca.
-## Mesmo padrão das demais janelas: árvore em código, sem estado
-## próprio, reconstruída a cada ação.
+## HUB DE NAVEGAÇÃO da Biblioteca — correção de arquitetura (pedido
+## explícito): "A ARTE É A INTERFACE". Library-V1.png preenche a tela
+## inteira (mesmo padrão AspectRatioContainer(STRETCH_COVER) já usado
+## em CityPanel/CapitalPanel); NENHUMA barra, label ou caixa de filtro
+## é desenhada por cima — só hotspots INVISÍVEIS sobre elementos já
+## presentes na própria arte (pedido §12: Control transparente, nunca
+## um Button visível com texto/fundo).
 ##
-## LACUNAS DE CONTEÚDO (não de regra — nada aqui foi inventado):
-## - "Lore" (LIBRARY.md §3): fonte seria LIBRARY_CONTENT.md, mas
-##   database/library_content/ está vazia — nenhum texto de lore
-##   existe ainda no projeto. Mostra "Lore não disponível ainda."
-## - "Arte Conceitual" (LIBRARY.md §2): nenhuma arte existe ainda
-##   (produção artística em paralelo, fora do escopo desta janela).
-## - "Velocidade" e "Alcance" (LIBRARY.md §5, "Atributos Base"):
-##   CardResource nunca teve esses campos — o motor de combate
-##   implementado usa só HP/Ataque/Defesa (ESC) o jogo inteiro,
-##   confirmado em COMBAT_CORE.md. Não mostrado, por não existir.
-## - "Árvore de Evolução Visual" (LIBRARY.md §10): mostrada como lista
-##   em texto (Produzida a partir de / Utilizada em), não como grafo
-##   visual — mesma limitação de sempre (motor sem renderização daqui).
+## A grade de Cartas, os filtros e o painel de detalhe (implementados
+## numa etapa anterior desta tela) foram REMOVIDOS daqui — essa
+## funcionalidade agora vive inteiramente no Bestiário
+## (bestiario_panel.gd, tela própria), conforme a correção de
+## arquitetura pedida. Nenhum dado/lógica de Carta foi perdido: o
+## Bestiário usa exatamente as mesmas fontes (GameDatabase.cards/
+## Kingdom.cards).
+##
+## Hotspot do Bestiário — CORRIGIDO nesta etapa (pedido explícito de
+## reavaliação, §6: "manter somente se continuar correspondendo"). A
+## mesa/pedestal central usada antes foi reexaminada por zoom e é,
+## claramente, uma mesa de CARTOGRAFIA (pergaminho com mapa + esfera
+## armilar/globo + compasso) — corresponde ao WORLD ATLAS, não ao
+## Bestiário. Nova correspondência encontrada: um dos dois quadros
+## emoldurados na estante superior direita (zoom confirmou um esboço de
+## uma criatura alada, estilo "estudo naturalista") — o quadro vizinho,
+## à direita, mostra uma cena de multidão/batalha, mais compatível com
+## LORE ARCHIVE. Ambas são escolhas razoáveis por inspeção visual
+## direta, não correspondências confirmadas pela intenção original da
+## arte.
+##
+## World Atlas e Lore Archive — ETAPA 3 (pedido explícito §2): agora
+## viram hotspots ATIVOS (Controls invisíveis, mesmo padrão do
+## Bestiário), mas nenhuma das duas telas existe no projeto ainda
+## (nenhuma cena em res://scenes/, reconfirmado). Pedido explícito:
+## "deixar o hotspot preparado... não quebrar a Biblioteca... não
+## navegar para uma tela errada" — cada hotspot tem um destino
+## constante e claro (WORLD_ATLAS_SCENE_PATH/LORE_ARCHIVE_SCENE_PATH);
+## o clique só navega se `ResourceLoader.exists(destino)` for
+## verdadeiro. Enquanto a cena não existir, o clique não faz nada (sem
+## popup, sem tela errada, sem crash) — só o hover chip aparece,
+## confirmando visualmente que o ponto de navegação já está mapeado.
+##
+## Kingdom Codex: não implementado (pedido explícito §9) — não há
+## definição funcional aprovada, e o único candidato visual (os
+## gráficos ramificados nos dois atris à esquerda da cena, estilo
+## árvore genealógica/tecnológica) é ambíguo demais pra associar sem
+## uma decisão de design.
+##
+## Performance (pedido §8): dispara CardArtCatalog.preload_all() assim
+## que a Biblioteca abre — aquece o cache de texturas das 39 Cartas em
+## segundo plano (ResourceLoader threaded, nunca bloqueia esta tela)
+## enquanto o jogador ainda está aqui decidindo se entra no Bestiário.
+## Medido (ver relatório da tarefa): carregar as 39 texturas do disco
+## pela primeira vez é o custo dominante (~2s) de abrir o Bestiário do
+## zero — não um laço ineficiente no código.
 
-var _root_vbox: VBoxContainer
-var _stats_label: Label
-var _list_container: VBoxContainer
-var _detail_container: VBoxContainer
-var _compare_container: VBoxContainer
+const LIBRARY_TEXTURE: Texture2D = preload("res://assets/art/city_buildings/library_v1.png")
+const LIBRARY_IMAGE_ASPECT_RATIO: float = 1672.0 / 941.0
 
-var _filter_faction: String = "(todas)"
-var _filter_rarity: String = "(todas)"
-var _filter_owned_only: bool = false
-var _filter_favorites_only: bool = false
+## Destinos de navegação — mesma convenção de nome de arquivo já usada
+## pelo Bestiário (bestiario_panel.tscn). Nenhuma das duas cenas existe
+## ainda; ver docstring do topo sobre o comportamento "preparado, mas
+## sem destino" enquanto isso não mudar.
+const WORLD_ATLAS_SCENE_PATH: String = "res://scenes/city/panels/world_atlas_panel.tscn"
+const LORE_ARCHIVE_SCENE_PATH: String = "res://scenes/city/panels/lore_archive_panel.tscn"
 
-var _selected_card_name: String = ""
-var _compare_card_name_a: String = ""
-var _compare_card_name_b: String = ""
+const HUD_FONT: Font = preload("res://assets/fonts/Cinzel-SemiBold.ttf")
+const HUD_TEXT_COLOR: Color = Color(0.93, 0.93, 0.90)
+const HUD_OUTLINE_COLOR: Color = Color(0.02, 0.02, 0.02, 0.95)
+const HUD_OUTLINE_SIZE: int = 4
+const HUD_SHADOW_COLOR: Color = Color(0.0, 0.0, 0.0, 0.5)
+const HUD_SHADOW_OFFSET: int = 2
+const HUD_ACCENT: Color = Color(0.75, 0.65, 0.45)
+
+## Quadro emoldurado (esboço de criatura alada) na estante superior
+## direita — recalibrado por inspeção de pixels (varredura de cor de
+## pergaminho isolando os dois quadros da estante, ver relatório da
+## tarefa) sobre Library-V1.png (1672x941). Ver docstring do topo sobre
+## a incerteza dessa escolha.
+const BESTIARIO_HOTSPOT_RECT: Rect2 = Rect2(0.7327, 0.1222, 0.0778, 0.1435)
+
+## World Atlas: mesa central de cartografia (pergaminho-mapa + esfera
+## armilar/globo + compasso) — mesma região já identificada numa etapa
+## anterior, reconfirmada por inspeção visual.
+const WORLD_ATLAS_HOTSPOT_RECT: Rect2 = Rect2(0.30, 0.30, 0.38, 0.38)
+
+## Lore Archive: segundo quadro emoldurado, à direita do quadro do
+## Bestiário (cena de multidão/batalha), na mesma estante — recalibrado
+## por varredura de pixel (cor de pergaminho isolando os dois quadros,
+## ver relatório da tarefa) pra garantir ZERO sobreposição com
+## BESTIARIO_HOTSPOT_RECT (que termina em x=0.7327+0.0778=0.8105; este
+## começa em x=0.8326 — intervalo de ~2.2% da largura entre os dois).
+const LORE_ARCHIVE_HOTSPOT_RECT: Rect2 = Rect2(0.8326, 0.0797, 0.1119, 0.1892)
+
+var _hover_name_container: Control
+var _hover_name_label: Label
+
+## FASE 12: node_name (mesma chave já passada a _build_hotspot()) ->
+## HotspotGlow — sinal luminoso discreto sobre cada hotspot desta tela
+## (mesmo componente já usado na Cidade, ver city_panel.gd).
+var _hotspot_glows: Dictionary = {}
 
 
 func _ready() -> void:
 	if not KingdomState.is_initialized:
 		KingdomState.initialize_new_kingdom()
 
-	refresh()
-	print("[BibliotecaPanel] Pronto. Cartas no catálogo: %d" % GameDatabase.cards.size())
+	CardArtCatalog.preload_all(GameDatabase.cards)
+
+	_build_static_structure()
+	print("[BibliotecaPanel] Pronto.")
 
 
 func _build_static_structure() -> void:
 	var background := ColorRect.new()
-	background.color = Color(0.12, 0.12, 0.16)
+	background.color = Color(0.03, 0.03, 0.05)
 	background.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(background)
 
-	var scroll := ScrollContainer.new()
-	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	add_child(scroll)
+	var library_area := Control.new()
+	library_area.set_anchors_preset(Control.PRESET_FULL_RECT)
+	library_area.clip_contents = true
+	add_child(library_area)
 
-	_root_vbox = VBoxContainer.new()
-	_root_vbox.custom_minimum_size = Vector2(800, 0)
-	_root_vbox.add_theme_constant_override("separation", 16)
-	scroll.add_child(_root_vbox)
+	var aspect := AspectRatioContainer.new()
+	aspect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	aspect.ratio = LIBRARY_IMAGE_ASPECT_RATIO
+	aspect.stretch_mode = AspectRatioContainer.STRETCH_COVER
+	aspect.alignment_horizontal = AspectRatioContainer.ALIGNMENT_CENTER
+	aspect.alignment_vertical = AspectRatioContainer.ALIGNMENT_CENTER
+	library_area.add_child(aspect)
 
-	var title := Label.new()
-	title.text = "Biblioteca"
-	title.add_theme_font_size_override("font_size", 24)
-	_root_vbox.add_child(title)
+	var texture_rect := TextureRect.new()
+	texture_rect.texture = LIBRARY_TEXTURE
+	texture_rect.stretch_mode = TextureRect.STRETCH_SCALE
+	texture_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	texture_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	aspect.add_child(texture_rect)
 
-	var back_button := Button.new()
-	back_button.text = "<- Voltar para a Cidade"
-	back_button.pressed.connect(_on_back_to_city_pressed, CONNECT_DEFERRED)
-	_root_vbox.add_child(back_button)
+	# --- Hotspots invisíveis de navegação (pedido §2/§12/§13) — arte
+	# real, nenhum fundo/borda/texto fixo. Bestiário já existe; World
+	# Atlas/Lore Archive ficam preparados com destino claro, só navegam
+	# se a cena existir (ver docstring do topo). ---
+	_build_hotspot(texture_rect, "Hotspot_Bestiario", BESTIARIO_HOTSPOT_RECT, "Bestiário", "res://scenes/city/panels/bestiario_panel.tscn")
+	_build_hotspot(texture_rect, "Hotspot_WorldAtlas", WORLD_ATLAS_HOTSPOT_RECT, "World Atlas", WORLD_ATLAS_SCENE_PATH)
+	_build_hotspot(texture_rect, "Hotspot_LoreArchive", LORE_ARCHIVE_HOTSPOT_RECT, "Lore Archive", LORE_ARCHIVE_SCENE_PATH)
 
-	_add_section_title("Estatísticas da Coleção")
-	_stats_label = Label.new()
-	_stats_label.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_root_vbox.add_child(_stats_label)
+	# --- Chip de hover (só aparece ao passar o mouse sobre um hotspot
+	# — mesmo padrão Cinzel já usado em Capital/Cidade; nunca um texto
+	# fixo sobre a arte). ---
+	var hover_chip: Dictionary = _build_chip()
+	_hover_name_container = hover_chip["container"]
+	_hover_name_label = hover_chip["label"]
+	_hover_name_container.visible = false
+	_hover_name_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_hover_name_container)
 
-	_add_section_title("Filtros")
-	_build_filters()
+	# --- Voltar para a Cidade — mesmo chip/comportamento já usado na
+	# Capital (duplicado localmente, nunca importado, mesma regra de
+	# sempre deste projeto). ---
+	var back_chip: Dictionary = _build_chip()
+	var back_container: Control = back_chip["container"]
+	var back_label: Label = back_chip["label"]
+	back_label.text = "Voltar para a Cidade"
+	back_container.mouse_filter = Control.MOUSE_FILTER_STOP
+	back_container.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	back_container.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	back_container.position = Vector2(16, 16)
+	back_container.size = back_container.get_combined_minimum_size()
+	back_container.gui_input.connect(_on_back_chip_gui_input)
+	add_child(back_container)
 
-	_add_section_title("Cartas")
-	_list_container = VBoxContainer.new()
-	_list_container.add_theme_constant_override("separation", 4)
-	_root_vbox.add_child(_list_container)
 
-	_add_section_title("Detalhe")
-	_detail_container = VBoxContainer.new()
-	_root_vbox.add_child(_detail_container)
+func _build_chip() -> Dictionary:
+	var chip := PanelContainer.new()
 
-	_add_section_title("Comparação")
-	_compare_container = VBoxContainer.new()
-	_root_vbox.add_child(_compare_container)
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(HUD_ACCENT.r, HUD_ACCENT.g, HUD_ACCENT.b, 0.10)
+	style.border_width_left = 1
+	style.border_width_right = 1
+	style.border_width_top = 1
+	style.border_width_bottom = 1
+	style.border_color = Color(HUD_ACCENT.r, HUD_ACCENT.g, HUD_ACCENT.b, 0.55)
+	style.corner_radius_top_left = 4
+	style.corner_radius_top_right = 4
+	style.corner_radius_bottom_left = 4
+	style.corner_radius_bottom_right = 4
+	style.content_margin_left = 10.0
+	style.content_margin_right = 10.0
+	style.content_margin_top = 5.0
+	style.content_margin_bottom = 5.0
+	chip.add_theme_stylebox_override("panel", style)
 
-
-func _add_section_title(text: String) -> void:
-	var separator := HSeparator.new()
-	_root_vbox.add_child(separator)
 	var label := Label.new()
-	label.text = text
-	label.add_theme_font_size_override("font_size", 18)
-	_root_vbox.add_child(label)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.add_theme_font_override("font", HUD_FONT)
+	label.add_theme_font_size_override("font_size", 14)
+	label.add_theme_color_override("font_color", HUD_TEXT_COLOR)
+	label.add_theme_color_override("font_outline_color", HUD_OUTLINE_COLOR)
+	label.add_theme_constant_override("outline_size", HUD_OUTLINE_SIZE)
+	label.add_theme_color_override("font_shadow_color", HUD_SHADOW_COLOR)
+	label.add_theme_constant_override("shadow_offset_x", HUD_SHADOW_OFFSET)
+	label.add_theme_constant_override("shadow_offset_y", HUD_SHADOW_OFFSET)
+	chip.add_child(label)
+
+	return {"container": chip, "label": label}
 
 
-func _build_filters() -> void:
-	var row := HBoxContainer.new()
-	_root_vbox.add_child(row)
+## Cria um Control invisível sobre `rect` (fração da arte), com hover
+## (chip Cinzel já existente) e clique. `scene_path` é o destino
+## pretendido — se a cena ainda não existir no projeto, o clique não
+## faz nada (nenhuma tela errada, nenhum popup, nenhum crash; pedido
+## §2 "deixar o hotspot preparado... não navegar para uma tela
+## errada"), mas o hover ainda funciona, confirmando visualmente que o
+## ponto de navegação já está mapeado.
+func _build_hotspot(parent: Control, node_name: String, rect: Rect2, hover_text: String, scene_path: String) -> void:
+	# FASE 12: sinal luminoso discreto sobre o elemento clicável — mesma
+	# fábrica reutilizável da Cidade (hotspot_glow.gd), mesma região
+	# fracionária já calibrada (rect), nenhuma coordenada nova.
+	_hotspot_glows[node_name] = preload("res://engine/presentation/hotspot_glow.gd").new().attach_to_region(parent, rect)
 
-	var faction_option := OptionButton.new()
-	faction_option.add_item("(todas)")
-	for faction: String in ["Império", "Natureza", "Mortos-Vivos"]:
-		faction_option.add_item(faction)
-	faction_option.item_selected.connect(_on_faction_filter_selected.bind(faction_option), CONNECT_DEFERRED)
-	row.add_child(faction_option)
-
-	var rarity_option := OptionButton.new()
-	rarity_option.add_item("(todas)")
-	for rarity: String in ["Comum", "Rara", "Épica", "Lendária"]:
-		rarity_option.add_item(rarity)
-	rarity_option.item_selected.connect(_on_rarity_filter_selected.bind(rarity_option), CONNECT_DEFERRED)
-	row.add_child(rarity_option)
-
-	var owned_check := CheckBox.new()
-	owned_check.text = "Só Possuídas"
-	owned_check.toggled.connect(_on_owned_only_toggled, CONNECT_DEFERRED)
-	row.add_child(owned_check)
-
-	var favorites_check := CheckBox.new()
-	favorites_check.text = "Só Favoritas"
-	favorites_check.toggled.connect(_on_favorites_only_toggled, CONNECT_DEFERRED)
-	row.add_child(favorites_check)
-
-
-func refresh() -> void:
-	_clear_children(self)
-	_build_static_structure()
-
-	var kingdom: Kingdom = KingdomState.kingdom
-	_refresh_stats(kingdom)
-	_refresh_list(kingdom)
-	_refresh_detail(kingdom)
-	_refresh_compare(kingdom)
+	var hotspot := Control.new()
+	hotspot.name = node_name
+	hotspot.anchor_left = rect.position.x
+	hotspot.anchor_top = rect.position.y
+	hotspot.anchor_right = rect.position.x + rect.size.x
+	hotspot.anchor_bottom = rect.position.y + rect.size.y
+	hotspot.offset_left = 0.0
+	hotspot.offset_top = 0.0
+	hotspot.offset_right = 0.0
+	hotspot.offset_bottom = 0.0
+	hotspot.mouse_filter = Control.MOUSE_FILTER_STOP
+	hotspot.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	hotspot.gui_input.connect(_on_hotspot_gui_input.bind(scene_path))
+	hotspot.mouse_entered.connect(_on_hotspot_mouse_entered.bind(hotspot, hover_text, node_name))
+	hotspot.mouse_exited.connect(_on_hotspot_mouse_exited.bind(node_name))
+	parent.add_child(hotspot)
 
 
-func _owned_card_names(kingdom: Kingdom) -> Dictionary:
-	var owned: Dictionary = {}
-	for card: CardResource in kingdom.cards:
-		owned[card.card_name] = true
-	return owned
-
-
-func _max_tier_owned(kingdom: Kingdom, card_name: String) -> int:
-	var max_tier: int = 0
-	for card: CardResource in kingdom.cards:
-		if card.card_name == card_name:
-			max_tier = maxi(max_tier, card.tier)
-	return max_tier
-
-
-func _refresh_stats(kingdom: Kingdom) -> void:
-	var owned: Dictionary = _owned_card_names(kingdom)
-	var total: int = GameDatabase.cards.size()
-	var unlocked: int = owned.size()
-	var percent: float = (float(unlocked) / float(total) * 100.0) if total > 0 else 0.0
-
-	var by_faction: Dictionary = {}
-	var by_rarity: Dictionary = {}
-	var by_tier: Dictionary = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
-	for card: CardResource in kingdom.cards:
-		by_faction[card.faction] = by_faction.get(card.faction, 0) + 1
-		by_rarity[card.rarity] = by_rarity.get(card.rarity, 0) + 1
-		by_tier[card.tier] = by_tier.get(card.tier, 0) + 1
-
-	var faction_lines: Array[String] = []
-	for faction: String in by_faction:
-		faction_lines.append("%s: %d" % [faction, by_faction[faction]])
-	var rarity_lines: Array[String] = []
-	for rarity: String in by_rarity:
-		rarity_lines.append("%s: %d" % [rarity, by_rarity[rarity]])
-
-	_stats_label.text = "Coleção: %d/%d cartas desbloqueadas (%.1f%%)\nPor Facção: %s\nPor Raridade: %s\nPor Tier — I: %d | II: %d | III: %d | IV: %d | V: %d" % [
-		unlocked, total, percent, ", ".join(faction_lines), ", ".join(rarity_lines),
-		by_tier[1], by_tier[2], by_tier[3], by_tier[4], by_tier[5]
-	]
-
-
-func _filtered_cards() -> Array[CardResource]:
-	var kingdom: Kingdom = KingdomState.kingdom
-	var owned: Dictionary = _owned_card_names(kingdom)
-	var result: Array[CardResource] = []
-
-	for card: CardResource in GameDatabase.cards:
-		if _filter_faction != "(todas)" and card.faction != _filter_faction:
-			continue
-		if _filter_rarity != "(todas)" and card.rarity != _filter_rarity:
-			continue
-		if _filter_owned_only and not owned.has(card.card_name):
-			continue
-		if _filter_favorites_only and not kingdom.is_favorite_card(card.card_name):
-			continue
-		result.append(card)
-
-	return result
-
-
-func _refresh_list(kingdom: Kingdom) -> void:
-	_clear_children(_list_container)
-	var owned: Dictionary = _owned_card_names(kingdom)
-
-	for card: CardResource in _filtered_cards():
-		var row := HBoxContainer.new()
-		_list_container.add_child(row)
-
-		var indicators: Array[String] = []
-		if owned.has(card.card_name):
-			indicators.append("Possuída")
+func _on_hotspot_gui_input(event: InputEvent, scene_path: String) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		if ResourceLoader.exists(scene_path):
+			get_tree().change_scene_to_file.call_deferred(scene_path)
 		else:
-			indicators.append("Não Possuída")
-		if kingdom.is_favorite_card(card.card_name):
-			indicators.append("★ Favorita")
-		if kingdom.is_new_card(card.card_name):
-			indicators.append("Nova")
-		if _max_tier_owned(kingdom, card.card_name) == 5:
-			indicators.append("Tier Máximo")
-
-		var button := Button.new()
-		button.text = "%s (%s, %s) — %s" % [card.card_name, card.rarity, card.faction, ", ".join(indicators)]
-		button.pressed.connect(_on_card_selected.bind(card.card_name), CONNECT_DEFERRED)
-		row.add_child(button)
-
-	if _list_container.get_child_count() == 0:
-		var empty_label := Label.new()
-		empty_label.text = "Nenhuma carta corresponde aos filtros."
-		_list_container.add_child(empty_label)
+			print("[BibliotecaPanel] Hotspot preparado, cena ainda não existe: %s" % scene_path)
 
 
-func _refresh_detail(kingdom: Kingdom) -> void:
-	_clear_children(_detail_container)
+func _on_hotspot_mouse_entered(hotspot: Control, hover_text: String, node_name: String = "") -> void:
+	if _hotspot_glows.has(node_name):
+		_hotspot_glows[node_name].set_hotspot_state(preload("res://engine/presentation/hotspot_glow.gd").State.HOVER)
+	_hover_name_label.text = hover_text
+	var chip_size: Vector2 = _hover_name_container.get_combined_minimum_size()
+	_hover_name_container.size = chip_size
 
-	if _selected_card_name == "":
-		var empty_label := Label.new()
-		empty_label.text = "Selecione uma carta na lista acima para ver o detalhe."
-		_detail_container.add_child(empty_label)
-		return
+	var hotspot_rect: Rect2 = hotspot.get_global_rect()
+	var x: float = hotspot_rect.position.x + hotspot_rect.size.x / 2.0 - chip_size.x / 2.0
+	var y: float = hotspot_rect.position.y + hotspot_rect.size.y / 2.0 - chip_size.y / 2.0
 
-	kingdom.clear_new_card_flag(_selected_card_name)
-
-	var template: CardResource = GameDatabase.get_card(_selected_card_name)
-	if template == null:
-		return
-
-	# --- Cabeçalho ---
-	var header := Label.new()
-	header.text = "%s | %s | %s | %s | Custo de Soldo: %d" % [
-		template.card_name, template.faction, template.card_class, template.rarity, Soldo.cost_for_rarity(template.rarity)
-	]
-	header.add_theme_font_size_override("font_size", 16)
-	_detail_container.add_child(header)
-
-	# --- Favoritar ---
-	var favorite_button := Button.new()
-	favorite_button.text = "Desfavoritar" if kingdom.is_favorite_card(_selected_card_name) else "Favoritar"
-	favorite_button.pressed.connect(_on_toggle_favorite_pressed, CONNECT_DEFERRED)
-	_detail_container.add_child(favorite_button)
-
-	# --- Lore ---
-	var lore_label := Label.new()
-	lore_label.text = "Lore não disponível ainda."
-	lore_label.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_detail_container.add_child(lore_label)
-
-	# --- Informações de Coleção ---
-	var owned_copies: Array[CardResource] = []
-	for card: CardResource in kingdom.cards:
-		if card.card_name == _selected_card_name:
-			owned_copies.append(card)
-	var by_tier_count: Dictionary = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
-	for card: CardResource in owned_copies:
-		by_tier_count[card.tier] += 1
-	var collection_label := Label.new()
-	collection_label.text = "Status: %s | Total: %d | Por Tier — I: %d, II: %d, III: %d, IV: %d, V: %d | Maior Tier: %d" % [
-		"Possuída" if not owned_copies.is_empty() else "Não Possuída", owned_copies.size(),
-		by_tier_count[1], by_tier_count[2], by_tier_count[3], by_tier_count[4], by_tier_count[5],
-		_max_tier_owned(kingdom, _selected_card_name)
-	]
-	_detail_container.add_child(collection_label)
-
-	# --- Atributos por Tier (I a V) ---
-	var progression_title := Label.new()
-	progression_title.text = "Progressão por Tier:"
-	_detail_container.add_child(progression_title)
-	var current: CardResource = template.duplicate()
-	current.tier = 1
-	for tier in range(1, 6):
-		var line := Label.new()
-		var ability_text: String = CardProgression.unlocked_ability_name(current)
-		line.text = "Tier %d — HP: %d | ATK: %d | Defesa: %d%s" % [
-			tier, current.hp, current.atk, current.esc,
-			(" | Desbloqueia: %s" % ability_text) if ability_text != "" else ""
-		]
-		_detail_container.add_child(line)
-		if tier < 5:
-			current = CardProgression.advance_tier(current)
-
-	# --- Origem e Receita ---
-	var origin_label := Label.new()
-	if template.recipe_ingredients.is_empty():
-		origin_label.text = "Origem: Produzida diretamente na Academia através de Fragmentos."
-	else:
-		origin_label.text = "Origem: Receita — %s" % ", ".join(template.recipe_ingredients)
-	_detail_container.add_child(origin_label)
-
-	# --- Utilizada nas seguintes Receitas ---
-	var used_in: Array[String] = []
-	for card: CardResource in GameDatabase.cards:
-		if card.recipe_ingredients.has(_selected_card_name):
-			used_in.append(card.card_name)
-	var used_in_label := Label.new()
-	used_in_label.text = "Utilizada nas Receitas de: %s" % (", ".join(used_in) if not used_in.is_empty() else "nenhuma")
-	used_in_label.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_detail_container.add_child(used_in_label)
-
-	# --- Mesmo Grupo ---
-	var same_group: Array[String] = []
-	for card: CardResource in GameDatabase.cards:
-		if card.card_name != template.card_name and card.faction == template.faction and card.rarity == template.rarity and card.card_class == template.card_class:
-			same_group.append(card.card_name)
-	var group_label := Label.new()
-	group_label.text = "Mesmo Grupo (Facção + Raridade + Classe): %s" % (", ".join(same_group) if not same_group.is_empty() else "nenhuma")
-	group_label.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_detail_container.add_child(group_label)
-
-	# --- Comparação: atalhos ---
-	var compare_row := HBoxContainer.new()
-	_detail_container.add_child(compare_row)
-	var set_a_button := Button.new()
-	set_a_button.text = "Definir como Carta A da Comparação"
-	set_a_button.pressed.connect(_on_set_compare_a_pressed, CONNECT_DEFERRED)
-	compare_row.add_child(set_a_button)
-	var set_b_button := Button.new()
-	set_b_button.text = "Definir como Carta B da Comparação"
-	set_b_button.pressed.connect(_on_set_compare_b_pressed, CONNECT_DEFERRED)
-	compare_row.add_child(set_b_button)
+	_hover_name_container.global_position = Vector2(x, y)
+	_hover_name_container.visible = true
 
 
-func _refresh_compare(kingdom: Kingdom) -> void:
-	_clear_children(_compare_container)
-
-	if _compare_card_name_a == "" or _compare_card_name_b == "":
-		var empty_label := Label.new()
-		empty_label.text = "Escolha 2 cartas (\"Definir como Carta A/B\" no Detalhe) para comparar lado a lado."
-		_compare_container.add_child(empty_label)
-		return
-
-	var card_a: CardResource = GameDatabase.get_card(_compare_card_name_a)
-	var card_b: CardResource = GameDatabase.get_card(_compare_card_name_b)
-
-	var row := HBoxContainer.new()
-	_compare_container.add_child(row)
-	for card: CardResource in [card_a, card_b]:
-		var column := VBoxContainer.new()
-		row.add_child(column)
-		var label := Label.new()
-		label.text = "%s\n%s | %s | %s\nHP: %d | ATK: %d | Defesa: %d\nCusto de Soldo: %d\nHabilidade Tier I: %s\nOrigem: %s" % [
-			card.card_name, card.faction, card.rarity, card.card_class,
-			card.hp, card.atk, card.esc, Soldo.cost_for_rarity(card.rarity),
-			card.tier_1_trait_name if card.tier_1_trait_name != "" else "(nenhuma)",
-			("Fragmentos" if card.recipe_ingredients.is_empty() else ", ".join(card.recipe_ingredients))
-		]
-		column.add_child(label)
+func _on_hotspot_mouse_exited(node_name: String = "") -> void:
+	if _hotspot_glows.has(node_name):
+		_hotspot_glows[node_name].set_hotspot_state(preload("res://engine/presentation/hotspot_glow.gd").State.AVAILABLE)
+	_hover_name_container.visible = false
 
 
-func _clear_children(container: Node) -> void:
-	for child in container.get_children():
-		container.remove_child(child)
-		child.free()
-
-
-func _on_back_to_city_pressed() -> void:
-	get_tree().change_scene_to_file.call_deferred("res://scenes/city/city_panel.tscn")
-
-
-func _on_faction_filter_selected(index: int, option: OptionButton) -> void:
-	_filter_faction = option.get_item_text(index)
-	refresh()
-
-
-func _on_rarity_filter_selected(index: int, option: OptionButton) -> void:
-	_filter_rarity = option.get_item_text(index)
-	refresh()
-
-
-func _on_owned_only_toggled(pressed: bool) -> void:
-	_filter_owned_only = pressed
-	refresh()
-
-
-func _on_favorites_only_toggled(pressed: bool) -> void:
-	_filter_favorites_only = pressed
-	refresh()
-
-
-func _on_card_selected(card_name: String) -> void:
-	_selected_card_name = card_name
-	refresh()
-
-
-func _on_toggle_favorite_pressed() -> void:
-	KingdomState.kingdom.toggle_favorite_card(_selected_card_name)
-	refresh()
-
-
-func _on_set_compare_a_pressed() -> void:
-	_compare_card_name_a = _selected_card_name
-	refresh()
-
-
-func _on_set_compare_b_pressed() -> void:
-	_compare_card_name_b = _selected_card_name
-	refresh()
+func _on_back_chip_gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		get_tree().change_scene_to_file.call_deferred("res://scenes/city/city_panel.tscn")

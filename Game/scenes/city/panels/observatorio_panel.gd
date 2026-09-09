@@ -1,153 +1,225 @@
 extends Control
 ## ObservatorioPanel (OBSERVATORY.md)
 ##
-## Só LÊ e mostra o Relatório de Balanceamento — quem GERA é a
-## ferramenta externa (tools/balance_report/), nunca este painel (ver
-## decisão registrada na conversa: Observatório = relatório de
-## balanceamento de Cartas/Formações, não histórico de Comandante nem
-## gerador de Exércitos — esses são outras duas peças, já resolvidas
-## em outro lugar). Também mostra o Registro de Simulações (histórico
-## de rodadas já feitas, incluindo gerações de PvE).
+## HUB VISUAL do Observatório — mesmo princípio arquitetural já usado
+## na Biblioteca (biblioteca_panel.gd): "A ARTE É A INTERFACE".
+## Observatory.png preenche a tela inteira (AspectRatioContainer
+## STRETCH_COVER, mesmo padrão de CityPanel/CapitalPanel/
+## BibliotecaPanel); nenhuma barra, label ou painel permanente é
+## desenhado por cima — só 4 hotspots INVISÍVEIS sobre elementos já
+## presentes na própria arte, cada um levando a uma das 4 áreas do
+## Observatório.
+##
+## Correspondência visual dos 4 hotspots (inspeção direta de
+## Observatory.png, 1672x941):
+## - OVERVIEW: a grande mesa circular iluminada no centro da sala (mapa-
+##   relevo do Reino sobre um pedestal de múltiplos anéis) — a estrutura
+##   mais central e grandiosa da cena.
+## - CELESTIAL FORECAST: o grande aparato astronômico (esfera armilar
+##   dourada) no fundo, sob a janela em arco central.
+## - ASTRAL RESEARCH: a grande mesa com diorama de exércitos em miniatura
+##   (peças azuis/marrons sobre um tabuleiro), no canto inferior
+##   esquerdo — a "estação de pesquisa" mais distinta à esquerda.
+## - CELESTIAL CHARTS: a grande mesa coberta de mapas/documentos/livros
+##   abertos, no canto inferior direito.
+## Os 4 Rect2 foram calibrados por inspeção visual direta (crops
+## dedicados, ver relatório da tarefa) com margem entre si — nenhuma
+## sobreposição.
+##
+## Cada tela interna é reaproveitada de bestiario_panel.tscn/
+## biblioteca_panel.tscn no MESMO padrão (nunca popup, nunca cena
+## modal) — troca de cena completa via change_scene_to_file, com botão
+## "Voltar para o Observatório" em cada uma.
 
-var _root_vbox: VBoxContainer
+const OBSERVATORY_TEXTURE: Texture2D = preload("res://assets/art/city_buildings/observatory_v1.png")
+const OBSERVATORY_IMAGE_ASPECT_RATIO: float = 1672.0 / 941.0
+
+const HUD_FONT: Font = preload("res://assets/fonts/Cinzel-SemiBold.ttf")
+const HUD_TEXT_COLOR: Color = Color(0.93, 0.93, 0.90)
+const HUD_OUTLINE_COLOR: Color = Color(0.02, 0.02, 0.02, 0.95)
+const HUD_OUTLINE_SIZE: int = 4
+const HUD_SHADOW_COLOR: Color = Color(0.0, 0.0, 0.0, 0.5)
+const HUD_SHADOW_OFFSET: int = 2
+const HUD_ACCENT: Color = Color(0.75, 0.65, 0.45)
+
+const OVERVIEW_SCENE_PATH: String = "res://scenes/city/panels/observatory_overview_panel.tscn"
+const ASTRAL_RESEARCH_SCENE_PATH: String = "res://scenes/city/panels/astral_research_panel.tscn"
+const CELESTIAL_CHARTS_SCENE_PATH: String = "res://scenes/city/panels/celestial_charts_panel.tscn"
+const CELESTIAL_FORECAST_SCENE_PATH: String = "res://scenes/city/panels/celestial_forecast_panel.tscn"
+
+## Mesa circular central (mapa-relevo iluminado).
+const OVERVIEW_HOTSPOT_RECT: Rect2 = Rect2(0.32, 0.36, 0.34, 0.34)
+## Esfera armilar dourada, fundo/centro-superior.
+const CELESTIAL_FORECAST_HOTSPOT_RECT: Rect2 = Rect2(0.38, 0.02, 0.24, 0.29)
+## Mesa com diorama de exércitos em miniatura, canto inferior esquerdo.
+const ASTRAL_RESEARCH_HOTSPOT_RECT: Rect2 = Rect2(0.02, 0.42, 0.24, 0.29)
+## Mesa coberta de mapas/documentos, canto inferior direito.
+const CELESTIAL_CHARTS_HOTSPOT_RECT: Rect2 = Rect2(0.74, 0.42, 0.24, 0.29)
+
+var _hover_name_container: Control
+var _hover_name_label: Label
+
+## FASE 12: node_name -> HotspotGlow — sinal luminoso discreto sobre
+## cada hotspot desta tela (mesmo componente já usado na Cidade, ver
+## city_panel.gd).
+var _hotspot_glows: Dictionary = {}
 
 
 func _ready() -> void:
-	refresh()
+	_build_static_structure()
 	print("[ObservatorioPanel] Pronto.")
 
 
-func refresh() -> void:
-	_clear_children(self)
-	_build_structure()
-
-
-func _build_structure() -> void:
+func _build_static_structure() -> void:
 	var background := ColorRect.new()
-	background.color = Color(0.12, 0.12, 0.16)
+	background.color = Color(0.03, 0.03, 0.05)
 	background.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(background)
 
-	var scroll := ScrollContainer.new()
-	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	add_child(scroll)
+	var observatory_area := Control.new()
+	observatory_area.set_anchors_preset(Control.PRESET_FULL_RECT)
+	observatory_area.clip_contents = true
+	add_child(observatory_area)
 
-	_root_vbox = VBoxContainer.new()
-	_root_vbox.custom_minimum_size = Vector2(750, 0)
-	_root_vbox.add_theme_constant_override("separation", 16)
-	scroll.add_child(_root_vbox)
+	var aspect := AspectRatioContainer.new()
+	aspect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	aspect.ratio = OBSERVATORY_IMAGE_ASPECT_RATIO
+	aspect.stretch_mode = AspectRatioContainer.STRETCH_COVER
+	aspect.alignment_horizontal = AspectRatioContainer.ALIGNMENT_CENTER
+	aspect.alignment_vertical = AspectRatioContainer.ALIGNMENT_CENTER
+	observatory_area.add_child(aspect)
 
-	var title := Label.new()
-	title.text = "Observatório"
-	title.add_theme_font_size_override("font_size", 24)
-	_root_vbox.add_child(title)
+	var texture_rect := TextureRect.new()
+	texture_rect.texture = OBSERVATORY_TEXTURE
+	texture_rect.stretch_mode = TextureRect.STRETCH_SCALE
+	texture_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	texture_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	aspect.add_child(texture_rect)
 
-	var back_button := Button.new()
-	back_button.text = "<- Voltar para a Cidade"
-	back_button.pressed.connect(_on_back_to_city_pressed, CONNECT_DEFERRED)
-	_root_vbox.add_child(back_button)
+	# --- 4 hotspots invisíveis, cada um sobre o elemento visual
+	# correspondente já presente na arte (ver docstring do topo). ---
+	_build_hotspot(texture_rect, "Hotspot_Overview", OVERVIEW_HOTSPOT_RECT, "Visão Geral", OVERVIEW_SCENE_PATH)
+	_build_hotspot(texture_rect, "Hotspot_AstralResearch", ASTRAL_RESEARCH_HOTSPOT_RECT, "Investigação Astral", ASTRAL_RESEARCH_SCENE_PATH)
+	_build_hotspot(texture_rect, "Hotspot_CelestialCharts", CELESTIAL_CHARTS_HOTSPOT_RECT, "Cartas Celestiais", CELESTIAL_CHARTS_SCENE_PATH)
+	_build_hotspot(texture_rect, "Hotspot_CelestialForecast", CELESTIAL_FORECAST_HOTSPOT_RECT, "Previsões Celestiais", CELESTIAL_FORECAST_SCENE_PATH)
 
-	var note := Label.new()
-	note.text = "Este painel só mostra o relatório mais recente já gerado — a geração em si acontece na ferramenta externa (tools/balance_report/balance_report_panel.tscn), fora do jogo."
-	note.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_root_vbox.add_child(note)
+	# --- Chip de hover (mesmo padrão Cinzel já usado na Biblioteca —
+	# só aparece ao passar o mouse sobre um hotspot). ---
+	var hover_chip: Dictionary = _build_chip()
+	_hover_name_container = hover_chip["container"]
+	_hover_name_label = hover_chip["label"]
+	_hover_name_container.visible = false
+	_hover_name_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_hover_name_container)
 
-	_add_section_title("Relatório de Balanceamento")
-	_build_report_section()
+	# --- Voltar para a Cidade (mesmo chip/padrão da Biblioteca). ---
+	var back_chip: Dictionary = _build_chip()
+	var back_container: Control = back_chip["container"]
+	var back_label: Label = back_chip["label"]
+	back_label.text = "Voltar para a Cidade"
+	back_container.mouse_filter = Control.MOUSE_FILTER_STOP
+	back_container.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	back_container.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	back_container.position = Vector2(16, 16)
+	back_container.size = back_container.get_combined_minimum_size()
+	back_container.gui_input.connect(_on_back_chip_gui_input)
+	add_child(back_container)
 
-	_add_section_title("Registro de Simulações")
-	_build_generation_log_section()
 
-	var refresh_button := Button.new()
-	refresh_button.text = "Recarregar"
-	refresh_button.pressed.connect(refresh, CONNECT_DEFERRED)
-	_root_vbox.add_child(refresh_button)
+func _build_chip() -> Dictionary:
+	var chip := PanelContainer.new()
 
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(HUD_ACCENT.r, HUD_ACCENT.g, HUD_ACCENT.b, 0.10)
+	style.border_width_left = 1
+	style.border_width_right = 1
+	style.border_width_top = 1
+	style.border_width_bottom = 1
+	style.border_color = Color(HUD_ACCENT.r, HUD_ACCENT.g, HUD_ACCENT.b, 0.55)
+	style.corner_radius_top_left = 4
+	style.corner_radius_top_right = 4
+	style.corner_radius_bottom_left = 4
+	style.corner_radius_bottom_right = 4
+	style.content_margin_left = 10.0
+	style.content_margin_right = 10.0
+	style.content_margin_top = 5.0
+	style.content_margin_bottom = 5.0
+	chip.add_theme_stylebox_override("panel", style)
 
-func _add_section_title(text: String) -> void:
-	var separator := HSeparator.new()
-	_root_vbox.add_child(separator)
 	var label := Label.new()
-	label.text = text
-	label.add_theme_font_size_override("font_size", 18)
-	_root_vbox.add_child(label)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	label.add_theme_font_override("font", HUD_FONT)
+	label.add_theme_font_size_override("font_size", 14)
+	label.add_theme_color_override("font_color", HUD_TEXT_COLOR)
+	label.add_theme_color_override("font_outline_color", HUD_OUTLINE_COLOR)
+	label.add_theme_constant_override("outline_size", HUD_OUTLINE_SIZE)
+	label.add_theme_color_override("font_shadow_color", HUD_SHADOW_COLOR)
+	label.add_theme_constant_override("shadow_offset_x", HUD_SHADOW_OFFSET)
+	label.add_theme_constant_override("shadow_offset_y", HUD_SHADOW_OFFSET)
+	chip.add_child(label)
+
+	return {"container": chip, "label": label}
 
 
-func _build_report_section() -> void:
-	var report: BalanceReport = SimulationReportService.load_balance_report()
-	if report == null:
-		var empty_label := Label.new()
-		empty_label.text = "Nenhum relatório gerado ainda. Rode a ferramenta externa de Balanceamento primeiro."
-		_root_vbox.add_child(empty_label)
-		return
+## Cria um Control invisível sobre `rect` (fração da arte), com hover
+## (chip Cinzel) e clique — mesmo padrão de biblioteca_panel.gd. Todas
+## as 4 telas internas já existem nesta implementação, então
+## `scene_path` sempre resolve; o guard de existência é mantido mesmo
+## assim (mesma robustez de biblioteca_panel.gd, nunca quebra se um
+## caminho mudar).
+func _build_hotspot(parent: Control, node_name: String, rect: Rect2, hover_text: String, scene_path: String) -> void:
+	# FASE 12: sinal luminoso discreto — mesma fábrica reutilizável da
+	# Cidade (hotspot_glow.gd), mesma região fracionária já calibrada.
+	_hotspot_glows[node_name] = preload("res://engine/presentation/hotspot_glow.gd").new().attach_to_region(parent, rect)
 
-	var header := Label.new()
-	header.text = "\"%s\" — %d batalhas (%d séries, seed %d) | Lado A: %.1f%% | Lado B: %.1f%% | Empates: %d" % [
-		report.label, report.total_battles, report.series_count, report.seed_value,
-		report.side_a_win_rate() * 100.0, report.side_b_win_rate() * 100.0, report.draws
-	]
-	header.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_root_vbox.add_child(header)
-
-	var cards_title := Label.new()
-	cards_title.text = "Win Rate por Carta (todas, ordenadas — maior primeiro):"
-	_root_vbox.add_child(cards_title)
-	for card_name: String in report.cards_sorted_by_win_rate():
-		var stats: Dictionary = report.card_stats[card_name]
-		var label := Label.new()
-		label.text = "%s: %.1f%% (%d aparições)" % [card_name, report.card_win_rate(card_name) * 100.0, stats["appearances"]]
-		_root_vbox.add_child(label)
-
-	var position_title := Label.new()
-	position_title.text = "Win Rate por Posição (1-9):"
-	_root_vbox.add_child(position_title)
-	for position in range(1, 10):
-		if not report.position_stats.has(position):
-			continue
-		var stats: Dictionary = report.position_stats[position]
-		var label := Label.new()
-		label.text = "Posição %d: %.1f%% (%d aparições)" % [position, report.position_win_rate(position) * 100.0, stats["appearances"]]
-		_root_vbox.add_child(label)
+	var hotspot := Control.new()
+	hotspot.name = node_name
+	hotspot.anchor_left = rect.position.x
+	hotspot.anchor_top = rect.position.y
+	hotspot.anchor_right = rect.position.x + rect.size.x
+	hotspot.anchor_bottom = rect.position.y + rect.size.y
+	hotspot.offset_left = 0.0
+	hotspot.offset_top = 0.0
+	hotspot.offset_right = 0.0
+	hotspot.offset_bottom = 0.0
+	hotspot.mouse_filter = Control.MOUSE_FILTER_STOP
+	hotspot.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	hotspot.gui_input.connect(_on_hotspot_gui_input.bind(scene_path))
+	hotspot.mouse_entered.connect(_on_hotspot_mouse_entered.bind(hotspot, hover_text, node_name))
+	hotspot.mouse_exited.connect(_on_hotspot_mouse_exited.bind(node_name))
+	parent.add_child(hotspot)
 
 
-func _build_generation_log_section() -> void:
-	var log: Array = SimulationReportService.read_generation_log()
-	if log.is_empty():
-		var empty_label := Label.new()
-		empty_label.text = "Nenhuma rodada registrada ainda."
-		_root_vbox.add_child(empty_label)
-		return
-
-	for i in range(log.size() - 1, maxi(-1, log.size() - 11), -1):  # últimas 10, mais recente primeiro
-		var entry: Dictionary = log[i]
-		var label := Label.new()
-		label.text = "[%s] %s" % [entry.get("type", ""), _format_log_entry(entry)]
-		label.autowrap_mode = TextServer.AUTOWRAP_WORD
-		_root_vbox.add_child(label)
+func _on_hotspot_gui_input(event: InputEvent, scene_path: String) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		if ResourceLoader.exists(scene_path):
+			get_tree().change_scene_to_file.call_deferred(scene_path)
+		else:
+			print("[ObservatorioPanel] Hotspot preparado, cena ainda não existe: %s" % scene_path)
 
 
-## F-046: cada ferramenta dev que grava no Registro (regional_generator_panel,
-## regional_chief_generator_panel, pve_generator_panel, balance_report_panel)
-## usa um conjunto de chaves diferente — sem um formato único por "type"
-## pra cada uma (fora do escopo desta correção), o formato genérico mais
-## legível é "chave: valor" separado por " | ", nunca a sintaxe crua de
-## JSON.stringify() (chaves entre aspas, sem espaçamento) que antes ia
-## direto pro jogador.
-func _format_log_entry(entry: Dictionary) -> String:
-	var parts: Array[String] = []
-	for key: String in entry:
-		if key == "type":
-			continue
-		parts.append("%s: %s" % [key, str(entry[key])])
-	return " | ".join(parts)
+func _on_hotspot_mouse_entered(hotspot: Control, hover_text: String, node_name: String = "") -> void:
+	if _hotspot_glows.has(node_name):
+		_hotspot_glows[node_name].set_hotspot_state(preload("res://engine/presentation/hotspot_glow.gd").State.HOVER)
+	_hover_name_label.text = hover_text
+	var chip_size: Vector2 = _hover_name_container.get_combined_minimum_size()
+	_hover_name_container.size = chip_size
+
+	var hotspot_rect: Rect2 = hotspot.get_global_rect()
+	var x: float = hotspot_rect.position.x + hotspot_rect.size.x / 2.0 - chip_size.x / 2.0
+	var y: float = hotspot_rect.position.y + hotspot_rect.size.y / 2.0 - chip_size.y / 2.0
+
+	_hover_name_container.global_position = Vector2(x, y)
+	_hover_name_container.visible = true
 
 
-func _clear_children(container: Node) -> void:
-	for child in container.get_children():
-		container.remove_child(child)
-		child.free()
+func _on_hotspot_mouse_exited(node_name: String = "") -> void:
+	if _hotspot_glows.has(node_name):
+		_hotspot_glows[node_name].set_hotspot_state(preload("res://engine/presentation/hotspot_glow.gd").State.AVAILABLE)
+	_hover_name_container.visible = false
 
 
-func _on_back_to_city_pressed() -> void:
-	get_tree().change_scene_to_file.call_deferred("res://scenes/city/city_panel.tscn")
+func _on_back_chip_gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		get_tree().change_scene_to_file.call_deferred("res://scenes/city/city_panel.tscn")

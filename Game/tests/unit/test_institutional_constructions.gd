@@ -86,4 +86,28 @@ static func run(ctx: TestRunner.Context) -> bool:
 	ctx.check(poor_result["reason"] == "insufficient_resources", "Motivo da falha deve ser insufficient_resources (obtido: %s)" % poor_result["reason"])
 	ctx.check(poor_kingdom.get_raw_resource("cristais_arcanos") == before_cristais, "Recursos não devem ser gastos parcialmente numa falha tudo-ou-nada")
 
+	# Teto da Academia (ACADEMY.md, "Progressão da Academia": Nível
+	# Máximo 120) — não existia antes desta tarefa (increment_academy_level()
+	# não tinha teto); adicionado em AcademyEconomy.MAX_LEVEL e reforçado
+	# em InstitutionalConstructionResolver.evolve().
+	var maxed_kingdom := Kingdom.new()
+	maxed_kingdom.capital_level = AcademyEconomy.MAX_LEVEL + 10
+	maxed_kingdom.academy_level = AcademyEconomy.MAX_LEVEL - 1
+	maxed_kingdom.raw_resources = {"ferro_negro": 1000000000, "cristais_arcanos": 1000000000, "essencia_vital": 1000000000}
+
+	var last_step_result: Dictionary = InstitutionalConstructionResolver.evolve(maxed_kingdom, InstitutionalConstructionConfig.Building.ACADEMIA)
+	print("  Academia Nível %d -> evoluir até o teto -> sucesso? %s | Nível agora: %d (esperado: true, %d)" % [
+		AcademyEconomy.MAX_LEVEL - 1, str(last_step_result["success"]), maxed_kingdom.academy_level, AcademyEconomy.MAX_LEVEL
+	])
+	ctx.check(last_step_result["success"] == true, "Evoluir a Academia até o Nível Máximo deve ter sucesso")
+	ctx.check(maxed_kingdom.academy_level == AcademyEconomy.MAX_LEVEL, "Academia deve estar no Nível Máximo (obtido: %d)" % maxed_kingdom.academy_level)
+
+	var beyond_max_result: Dictionary = InstitutionalConstructionResolver.evolve(maxed_kingdom, InstitutionalConstructionConfig.Building.ACADEMIA)
+	print("  Academia já no Nível Máximo (%d) -> evoluir de novo -> sucesso? %s | motivo: %s (esperado: false, max_level_reached)" % [
+		AcademyEconomy.MAX_LEVEL, str(beyond_max_result["success"]), beyond_max_result["reason"]
+	])
+	ctx.check(beyond_max_result["success"] == false, "Evoluir a Academia além do Nível Máximo deve falhar")
+	ctx.check(beyond_max_result["reason"] == "max_level_reached", "Motivo da falha deve ser max_level_reached (obtido: %s)" % beyond_max_result["reason"])
+	ctx.check(maxed_kingdom.academy_level == AcademyEconomy.MAX_LEVEL, "Nível da Academia não deve mudar numa tentativa bloqueada pelo teto")
+
 	return true

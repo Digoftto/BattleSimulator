@@ -219,9 +219,18 @@ func is_ready_for_battle() -> bool:
 ## TECHNICAL_BACKLOG.md (F-018) — corrigir os geradores é pré-requisito
 ## antes de usar esta função como trava de validação.
 func has_support_at_position_5() -> bool:
+	return Army.would_have_support_at_position_5(cards)
+
+
+## Mesmo algoritmo acima, exposto como função estática/pura pra telas que
+## ainda não têm um Army instanciado (ex: army_editor_panel.gd, durante a
+## escolha de Cartas na Fase 1, antes de Kingdom.form_army() existir) —
+## nunca uma segunda cópia da regra, só uma forma de reutilizá-la sem
+## precisar construir um Army primeiro.
+static func would_have_support_at_position_5(cards_to_check: Array[CardResource]) -> bool:
 	var machine_card: CardResource = null
 	var other_cards: Array[CardResource] = []
-	for card: CardResource in cards:
+	for card: CardResource in cards_to_check:
 		if card.card_class == "Máquina de Guerra" and machine_card == null:
 			machine_card = card
 		else:

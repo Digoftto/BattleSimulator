@@ -10,9 +10,11 @@ Este documento define todas as telas, janelas, indicadores e fluxos de interface
 
 Este documento é a fonte única de verdade (*Single Source of Truth*) para:
 
-* A organização das janelas do CdC (PvP, Minas, PvE, Treinamento, Legado, Comandantes, Exércitos);
+* A organização das janelas do CdC (Treinamento, Legado, Comandantes, Exércitos);
 * O fluxo de navegação entre essas janelas;
 * Quais informações cada janela exibe e quais ações o jogador pode tomar nelas.
+
+> **REORGANIZAÇÃO:** as janelas de PvP, Minas e PvE deixaram de pertencer ao CdC — mudaram de proprietário documental para `WORLD_MAP_GATE.md` (decisão explícita do usuário, revertendo a hierarquia anterior "F-016/F-017" que fazia do CdC a porta de entrada única desses 3 sistemas; ver `WORLD_MAP_GATE.md` para o texto integral das 3 janelas, preservado sem alteração de regra). **Correção posterior:** o World Map Gate também deixou de ser alcançado a partir do CdC — é uma localização própria da Cidade (`CITY.md`), com hitbox direto sobre a arte (`city_panel.gd`). O CdC não organiza esse acesso em nenhum nível.
 
 Este documento **não** define:
 
@@ -21,7 +23,7 @@ Este documento **não** define:
 * Regras de Minas, Ciclo de Mineração ou Guarnição (`MINES.md`);
 * Regras de Formações de Exército (`ARMY.md`);
 * Estados administrativos, recrutamento, treinamento ou legado de Comandantes (`COMMAND_CENTER.md` e demais documentos do módulo `command_center`);
-* Ordem de ataque, Exército de Defesa ou mapeamento de Campos de Batalha do Plano de Campanha (`COMMAND_CENTER.md`, "Plano de Campanha").
+* Ordem de ataque, Exército de Defesa ou mapeamento de Campos de Batalha do Plano de Campanha (`COMMAND_CENTER.md`, "Plano de Campanha") — este último permanece descrito aqui como configuração operacional do CdC (o Plano de Campanha em si é acionado pela janela de PvP, hoje em `WORLD_MAP_GATE.md`, mas seus parâmetros de mapeamento continuam sendo geridos administrativamente pelo CdC, ver `COMMAND_CENTER.md`).
 
 Esses domínios pertencem exclusivamente aos seus respectivos documentos de arquitetura. Este documento apenas organiza como o jogador acessa e visualiza esses sistemas — nunca redefine suas regras.
 
@@ -29,90 +31,7 @@ Esses domínios pertencem exclusivamente aos seus respectivos documentos de arqu
 
 # Princípio Geral: Interface, Não Regra
 
-O CdC é a porta de entrada operacional para a utilização de Comandantes e Exércitos em PvP, PvE e Minas — mas nunca é o dono das regras desses modos (`COMMAND_CENTER.md`, "O que o CdC NÃO faz"). Cada janela descrita abaixo consulta e aciona o sistema correspondente; nenhuma janela decide uma regra que não esteja documentada no sistema dono daquele domínio.
-
----
-
-# Janela: PvP
-
-Ponto de acesso único às 4 Ligas (Bronze, Prata, Ouro, Diamante — `RANKING.md`).
-
-## Bronze (Modelo Individual)
-
-* O jogador registra de 1 a 3 Comandantes, cada um liderando um Exército **totalmente independente** dos demais — sem vínculo, sem Plano de Campanha.
-* Não existe registro de Campos de Batalha customizados: toda partida da Liga Bronze ocorre no Campo Aberto (`RANKING.md`, "Isenções do Modelo").
-* A janela exibe, por Comandante: Divisão atual, Pontos de Liga, histórico recente, energia do Exército.
-
-## Prata, Ouro e Diamante (Plano de Campanha)
-
-* O jogador registra até 3 Comandantes vinculados a um único Plano de Campanha por Liga (`RANKING.md`).
-* A janela permite configurar, a qualquer momento do ciclo (`COMMAND_CENTER.md`, "Plano de Campanha"):
-  * O mapeamento dos 9 Campos de Batalha Especiais entre os 3 Exércitos (0 a 9 por Exército, sem repetição);
-  * O Exército de Defesa Preferencial para o Campo Aberto (único Campo compartilhável);
-  * A Ordem de Ataque entre os Exércitos elegíveis ao Campo Aberto;
-  * A composição de cada Exército (cartas, formações, posicionamento).
-* **Ao Atacar:** o Campo de Batalha é sorteado automaticamente (`BATTLEFIELDS.md`), restrito aos Campos cujo Exército mapeado ainda tenha energia suficiente (10 pontos por Ataque — `ENERGY.md`). Se mais de um Exército for elegível (só possível no Campo Aberto), a Ordem de Ataque decide qual é usado. Se nenhum Exército tiver energia suficiente para nenhum Campo, Atacar fica indisponível até a energia recuperar.
-* **Ao ser atacado (Defesa):** sempre automática — o Campo sorteado pelo atacante identifica o Exército mapeado (ou o Defensor Preferencial, se o Campo Aberto). A energia do defensor nunca é verificada; a defesa está sempre disponível.
-* A janela exibe: Divisão atual, Pontos de Liga, histórico de confrontos recentes (Ataque e Defesa), energia de cada um dos 3 Exércitos, e qual Campo cada um está mapeado a defender.
-
-## Recuperação
-
-Quando um Exército registrado em qualquer Liga não está em combate, ele é considerado posicionado na Cidade para todos os efeitos de recuperação de Energia (`ENERGY.md`) — nenhuma regra nova, apenas a aplicação da regra já existente.
-
----
-
-# Janela: Minas
-
-Lista todas as Minas já conquistadas pelo jogador (`MINES.md`) — **a conquista de novas Minas não acontece aqui**, é parte do fluxo de PvE (`PvE.md`, "Ramificação"); esta janela só gerencia o que já pertence ao jogador.
-
-Para cada Mina, exibe:
-
-* Localização (Fase/Território, ou "Mina Inicial");
-* Nível estrutural atual;
-* Se há um Ciclo de Mineração ativo, e quanto tempo falta para ele terminar;
-* A Guarnição atualmente designada (Exército e Comandante);
-* O modo de Renovação configurado (Automática ou Manual — `MINES.md`, "Renovação").
-
-## Visualização da Mina
-
-Ao entrar em uma Mina específica, o jogador vê o Exército da Guarnição (Defensor) e a Formação de Referência (Atacante) posicionados em alguma formação — **essa visualização é sempre estática e ilustrativa**, nunca reflete literalmente qual das 362.880 combinações está "em disputa" naquele instante. O cálculo em lote (`MINES.md`, "Observação Técnica") é inteiramente invisível ao jogador; não existe tela de carregamento nem prévia de resultado.
-
-## Ações Disponíveis por Mina
-
-* **Designar ou trocar a Guarnição** — só possível quando não há Ciclo ativo (trava anti-exploit já existente, `MINES.md`). Só Exércitos livres (não alocados em outra função) podem ser designados.
-* **Escolher o modo de Renovação** (Automática ou Manual) — pode ser alterado a qualquer momento, mesmo com um Ciclo em andamento; o modo escolhido só faz efeito no término do Ciclo atual.
-* **Iniciar um novo Ciclo de Mineração**, uma vez a Guarnição designada.
-
-## Sem Previsão de Resultado
-
-Diferente de outras janelas, esta não oferece nenhuma prévia de Eficiência antes de confirmar a Guarnição — o resultado só é conhecido através da produção creditada ao longo do Ciclo.
-
----
-
-# Janela: PvE
-
-Exibe, por Trilha ativa (`PvE.md`) — o jogador pode ter múltiplas Trilhas em andamento simultaneamente, cada uma com seu próprio Squad:
-
-* O Squad posicionado naquela Trilha (quais Exércitos o compõem, e a Ordem de Substituição entre eles);
-* Progresso atual (Fase alcançada, Acampamento mais recente);
-* Energia de cada Exército do Squad;
-* Se há uma Mina disponível naquele trecho já percorrido (conquistada ou não).
-
-## Montagem e Edição do Squad
-
-* **Montagem inicial:** ao começar uma Expedição (ou um Replay), o jogador monta o Squad com a quantidade de Exércitos exigida pelo estágio da Trilha (`PvE.md`: 1 na Campanha inicial, 2 no 1º Replay, 3 do 2º Replay em diante), usando o Editor de Exército comum para cada um.
-* **Travado durante o avanço:** quais Exércitos compõem o Squad, e a Ordem de Substituição entre eles, só podem ser alterados quando o Squad está na Cidade ou parado em um Acampamento — nunca durante o avanço idle ativo entre dois Acampamentos.
-* **Edição individual sempre livre:** independente disso, a composição de cada Exército (Comandante, cartas) e suas 5 Formações (α a ε) podem ser editadas a qualquer momento fora de combate — inclusive como a alavanca oficial para destravar um Trecho difícil (`PvE.md`, "Filosofia do Travamento").
-
-## Minas
-
-* Uma Mina fica disponível assim que a Fase adjacente a ela é vencida — não exige presença física naquele ponto da Trilha, nem interrompe a marcha idle enquanto não for acionada.
-* Conquistá-la não exige o Exército atualmente liderando o Squad — **qualquer Exército disponível do Reino** pode ser enviado, mesmo que não pertença àquele Squad.
-* Gerenciamento contínuo da Mina (Guarnição, Ciclo de Mineração) pertence à Janela de Minas, não a esta.
-
-## Acampamentos
-
-Ao atingir ou recuar para um Acampamento, a janela oferece as duas opções já documentadas (`PvE.md`, "Decisão Estratégica no Acampamento"): continuar imediatamente com energia parcial, ou permanecer em repouso até recuperar mais.
+O CdC é a porta de entrada operacional para a utilização de Comandantes e Exércitos em Treinamento e Legado — mas nunca é o dono das regras desses modos (`COMMAND_CENTER.md`, "O que o CdC NÃO faz"). Cada janela descrita abaixo consulta e aciona o sistema correspondente; nenhuma janela decide uma regra que não esteja documentada no sistema dono daquele domínio. PvP, PvE e Minas seguem o mesmo princípio, agora sob `WORLD_MAP_GATE.md`.
 
 ---
 
@@ -219,11 +138,7 @@ Um Comandante ou Exército alocado em uma função (Liga de PvP, Trilha de PvE, 
 * **COMMAND_CENTER_RECRUITMENT.md:** Regras de recrutamento (janela própria, já documentada).
 * **COMMAND_CENTER_TRAINING.md:** Regras de Treinamento.
 * **COMMAND_CENTER_LEGACY.md:** Regras de Legado e Hall dos Comandantes.
-* **RANKING.md:** Ligas, Divisões, Pontos de Liga, inscrição no Plano de Campanha.
-* **BATTLEFIELDS.md:** Campos de Batalha, sorteio e seleção automática de Exército.
-* **PvE.md:** Trilhas, Expedições, Fases.
-* **MINES.md:** Minas, Ciclo de Mineração, Guarnição.
+* **WORLD_MAP_GATE.md:** Janelas de PvP, PvE e Minas (movidas para lá nesta reorganização).
 * **ARMY.md:** Formações de Exército.
-* **ENERGY.md:** Recuperação de Energia na Cidade.
 * **COMMANDERS.md:** Patentes, Autoridade Militar, Pontos de Soldo.
 * **SOLDO.md:** Requisitos de Soldo para o Grande Legado Militar.

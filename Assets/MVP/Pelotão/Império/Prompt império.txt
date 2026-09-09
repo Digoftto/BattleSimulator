@@ -1,0 +1,237 @@
+BATTLE SIMULATOR
+BATTLE ART BASE — PRODUÇÃO INDIVIDUAL
+
+Vamos produzir UM ÚNICO Battle Art Base.
+
+PERSONAGEM:
+[INSERIR NOME]
+
+REFERÊNCIA:
+Use a carta/imagem fornecida deste personagem como referência
+PRINCIPAL E EXCLUSIVA de identidade.
+
+Use o Battle Art Base aprovado do Arqueiro Imperial como referência
+principal de:
+
+- câmera
+- perspectiva
+- inclinação
+- enquadramento
+- escala
+- proporção
+- linguagem visual
+- acabamento
+- iluminação
+
+==================================================
+REGRA FUNDAMENTAL
+==================================================
+
+PRODUZA SOMENTE UM PERSONAGEM.
+
+UM PERSONAGEM
+=
+UM ASSET
+=
+UMA IMAGEM
+
+NÃO gerar múltiplas versões.
+
+NÃO gerar variações.
+
+NÃO gerar três imagens.
+
+NÃO gerar quatro imagens.
+
+NÃO gerar uma prancha.
+
+NÃO gerar contact sheet.
+
+NÃO gerar spritesheet.
+
+NÃO colocar versões lado a lado.
+
+NÃO mostrar alternativas.
+
+A saída visual deve conter EXATAMENTE UMA representação do
+personagem.
+
+==================================================
+BATTLE ART BASE
+==================================================
+
+Este é o asset base utilizado como unidade no Battlefield do
+Battle Simulator.
+
+Não estamos criando uma carta.
+
+Não estamos criando concept art.
+
+Não estamos criando uma ilustração promocional.
+
+Não estamos criando uma pose para apresentação.
+
+Estamos criando o personagem isolado que será colocado no campo de
+batalha pela câmera do jogo.
+
+Reproduza a mesma lógica de câmera e perspectiva já aprovada no
+Arqueiro Imperial.
+
+==================================================
+PERSONAGEM
+==================================================
+
+Preserve rigorosamente a identidade da referência:
+
+- rosto
+- cabelo
+- corpo
+- proporções
+- idade aparente
+- armadura
+- roupas
+- cores
+- materiais
+- armas
+- escudos
+- equipamentos
+- acessórios
+- símbolos
+- detalhes característicos
+
+Não redesenhar o personagem.
+
+Não trocar equipamentos.
+
+Não inventar equipamentos.
+
+Não modificar sua identidade.
+
+==================================================
+POSE
+==================================================
+
+Criar uma pose natural de Battlefield.
+
+Corpo inteiro.
+
+Pés e pernas completamente visíveis.
+
+Nenhuma parte importante cortada.
+
+A pose deve funcionar como uma unidade parada no campo de batalha.
+
+Não criar pose extrema de ataque.
+
+Não criar animação.
+
+Não criar ação.
+
+Este é o Battle Art BASE.
+
+==================================================
+FUNDO
+==================================================
+
+FUNDO 100% TRANSPARENTE.
+
+Sem:
+
+- cenário
+- chão
+- ambiente
+- céu
+- objetos
+- partículas
+- fumaça
+- efeitos
+- texto
+- moldura
+- HUD
+- elementos de carta
+- sombra de cenário
+
+O personagem deve estar isolado em alpha.
+
+==================================================
+CÂMERA
+==================================================
+
+A câmera do Battlefield é a autoridade.
+
+Não transformar o personagem em uma vista frontal convencional.
+
+Não usar perspectiva de concept art.
+
+Não usar câmera de retrato.
+
+Não usar câmera ortográfica.
+
+Reproduzir a perspectiva inclinada do Battle Art Base aprovado do
+Arqueiro Imperial.
+
+O personagem deve parecer estar fisicamente posicionado no
+Battlefield e sendo observado pela câmera do jogo.
+
+==================================================
+ESCALA
+==================================================
+
+Manter escala visual compatível com o Arqueiro Imperial.
+
+O personagem deve ocupar aproximadamente a mesma proporção do
+canvas que os demais Battle Arts Base.
+
+Não aproximar excessivamente a câmera.
+
+Não cortar pés, armas ou equipamentos.
+
+==================================================
+OUTPUT
+==================================================
+
+Entregar SOMENTE:
+
+1 arquivo PNG
+
+Nome:
+
+battle_art_[nome_da_unidade].png
+
+Exemplo:
+
+battle_art_engenheiro_imperial.png
+
+Não criar outros arquivos de imagem.
+
+Não criar previews adicionais.
+
+Não criar montagens.
+
+==================================================
+CONTROLE FINAL
+==================================================
+
+Antes de entregar, confirme visualmente:
+
+[ ] existe apenas UM personagem
+[ ] corpo inteiro visível
+[ ] identidade preservada
+[ ] equipamentos preservados
+[ ] arma preservada
+[ ] câmera compatível com o Arqueiro Imperial
+[ ] perspectiva compatível com o Battlefield
+[ ] escala compatível
+[ ] fundo transparente
+[ ] sem cenário
+[ ] sem texto
+[ ] sem elementos de carta
+[ ] sem versões alternativas
+[ ] sem segundo personagem
+[ ] sem múltiplas imagens
+
+Se qualquer item falhar, corrija antes da entrega.
+
+NÃO tente produzir outros personagens neste pedido.
+
+Produza somente este Battle Art Base.

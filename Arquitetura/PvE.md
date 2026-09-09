@@ -175,7 +175,7 @@ A progressão ao longo de qualquer Trilha atravessa Regiões bem delimitadas, es
 
 ## Região II (Fases 3001 a 6000 de cada Trilha)
 
-* **Nível de Inimigos:** Formações inimigas utilizam níveis intermediários de Tier (referência: **Tier III**, **Tier IV** e **Tier V**).
+* **Nível de Inimigos:** Formações inimigas utilizam níveis intermediários de Tier (referência: **Tier III** e **Tier IV** — implementado em `EnemyArmyGenerator.REGION_TIER_RANGE`; Tier V é exclusivo da Região III).
 * **Recompensas de Chefes:** A vitória sobre Chefes Normais concede cartas de raridade **Rara** pertencentes à Facção da Trilha.
 * **Chefes Regionais:** Localizados nas Fases 4000, 5000 e 6000 da Trilha (Fases 1000, 2000 e 3000 da Região II).
 

@@ -253,39 +253,175 @@ static func _environment_update_phase(state: CombatState) -> void:
 	AffinityRuntime.snapshot_turn(state)
 
 
-## Movimentação (Fase de Avanço, 5.2). Avanço automático por coluna,
-## processado do fundo para a frente, respeitando a exceção estrutural de
-## Suporte (5.2.3/6.5). A Máquina de Guerra só tem restrição de
-## posicionamento INICIAL (6.6, posição 9 obrigatória) — depois de
-## iniciado o combate, segue a regra geral de avanço como qualquer outra
-## Classe (não é uma exceção de movimento).
+## Movimentação (Fase de Avanço, 5.2). COMBAT_RULES.md 5.2.1 define UMA
+## ÚNICA sequência espacial oficial (Fluxo de Avanço: 9→8→7→6→5→4→3→2→1 —
+## já existente e documentada como tal em CombatBoard.ADVANCE_ORDER, só não
+## estava conectada a esta função), não três colunas processadas em
+## paralelo — CombatBoard.COLUMNS continua existindo e correto para
+## geometria/alvo/afinidade que são deliberadamente por coluna
+## (RANGED_TARGET_MAP, Mago, AffinityRuntime, Sacrifício de Carne em
+## unit_trait_runtime.gd via positions_behind()), mas NUNCA foi a
+## estrutura certa para decidir "quem avança pra onde" — 5.2.1 é
+## explícito: "preservando a ordem original do exército", uma única fila,
+## não três. A Cadeia de Bloqueio do Suporte (6.5) TAMBÉM foi migrada pra
+## sequência única (CombatBoard.support_position_behind(), auditoria de
+## 2026-09-01) — ela é uma exceção da MESMA Fase de Avanço (5.2.3), não
+## uma regra independente por coluna como Sacrifício de Carne.
+##
+## Uma morte pode liberar mais de uma posição na mesma Fase, e mais de uma
+## unidade pode precisar avançar mais de um passo pra recompactar
+## totalmente a fila (COMBAT_RULES.md 5.2.1, "até ocupar a posição livre
+## mais próxima"). Uma única varredura da sequência resolve só o primeiro
+## nível da cadeia (ver Cenário 2 da auditoria: duas mortes não-adjacentes
+## exigem 2 varreduras pra compactar por completo) — por isso o laço
+## externo repete a varredura até uma passada inteira não mover mais
+## ninguém, com um teto de segurança de ADVANCE_ORDER.size() passadas
+## (suficiente por construção: no máximo 9 posições, cada passada resolve
+## pelo menos mais um nível de cadeia quando há progresso a fazer).
+##
+## Exceção estrutural de Suporte (5.2.3/6.5, _can_advance()) e a única
+## restrição de Máquina de Guerra (6.6, posicionamento INICIAL, aplicada
+## em _place_army(), nunca aqui) permanecem exatamente como antes — esta
+## correção troca apenas a GEOMETRIA usada para decidir adjacência
+## "posição atual -> próxima posição livre", nunca as regras de
+## elegibilidade por Classe.
+##
+## FASE 8 (2026-09-04) — ULTRAPASSAGEM (COMBAT_RULES.md §6.5, cláusula
+## final: "o pelotão bloqueador continua avançando normalmente... e pode
+## ultrapassar a posição do bloco de Suportes que ele mantém parado").
+## Auditoria desta tarefa confirmou: a documentação já descrevia essa
+## cláusula, mas nenhum código jamais a implementou — _movement_phase()
+## só conhecia "avançar 1 célula, se vazia", nunca "pular uma célula
+## ocupada por Suporte pra alcançar uma vazia além dela". Simulação
+## manual do "Exemplo Oficial" (relatório desta tarefa) confirmou a
+## divergência E validou a correção abaixo, célula por célula, nas 2
+## transições do exemplo.
+##
+## Cada PASSADA do while (inalterado: mesmo teto de segurança, mesmo
+## critério de parada) agora resolve em 2 ESTÁGIOS, sempre nesta ordem:
+##   ESTÁGIO 1 (não-Suporte): Máquina de Guerra mantém a regra antiga,
+##     sem exceção (6.6 — "segue normalmente as regras gerais", nunca
+##     ultrapassa) — só front_pos literal. Qualquer outra Classe usa
+##     _non_support_advance_target(), que PULA células ocupadas por
+##     Suporte (nunca um bloqueio real pra quem não é Suporte) e para
+##     na primeira vazia (destino, pode ser >1 célula de distância nesta
+##     passada) ou na primeira ocupada por outra Classe QUALQUER
+##     (Corpo a Corpo, Barreira, À Distância, Mago ou Máquina de Guerra —
+##     bloqueio real, nunca ultrapassável).
+##   ESTÁGIO 2 (Suporte): SEMPRE depois do Estágio 1 inteiro desta
+##     passada (nunca intercalado) — regra 100% inalterada
+##     (_can_advance()/_support_chain_clear(), nunca tocadas por esta
+##     tarefa). Rodar Suporte por último garante que uma unidade
+##     convencional evaluated mais cedo nesta mesma passada já tenha
+##     "roubado" a vaga que existia à frente do Suporte, se for o caso
+##     (ver Exemplo Oficial, 1ª transição: sem isso, o Suporte
+##     avançaria antes da À Distância conseguir competir pela mesma
+##     vaga).
+## Ambos os estágios preservam a MESMA ordem de avaliação determinística
+## já existente (2→3→...→9), sem nenhuma aleatoriedade.
 static func _movement_phase(state: CombatState) -> void:
 	for side in [0, 1]:
-		for column: Array in CombatBoard.COLUMNS:
-			for i in range(column.size() - 1, 0, -1):
-				var pos: int = column[i]
-				var front_pos: int = column[i - 1]
+		var moved_any: bool = true
+		var safety_passes: int = 0
+		while moved_any and safety_passes < CombatBoard.ADVANCE_ORDER.size():
+			moved_any = false
+			safety_passes += 1
+
+			# ESTÁGIO 1 — não-Suporte (Máquina de Guerra: front_pos
+			# literal, sem ultrapassagem; demais Classes: ultrapassam
+			# Suporte via _non_support_advance_target()).
+			for k in range(CombatBoard.ADVANCE_ORDER.size() - 2, -1, -1):
+				var pos: int = CombatBoard.ADVANCE_ORDER[k]
 				var unit: CombatUnit = state.unit_at(side, pos)
-				if unit == null:
+				if unit == null or unit.card.card_class == "Suporte":
+					continue
+
+				var target: int
+				if unit.card.card_class == "Máquina de Guerra":
+					var front_pos: int = CombatBoard.ADVANCE_ORDER[k + 1]
+					target = front_pos if state.unit_at(side, front_pos) == null else -1
+				else:
+					target = _non_support_advance_target(state, side, pos)
+				if target == -1:
+					continue
+
+				moved_any = true
+				_move_unit(state, side, unit, pos, target)
+
+			# ESTÁGIO 2 — Suporte, sempre depois do Estágio 1 desta
+			# mesma passada (regra 100% inalterada).
+			for k in range(CombatBoard.ADVANCE_ORDER.size() - 2, -1, -1):
+				var pos: int = CombatBoard.ADVANCE_ORDER[k]
+				var front_pos: int = CombatBoard.ADVANCE_ORDER[k + 1]
+				var unit: CombatUnit = state.unit_at(side, pos)
+				if unit == null or unit.card.card_class != "Suporte":
 					continue
 				if state.unit_at(side, front_pos) != null:
 					continue
 				if not _can_advance(state, unit):
 					continue
 
-				unit.position = front_pos
-				_apply_arrival_position_effects(unit)
-				var reorg_note: String = " (entra em Reorganização)" if unit.is_reorganizing_this_turn else ""
-				if state.enable_battle_log:
-					state.battle_log.append("Lado %d: %s avança de %d para %d%s" % [side, unit.card.card_name, pos, front_pos, reorg_note])
+				moved_any = true
+				_move_unit(state, side, unit, pos, front_pos)
 
-				var move_ctx := CombatContext.new()
-				move_ctx.state = state
-				move_ctx.turn = state.turn
-				move_ctx.attacker = unit
-				move_ctx.side = side
-				move_ctx.position = front_pos
-				state.event_bus.publish(CombatEventType.Type.UNIT_MOVED, move_ctx)
+
+## Aplica um avanço já decidido (por qualquer um dos 2 estágios acima):
+## atualiza a posição, os efeitos de chegada (Bônus de Posição da
+## Barreira/Reorganização), o Battle Log narrativo e publica o MESMO
+## evento UNIT_MOVED de sempre — extraído de _movement_phase() nesta
+## tarefa só pra ser reaproveitado pelos 2 estágios, nenhuma mudança de
+## comportamento em si. "from_pos"/"to_pos" são sempre a origem/destino
+## REAIS do avanço (com ultrapassagem, to_pos pode ser >1 célula de
+## distância de from_pos numa única chamada — um único evento MOVE,
+## nunca eventos intermediários falsos pras células puladas).
+static func _move_unit(state: CombatState, side: int, unit: CombatUnit, from_pos: int, to_pos: int) -> void:
+	unit.position = to_pos
+	_apply_arrival_position_effects(unit)
+	var reorg_note: String = " (entra em Reorganização)" if unit.is_reorganizing_this_turn else ""
+	if state.enable_battle_log:
+		state.battle_log.append("Lado %d: %s avança de %d para %d%s" % [side, unit.card.card_name, from_pos, to_pos, reorg_note])
+
+	var move_ctx := CombatContext.new()
+	move_ctx.state = state
+	move_ctx.turn = state.turn
+	move_ctx.attacker = unit
+	move_ctx.side = side
+	move_ctx.position = to_pos
+	state.event_bus.publish(CombatEventType.Type.UNIT_MOVED, move_ctx)
+
+
+## FASE 8 — alvo de avanço de uma unidade NÃO-Suporte (nunca chamada
+## para Máquina de Guerra, que mantém front_pos literal em
+## _movement_phase()): percorre ADVANCE_ORDER a partir de "position",
+## em direção à frente, pulando qualquer célula ocupada por Suporte
+## (nunca um bloqueio real pra quem não é Suporte — COMBAT_RULES.md
+## §6.5, "pode ultrapassar"). Para e retorna a posição na primeira
+## célula VAZIA encontrada (destino válido, pode ser >1 célula de
+## distância de "position"). Retorna -1 se a primeira célula não-vazia
+## encontrada estiver ocupada por qualquer Classe que NÃO seja Suporte
+## (bloqueio real — nunca ultrapassável, seja Corpo a Corpo, Barreira,
+## À Distância, Mago OU Máquina de Guerra) ou se a sequência acabar
+## (Posição 1 não tem front_pos). Função pura — nunca move nada, nunca
+## publica evento, só calcula.
+static func _non_support_advance_target(state: CombatState, side: int, position: int) -> int:
+	var current: int = position
+	# Teto de segurança = tamanho do tabuleiro (9): nunca existem mais
+	# células de Suporte consecutivas pra pular do que posições no
+	# próprio ADVANCE_ORDER — nunca alcançado na prática, só evita um
+	# "while true" (GDScript exige um retorno alcançável fora dele,
+	# mesmo quando toda iteração interna já retorna ou avança).
+	for _i in range(CombatBoard.ADVANCE_ORDER.size()):
+		var index: int = CombatBoard.ADVANCE_ORDER.find(current)
+		if index == -1 or index >= CombatBoard.ADVANCE_ORDER.size() - 1:
+			return -1
+		var next_pos: int = CombatBoard.ADVANCE_ORDER[index + 1]
+		var occupant: CombatUnit = state.unit_at(side, next_pos)
+		if occupant == null:
+			return next_pos
+		if occupant.card.card_class != "Suporte":
+			return -1
+		current = next_pos
+	return -1
 
 
 ## Regra geral: avança se a posição à frente estiver livre. Exceção
@@ -293,6 +429,10 @@ static func _movement_phase(state: CombatState) -> void:
 ## própria (6.5, Cadeia de Bloqueio) — Máquina de Guerra segue a regra
 ## geral como qualquer outra Classe (sua única restrição é de
 ## posicionamento INICIAL, 6.6, aplicada em _place_army(), nunca aqui).
+## Usada hoje só pelo Estágio 2 (Suporte) de _movement_phase() e pelos
+## testes que validam _can_advance() isoladamente — o Estágio 1
+## (não-Suporte) resolve seu próprio alvo via
+## _non_support_advance_target()/front_pos literal, nunca por aqui.
 static func _can_advance(state: CombatState, unit: CombatUnit) -> bool:
 	match unit.card.card_class:
 		"Suporte":
@@ -302,7 +442,16 @@ static func _can_advance(state: CombatState, unit: CombatUnit) -> bool:
 
 
 ## Cadeia de Bloqueio do Suporte (COMBAT_RULES.md 6.5). Verifica apenas a
-## posição IMEDIATAMENTE atrás de "unit":
+## posição IMEDIATAMENTE atrás de "unit" NA SEQUÊNCIA ÚNICA DE AVANÇO
+## (CombatBoard.ADVANCE_ORDER, 5.2.1/5.2.3 — via
+## CombatBoard.support_position_behind()), NÃO na coluna antiga
+## (CombatBoard.positions_behind()/column_of() continuam corretos para
+## "Sacrifício de Carne", que é explicitamente "mesma coluna" por
+## definição própria em ABILITIES.md/CARD_CATALOG.md, nunca para a Cadeia
+## de Bloqueio). Auditoria de movimentação (2026-09-01) encontrou que esta
+## função usava a geometria de coluna mesmo depois de _movement_phase()
+## ter migrado pra sequência única — corrigido aqui, sem tocar
+## positions_behind() nem quem ainda depende dela.
 ## - Vazia, ou ocupada por Máquina de Guerra: nunca bloqueia — a cadeia
 ##   termina aqui, o que estiver mais atrás (mesmo um pelotão
 ##   convencional) é irrelevante (Máquina de Guerra é opaca à cadeia).
@@ -313,11 +462,11 @@ static func _can_advance(state: CombatState, unit: CombatUnit) -> bool:
 ##   Distância ou Mago): bloqueia o avanço de toda a cadeia de Suportes
 ##   à sua frente.
 static func _support_chain_clear(state: CombatState, unit: CombatUnit) -> bool:
-	var behind_positions: Array[int] = CombatBoard.positions_behind(unit.position)
-	if behind_positions.is_empty():
+	var behind_position: int = CombatBoard.support_position_behind(unit.position)
+	if behind_position == -1:
 		return true
 
-	var ally: CombatUnit = state.unit_at(unit.side, behind_positions[0])
+	var ally: CombatUnit = state.unit_at(unit.side, behind_position)
 	if ally == null or ally.card.card_class == "Máquina de Guerra":
 		return true
 	if ally.card.card_class == "Suporte":

@@ -3,18 +3,55 @@ extends Control
 ## ArmyEditorPanel (COMMAND_CENTER_UI.md, "motor de geração de exército
 ## comum")
 ##
-## Componente reutilizável: monta 1 Exército (Comandante + 9 Cartas) e,
-## se "formation_count" > 1, edita as Formações extras (posicionamento
-## das MESMAS 9 cartas, nunca cartas diferentes). Cada janela que
-## precisa montar um Exército (PvE, PvP, Minas) instancia esta cena e
-## configura "formation_count" antes de _ready() rodar — 5 para PvE
-## (α a ε), 1 para PvP e Minas (só a posição base importa).
+## RECONSTRUÇÃO (pedido explícito): de um formulário puro (OptionButton
+## de Comandante + CheckBox por Carta + dropdown de posição) para um
+## "Montador de Exército" visual — moldura "Caixa de texto centro de
+## comando_exercito.png" (mesma arte/geometria de exercitos_panel.gd,
+## medida por pixel naquela etapa, reaproveitada aqui sem remedir),
+## abas COMANDANTE/PELOTÃO na faixa superior, lista/grade com arte real
+## + filtros reais na área grande esquerda, e Comandante + Formação 3x3
+## (Drag-and-Drop nativo do Godot) sempre visível na coluna direita.
 ##
-## Emite "army_ready" quando o Exército está pronto para uso — quem
-## instanciou decide o que fazer com ele (adicionar a um Squad, usar
-## como Guarnição de Mina etc.). Este Editor nunca decide isso sozinho.
+## CONTRATO PRESERVADO (bootstrap.gd chama estes campos/métodos
+## DIRETO, sem passar pela UI — auditado antes de reescrever, ver
+## relatório da tarefa): formation_count, existing_army,
+## editing_composition, _commander_option (só .visible), _formations_section
+## (só .visible), _formation_cards (Dictionary String -> Array[CardResource]),
+## _current_formation, _selected_commander, _selected_cards, _army,
+## sinais army_ready/cancelled, e os métodos _on_card_toggled(pressed,card),
+## _on_montar_pressed(), _on_slot_card_selected(new_card_index,slot_index),
+## _on_concluir_pressed(), _on_cancel_pressed() — todos com o MESMO corpo
+## funcional de antes (Kingdom.form_army/re_form_army/disband_army nunca
+## tocados). Tudo o mais (_cards_container, _soldo_label, _montar_button,
+## _slots_grid, _formation_tabs_row, _concluir_button da versão anterior)
+## não é testado por nome — foi livremente redesenhado.
 ##
-## Layout de posição (COMBAT_RULES.md, "Campo de Batalha"):
+## _commander_option agora é o Control que envolve a FAIXA SUPERIOR
+## (abas) + a ÁREA GRANDE ESQUERDA (filtros + lista/grade) inteiras —
+## escondê-lo (.visible=false) esconde a escolha de Comandante/Cartas
+## por completo, exatamente como o modo "só editar Formação" precisa.
+## _formations_section agora é a COLUNA DIREITA (retrato+dados do
+## Comandante, Soldo do Exército, e a Formação 3x3) — sempre construído
+## visível (nenhum teste espera .visible=false nela em nenhum momento).
+##
+## GAP ENCONTRADO (auditoria desta etapa, ver relatório): não existia
+## nenhum componente de Drag-and-Drop em lugar nenhum do projeto.
+## Resolvido com os métodos NATIVOS do Godot Control
+## (_get_drag_data/_can_drop_data/_drop_data), encapsulados em
+## ArmyCardSlot (res://scenes/army/army_card_slot.gd) — uma classe
+## puramente mecânica, sem nenhuma regra de Exército/Carta embutida.
+##
+## Posicionamento ANTES de "Montar"/"Salvar Alterações" é só rascunho
+## de UI local (_phase1_slots, 9 posições, nunca chega ao Kingdom).
+## "Montar"/"Salvar Alterações" continua sendo a ÚNICA ação que de fato
+## grava no Reino (Kingdom.form_army()/re_form_army(), EXATAMENTE como
+## antes — nunca chamado a cada arrasto). O rascunho só decide a ORDEM
+## inicial de "α" (_formation_cards["α"]) no momento do commit — nunca
+## os objetos CardResource passados a form_army()/re_form_army(), que
+## continuam sendo _selected_cards.duplicate(), byte-a-byte como antes.
+##
+## Layout de posição (COMBAT_RULES.md, "Campo de Batalha") — nunca
+## alterado:
 ## Linha 1 (Frente): [1] [2] [3]
 ## Linha 2 (Meio):   [6] [5] [4]
 ## Linha 3 (Fundo):  [7] [8] [9]
@@ -23,74 +60,180 @@ signal army_ready(army: Army)
 signal cancelled
 
 ## ATENÇÃO AO CONECTAR "army_ready": lambdas do GDScript capturam
-## variáveis locais POR VALOR, não por referência — um padrão como
-## `editor.army_ready.connect(func(a): minha_variavel_local = a)`
-## NUNCA atualiza "minha_variavel_local" de verdade (confirmado com
-## execução real: a conexão existe, o emit() roda, mas a variável
-## externa nunca muda). Quem for consumir este sinal deve conectar a
-## um MÉTODO nomeado que faça "self.algo = a" (mutação de propriedade
-## do próprio objeto funciona normalmente) — nunca uma lambda tentando
-## escrever numa variável local externa.
+## variáveis locais POR VALOR, não por referência — conecte a um MÉTODO
+## nomeado, nunca a uma lambda que tenta escrever numa variável local
+## externa (confirmado com execução real, ver bootstrap.gd).
 
-## Configurar ANTES de _ready() rodar (ex: definir logo após
-## instanciar a cena, antes de add_child na árvore). 1 = só a posição
-## base (PvP, Minas). 5 = PvE (Formações α a ε).
+## Configurar ANTES de _ready() rodar. 1 = só a posição base (PvP,
+## Minas). 5 = PvE (Formações α a ε).
 var formation_count: int = 1
 
 const POSITION_LAYOUT: Array[int] = [1, 2, 3, 6, 5, 4, 7, 8, 9]  # ordem visual, valor = nº da posição
 const FORMATION_NAMES: Array[String] = ["α", "β", "γ", "δ", "ε"]
 
-var _root_vbox: VBoxContainer
-var _commander_option: OptionButton
-var _cards_container: VBoxContainer
-var _soldo_label: Label
-var _montar_button: Button
-var _formations_section: VBoxContainer
-var _slots_grid: GridContainer
-var _formation_tabs_row: HBoxContainer
-var _concluir_button: Button
-
-var _eligible_commanders: Array[CommanderResource] = []
-var _selected_commander: CommanderResource = null
-var _selected_cards: Array[CardResource] = []  # ordem de escolha = posição base 1..9
-
-var _army: Army = null
-var _formation_cards: Dictionary = {}  # nome ("α".."ε") -> Array[CardResource] (9 posições)
-var _current_formation: String = "α"
-
-
 ## Definido ANTES de add_child() por quem chama, quando o objetivo é
-## editar as Formações de um Exército JÁ EXISTENTE (não criar um
-## novo). Quando setado, _ready() pula a Fase 1 inteira (Comandante +
-## 9 Cartas já estão definidos) e vai direto pras Formações.
+## editar as Formações de um Exército JÁ EXISTENTE.
 var existing_army: Army = null
 
 ## Definido junto com "existing_army", ANTES de add_child(), quando o
-## objetivo é editar a COMPOSIÇÃO (Comandante e/ou Cartas) de um
-## Exército já existente — não só as Formações. Mostra a Fase 1
-## (Comandante + 9 Cartas) pré-preenchida com a composição atual.
+## objetivo é editar a COMPOSIÇÃO (Comandante e/ou Cartas), não só as
+## Formações.
 var editing_composition: bool = false
+
+## Campo de Prova (CAMPO_DE_PROVA.md): quando true, "Montar Exército"/
+## "Salvar Alterações" NUNCA chama Kingdom.form_army()/re_form_army() —
+## constrói um Army solto (nunca em Kingdom.armies) e o entrega via
+## army_ready, sem tocar ownership/inventário do jogador. "Cancelar"
+## também nunca chama Kingdom.disband_army() nesse modo (nada foi
+## registrado no Reino pra desfazer). Setar ANTES de add_child(), mesmo
+## padrão de existing_army/editing_composition — nunca durante uso.
+var sandbox_mode: bool = false
+
+## Pool de Cartas/Comandantes a oferecer quando sandbox_mode == true.
+## [] (padrão) usa o catálogo completo do jogo (GameDatabase), sempre
+## .duplicate() antes de exibir; um Array não-vazio o substitui (ex:
+## Kingdom.cards do próprio jogador, pra "editar meu Exército para o
+## Campo de Prova" sem tocar ownership real, mas ainda restrito ao que
+## o jogador de fato possui). Nunca lido quando sandbox_mode == false.
+var sandbox_card_pool: Array[CardResource] = []
+var sandbox_commander_pool: Array[CommanderResource] = []
+
+## Cache do catálogo completo duplicado — construído uma vez por sessão
+## do Editor (nunca recriado a cada refresh), só quando sandbox_mode ==
+## true e nenhum pool explícito foi fornecido.
+var _cached_sandbox_catalog_cards: Array[CardResource] = []
+var _cached_sandbox_catalog_commanders: Array[CommanderResource] = []
+
+## --- Contrato (nomes preservados, ver docstring do topo) ---
+var _commander_option: Control = null
+var _formations_section: Control = null
+var _formation_cards: Dictionary = {}  # nome ("α".."ε") -> Array[CardResource] (9 posições)
+var _current_formation: String = "α"
+
+var _eligible_commanders: Array[CommanderResource] = []
+var _selected_commander: CommanderResource = null
+var _selected_cards: Array[CardResource] = []  # ordem de escolha = posição base 1..9 (fallback)
+
+var _army: Army = null
+
+## BUG REAL CONFIRMADO (auditoria desta etapa): toda ação (selecionar
+## Carta, arrastar, filtrar, trocar Comandante) chama _refresh_all(),
+## que sempre cria um ScrollContainer NOVO do zero — nunca reaproveita
+## o existente. Um ScrollContainer novo sempre nasce com
+## scroll_vertical=0, então CADA ação devolvia o jogador ao topo da
+## lista/grade, mesmo que a ação em si não tivesse relação nenhuma com
+## rolagem. Corrigido guardando a posição do ScrollContainer ATUAL
+## antes de destruí-lo (_refresh_all()/_rebuild_detail_content()) e
+## reaplicando no NOVO logo depois de construído — via call_deferred,
+## porque a extensão rolável (scroll_vertical máximo) só fica correta
+## depois que o Godot processa o layout do conteúdo recém-adicionado
+## (mesma cautela de timing já usada no resto desta tela).
+var _list_scroll: ScrollContainer = null
+var _list_scroll_position: int = 0
+var _detail_scroll: ScrollContainer = null
+var _detail_scroll_position: int = 0
+
+## --- Estado novo (livre, não testado por bootstrap.gd) ---
+var _mode: String = "comandante"  # "comandante" | "pelotao"
+
+## Rascunho de posicionamento da Fase 1 (antes de Montar/Salvar) — 9
+## posições, null = vazia. Mantido em sincronia por _on_card_toggled()
+## quando chamado pela UI; se algo escrever _selected_cards direto
+## (bootstrap.gd faz isso em alguns testes) ele fica desatualizado de
+## propósito, e _resolved_alpha_order() detecta isso e cai de volta em
+## _selected_cards.duplicate() — nunca quebra o contrato antigo.
+var _phase1_slots: Array[CardResource] = [null, null, null, null, null, null, null, null, null]
+
+## Mensagem do último "Criar Exército Aleatório" — só preenchida quando
+## a geração FALHA (nenhuma composição válida encontrada); limpa em
+## qualquer geração bem-sucedida ou interação manual subsequente.
+var _random_army_message: String = ""
+
+var _filter_cmd_faction: String = "(todas)"
+var _filter_cmd_patente: String = "(qualquer)"
+var _filter_cmd_soldo_min: String = "(qualquer)"
+
+var _filter_card_faction: String = "(todas)"
+var _filter_card_class: String = "(todas)"
+var _filter_card_rarity: String = "(todas)"
+var _filter_card_tier: String = "(todos)"
+
+const FACCAO_VALUES: Array[String] = ["(todas)", "Império", "Natureza", "Mortos-Vivos"]
+## Mesmo vocabulário de CardResource.card_class já usado em
+## bestiario_panel.gd/academia_producao_panel.gd — nunca uma segunda
+## taxonomia inventada.
+const CLASSE_VALUES: Array[String] = ["(todas)", "Corpo a Corpo", "À Distância", "Mago", "Suporte", "Barreira", "Máquina de Guerra"]
+const RARIDADE_VALUES: Array[String] = ["(todas)", "Comum", "Rara", "Épica", "Lendária"]
+const TIER_VALUES: Array[String] = ["(todos)", "1", "2", "3", "4", "5"]
+
+## --- Identidade visual (mesma moldura/paleta do Centro de Comando —
+## mesmo arquivo/geometria já medida por pixel em exercitos_panel.gd). ---
+const FRAME_TEXTURE: Texture2D = preload("res://assets/art/city_buildings/command_center_army_window_frame.png")
+const FRAME_IMAGE_ASPECT_RATIO: float = 1536.0 / 1024.0
+
+const TITLE_RECT: Rect2 = Rect2(0.318, 0.133, 0.364, 0.061)
+const CLOSE_BUTTON_RECT: Rect2 = Rect2(0.859, 0.117, 0.072, 0.103)
+const TOP_RECT: Rect2 = Rect2(0.086, 0.242, 0.572, 0.102)     # faixa superior: abas Comandante/Pelotão
+const LIST_RECT: Rect2 = Rect2(0.086, 0.362, 0.572, 0.465)    # área grande esquerda: filtros + lista/grade
+const DETAIL_RECT: Rect2 = Rect2(0.674, 0.242, 0.241, 0.585)  # coluna direita: Comandante + Formação
+
+const HUD_FONT: Font = preload("res://assets/fonts/Cinzel-SemiBold.ttf")
+const HUD_TEXT_COLOR: Color = Color(0.93, 0.93, 0.90)
+const HUD_MUTED_COLOR: Color = Color(0.62, 0.62, 0.60)
+const HUD_OUTLINE_COLOR: Color = Color(0.02, 0.02, 0.02, 0.95)
+const HUD_OUTLINE_SIZE: int = 3
+const HUD_SHADOW_COLOR: Color = Color(0.0, 0.0, 0.0, 0.5)
+const HUD_SHADOW_OFFSET: int = 2
+const HUD_ACCENT: Color = Color(0.75, 0.65, 0.45)
+const HUD_ACCENT_SELECTED: Color = Color(0.95, 0.80, 0.35)
+const HUD_ERROR_COLOR: Color = Color(0.92, 0.45, 0.40)
+
+const PORTRAIT_IMPERIO_1: Texture2D = preload("res://assets/art/commanders/commander_portrait_imperio_1.png")
+const PORTRAIT_IMPERIO_2: Texture2D = preload("res://assets/art/commanders/commander_portrait_imperio_2.png")
+const PORTRAIT_NATUREZA_1: Texture2D = preload("res://assets/art/commanders/commander_portrait_natureza_1.png")
+const PORTRAIT_NATUREZA_2: Texture2D = preload("res://assets/art/commanders/commander_portrait_natureza_2.png")
+const PORTRAIT_MORTOS_VIVOS_1: Texture2D = preload("res://assets/art/commanders/commander_portrait_mortos_vivos_1.png")
+const PORTRAIT_MORTOS_VIVOS_2: Texture2D = preload("res://assets/art/commanders/commander_portrait_mortos_vivos_2.png")
+
+const FORMATION_CARD_WIDTH: float = 70.0
+const COMMANDER_PORTRAIT_SIZE: float = 84.0
+const LIST_CARD_WIDTH: float = 82.0
+const LIST_COMMANDER_PORTRAIT: float = 46.0
 
 
 func _ready() -> void:
 	if not KingdomState.is_initialized:
 		KingdomState.initialize_new_kingdom()
 
+	# Aquece o cache de textura das Cartas em segundo plano (mesmo
+	# padrão de biblioteca_panel.gd/bestiario_panel.gd/exercitos_panel.gd)
+	# — a lista/grade do modo Pelotão e a Formação usam BattleCardView/
+	# CardArtCatalog, diferente da versão anterior (só texto).
+	CardArtCatalog.preload_all(GameDatabase.cards)
+
 	_build_static_structure()
 	if existing_army != null and editing_composition:
 		_selected_commander = existing_army.commander
 		_selected_cards = existing_army.cards.duplicate()
-		_refresh_choice_phase()
+		# F-021.1.1: sem isto a grade (_current_grid_source() lê
+		# _phase1_slots enquanto _army == null, ou seja, durante toda a
+		# edição pré-commit) mostrava as 9 posições vazias mesmo com a
+		# Formação real intacta em _selected_cards/existing_army.cards —
+		# bug puramente visual (salvar já recaía em _selected_cards via
+		# _resolved_alpha_order()), nunca perda de dado.
+		_phase1_slots = existing_army.cards.duplicate()
+		_refresh_all()
 	elif existing_army != null:
 		_start_formation_edit_mode()
 	else:
-		_refresh_choice_phase()
+		_refresh_all()
 
 
-## ARMY.md: todo Exército já existente já tem as 5 Formações (α já é
-## army.cards; β-ε já foram geradas por Kingdom.form_army() na
-## criação, ou já foram editadas manualmente antes). Aqui só carrega
-## esse estado já existente pra edição — nunca gera nada novo.
+## ARMY.md: todo Exército já existente já tem as 5 Formações. Aqui só
+## carrega esse estado já existente pra edição — nunca gera nada novo.
+## _commander_option fica invisível (nada a escolher); _formations_section
+## sozinho mostra Comandante + Formação, com as abas α-ε se
+## formation_count>1.
 func _start_formation_edit_mode() -> void:
 	_army = existing_army
 	_selected_commander = existing_army.commander
@@ -98,147 +241,1556 @@ func _start_formation_edit_mode() -> void:
 	formation_count = 5  # sempre permite editar as 5, mesmo que o Exército tenha nascido de um fluxo de 1 Formação só
 
 	_commander_option.visible = false
-	_cards_container.visible = false
-	_soldo_label.visible = false
-	_montar_button.visible = false
 
 	_formation_cards["α"] = existing_army.cards.duplicate()
 	for i in range(1, formation_count):
-		var name: String = FORMATION_NAMES[i]
-		_formation_cards[name] = existing_army.formations[name].duplicate() if existing_army.formations.has(name) else existing_army.cards.duplicate()
+		var formation_name: String = FORMATION_NAMES[i]
+		_formation_cards[formation_name] = existing_army.formations[formation_name].duplicate() if existing_army.formations.has(formation_name) else existing_army.cards.duplicate()
 
-	_formations_section.visible = true
-	_concluir_button.visible = true
 	_current_formation = "α"
-	_build_formation_tabs()
-	_build_slots_grid()
+	_rebuild_detail_content()
 
+
+## --- Estrutura estática (moldura + as duas regiões alternáveis). ---
 
 func _build_static_structure() -> void:
-	var background := ColorRect.new()
-	background.color = Color(0.12, 0.12, 0.16)
-	background.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(background)
+	var backdrop := ColorRect.new()
+	backdrop.color = Color(0, 0, 0, 0.72)
+	backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
+	backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(backdrop)
+
+	var window_area := Control.new()
+	window_area.set_anchors_preset(Control.PRESET_FULL_RECT)
+	window_area.clip_contents = true
+	add_child(window_area)
+
+	var aspect := AspectRatioContainer.new()
+	aspect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	aspect.ratio = FRAME_IMAGE_ASPECT_RATIO
+	aspect.stretch_mode = AspectRatioContainer.STRETCH_FIT
+	aspect.alignment_horizontal = AspectRatioContainer.ALIGNMENT_CENTER
+	aspect.alignment_vertical = AspectRatioContainer.ALIGNMENT_CENTER
+	window_area.add_child(aspect)
+
+	var texture_rect := TextureRect.new()
+	texture_rect.texture = FRAME_TEXTURE
+	texture_rect.stretch_mode = TextureRect.STRETCH_SCALE
+	texture_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	texture_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	aspect.add_child(texture_rect)
+
+	_build_title(texture_rect, "Editar Exército" if existing_army != null else "Editor de Exército")
+	_build_close_button(texture_rect)
+
+	# _commander_option: faixa superior (abas) + área grande esquerda
+	# (filtros + lista/grade), como UM SÓ Control — visible=false
+	# esconde as duas de uma vez (contrato do modo "só Formação").
+	# BUG REAL CONFIRMADO (auditoria desta etapa): estes dois wrappers
+	# cobrem o retângulo INTEIRO da moldura (0,0,1,1) só para que um
+	# único .visible os escondesse juntos — mas com MOUSE_FILTER_PASS
+	# (usado antes aqui) cada um ainda participa do hit-test do Godot em
+	# QUALQUER ponto da tela, inclusive por cima do botão X e um por
+	# cima do outro (_formations_section é adicionado depois, logo fica
+	# na frente de _commander_option inteiro). Na prática isso bloqueava
+	# cliques em toda a janela, não só numa borda. MOUSE_FILTER_IGNORE
+	# torna os dois wrappers inteiramente transparentes ao mouse — só os
+	# filhos ancorados (TOP_RECT/LIST_RECT/DETAIL_RECT, cada um com seu
+	# próprio MOUSE_FILTER_STOP local, mesmo padrão de exercitos_panel.gd/
+	# comandantes_panel.gd) continuam capturando clique.
+	_commander_option = _anchor_new_control(texture_rect, Rect2(0, 0, 1, 1))
+	_commander_option.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_build_top_tabs_area(_commander_option)
+	_build_selection_area(_commander_option)
+
+	# _formations_section: coluna direita — sempre construído visível.
+	_formations_section = _anchor_new_control(texture_rect, Rect2(0, 0, 1, 1))
+	_formations_section.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+
+func _build_title(parent: Control, text: String) -> void:
+	var area := _anchor_new_control(parent, TITLE_RECT)
+	var label := _make_centered_label(text, 18, HUD_ACCENT)
+	label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	area.add_child(label)
+
+
+func _build_close_button(parent: Control) -> void:
+	var hotspot := _anchor_new_control(parent, CLOSE_BUTTON_RECT)
+	hotspot.mouse_filter = Control.MOUSE_FILTER_STOP
+	hotspot.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	hotspot.gui_input.connect(_on_close_button_gui_input)
+
+
+func _on_close_button_gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		_on_cancel_pressed()
+
+
+## Reconstrói as duas regiões alternáveis inteiras — mesmo padrão de
+## reconstrução total já usado no resto do projeto (nenhum estado de
+## Control é preservado entre chamadas, só as variáveis desta classe) —
+## exceto a posição de rolagem da lista/grade, guardada e reaplicada
+## (ver docstring de _list_scroll).
+func _refresh_all() -> void:
+	if _list_scroll != null:
+		_list_scroll_position = _list_scroll.scroll_vertical
+	if _commander_option != null:
+		_clear_children(_commander_option)
+		_build_top_tabs_area(_commander_option)
+		_build_selection_area(_commander_option)
+	_rebuild_detail_content()
+
+
+func _rebuild_detail_content() -> void:
+	if _detail_scroll != null:
+		_detail_scroll_position = _detail_scroll.scroll_vertical
+	if _formations_section == null:
+		return
+	_clear_children(_formations_section)
+	_build_detail_area(_formations_section)
+
+
+## --- Faixa superior: abas COMANDANTE / PELOTÃO + ação administrativa
+## "Criar Exército Aleatório" (área própria, nunca competindo com as
+## abas — fica presa à borda direita enquanto as abas continuam
+## centralizadas por dois espaçadores EXPAND_FILL iguais). ---
+## O Comandante precisa ser escolhido primeiro (regra do pedido) — a
+## aba PELOTÃO fica desabilitada até _selected_commander != null.
+func _build_top_tabs_area(parent: Control) -> void:
+	var area := _anchor_new_control(parent, TOP_RECT)
+
+	var margin := MarginContainer.new()
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	margin.add_theme_constant_override("margin_left", 10)
+	margin.add_theme_constant_override("margin_right", 10)
+	area.add_child(margin)
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	margin.add_child(row)
+
+	var left_spacer := Control.new()
+	left_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(left_spacer)
+
+	var tabs_hbox := HBoxContainer.new()
+	tabs_hbox.add_theme_constant_override("separation", 14)
+	row.add_child(tabs_hbox)
+
+	var commander_tab := _make_tab_button("Comandante", _mode == "comandante")
+	commander_tab.pressed.connect(_on_mode_tab_pressed.bind("comandante"), CONNECT_DEFERRED)
+	tabs_hbox.add_child(commander_tab)
+
+	var pelotao_tab := _make_tab_button("Pelotão", _mode == "pelotao")
+	pelotao_tab.disabled = _selected_commander == null
+	pelotao_tab.pressed.connect(_on_mode_tab_pressed.bind("pelotao"), CONNECT_DEFERRED)
+	tabs_hbox.add_child(pelotao_tab)
+
+	var right_spacer := Control.new()
+	right_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(right_spacer)
+
+	var random_button := _make_small_button("Criar Exército Aleatório")
+	random_button.disabled = _army != null
+	random_button.pressed.connect(_on_random_army_pressed, CONNECT_DEFERRED)
+	row.add_child(random_button)
+
+
+func _on_mode_tab_pressed(mode: String) -> void:
+	if mode == "pelotao" and _selected_commander == null:
+		return
+	if mode != _mode:
+		_list_scroll_position = 0  # lista de Comandantes e grade de Cartas são conteúdos diferentes — preservar rolagem entre as duas não faz sentido
+	_mode = mode
+	_refresh_all()
+
+
+## --- "Criar Exército Aleatório" ---
+##
+## AUDITORIA (antes de implementar, pedido explícito): a única
+## "heurística de composição automática" real do projeto é
+## EnemyArmyGenerator (engine/world/season/enemy_army_generator.gd) —
+## usada pra gerar Exércitos INIMIGOS de PvE/PvP. Ela NÃO serve pra
+## reuso direto aqui: monta um CommanderResource TÉCNICO/PROCEDURAL
+## novo (nunca um Comandante real do jogador) e distribui as 9 Cartas
+## numa proporção fixa de Facção do Território (6+3) que não existe no
+## contexto do Editor (o jogador escolhe livremente do seu próprio
+## acervo, sem "território"). O que É diretamente reaproveitável, e
+## reaproveitado aqui:
+##   - a TÉCNICA de amostragem da própria EnemyArmyGenerator
+##     (build_composition()/_pick_unique_by_name()): embaralhar o pool,
+##     preencher gananciosamente respeitando Unicidade de Nome, testar
+##     o Soldo total contra o teto, tentar de novo com outro embaralhamento
+##     se estourar — nunca "9 cartas aleatórias sem checar nada";
+##   - Soldo.cap_for_patente()/Soldo.total_for_composition()/
+##     Soldo.cost_for_rarity() (SOLDO.md, SSoT real, nunca recalculado);
+##   - a mesma checagem de Unicidade de Composição usada por
+##     _on_card_toggled();
+##   - a mesma checagem de posse (_card_is_owned_elsewhere(),
+##     _eligible_commanders_filtered_ignoring_filters()) já usada no
+##     resto desta tela — nunca uma 2ª regra de disponibilidade;
+##   - ArmyFormationArchetypes.generate_all() (a heurística REAL de
+##     POSICIONAMENTO tático, já usada por Kingdom.form_army() pra
+##     gerar β-γ-δ-ε) — usada aqui só pra dar à prévia (_phase1_slots)
+##     um arranjo tático sensato (Formação δ, Equilibrada) em vez de
+##     ordem arbitrária, antes mesmo de "Montar Exército" rodar.
+##
+## Restrição/Requisito da Doutrina do Comandante sorteado: não existe
+## nenhuma regra de "restrição/requisito de Doutrina afeta ELEGIBILIDADE
+## do Comandante pra liderar um Exército" em ARMY.md/COMMANDERS.md hoje
+## (Doutrina se aplica em Combate, via CommanderDoctrineRuntime — nunca
+## bloqueia formar o Exército em si). Não inventei essa checagem.
+##
+## Nunca forma/salva o Exército de verdade (Kingdom.form_army() só roda
+## se o jogador clicar "Montar Exército"/"Salvar Alterações" depois,
+## revisando o resultado como qualquer composição escolhida manualmente).
+## Teto de tentativas: ver ArmyRandomComposer.MAX_ATTEMPTS (extraída
+## nesta etapa, Campo de Prova).
+
+
+func _on_random_army_pressed() -> void:
+	if _army != null:
+		return
+
+	var kingdom: Kingdom = KingdomState.kingdom
+	var eligible_commanders: Array[CommanderResource] = _eligible_commanders_filtered_ignoring_filters(kingdom)
+	if eligible_commanders.is_empty():
+		_random_army_message = "NÃO FOI POSSÍVEL ENCONTRAR UMA COMPOSIÇÃO VÁLIDA: nenhum Comandante Ativo e livre no Reino. Recrute/promova um em \"Comandantes\" primeiro."
+		_refresh_all()
+		return
+
+	var pool: Array[CardResource] = _random_selectable_cards(kingdom)
+	if pool.size() < 9:
+		_random_army_message = "NÃO FOI POSSÍVEL ENCONTRAR UMA COMPOSIÇÃO VÁLIDA: só existem %d Carta(s) livre(s) no Reino — são necessárias 9 com Nomes distintos." % pool.size()
+		_refresh_all()
+		return
+
+	var shuffled_commanders: Array[CommanderResource] = eligible_commanders.duplicate()
+	shuffled_commanders.shuffle()
+
+	for commander: CommanderResource in shuffled_commanders:
+		var patente: String = CommanderCareer.patente_for_xp(commander.accumulated_xp)
+		var cap: int = Soldo.cap_for_patente(patente)
+		var composition: Array[CardResource] = _random_valid_composition(pool, cap)
+		if composition.is_empty():
+			continue
+
+		_random_army_message = ""
+		_selected_commander = commander
+		_selected_cards = composition
+		var archetypes: Dictionary = ArmyFormationArchetypes.generate_all(composition)
+		var balanced: Array[CardResource] = archetypes.get("δ", composition)
+		_phase1_slots = balanced.duplicate()
+		_mode = "pelotao"
+		_refresh_all()
+		return
+
+	_random_army_message = "NÃO FOI POSSÍVEL ENCONTRAR UMA COMPOSIÇÃO VÁLIDA: nenhum Comandante elegível tem Soldo suficiente pra cobrir 9 Cartas livres e distintas do Reino."
+	_refresh_all()
+
+
+## Mesmo filtro de disponibilidade real de sempre (_card_is_owned_elsewhere,
+## já usado pela lista/grade do Pelotão) — nunca uma 2ª regra de posse.
+func _random_selectable_cards(kingdom: Kingdom) -> Array[CardResource]:
+	var result: Array[CardResource] = []
+	for card: CardResource in _effective_card_pool(kingdom):
+		if _card_is_owned_elsewhere(card):
+			continue
+		result.append(card)
+	return result
+
+
+## Resolve de qual pool este Editor lê Cartas/Comandantes: o Reino do
+## jogador (comportamento normal, inalterado) ou o pool de sandbox do
+## Campo de Prova (sandbox_mode == true) — explícito
+## (sandbox_card_pool/sandbox_commander_pool) ou, na ausência de um,
+## o catálogo completo do jogo (GameDatabase), duplicado uma única vez
+## por sessão do Editor. Único ponto que decide a origem — as demais
+## funções de elegibilidade/filtro continuam exatamente as mesmas,
+## nenhuma regra duplicada.
+func _effective_card_pool(kingdom: Kingdom) -> Array[CardResource]:
+	if not sandbox_mode:
+		return kingdom.cards
+	if not sandbox_card_pool.is_empty():
+		return sandbox_card_pool
+	if _cached_sandbox_catalog_cards.is_empty():
+		for template: CardResource in GameDatabase.cards:
+			_cached_sandbox_catalog_cards.append(template.duplicate())
+	return _cached_sandbox_catalog_cards
+
+
+## Catálogo real de Comandantes hoje é quase inexistente (1 template
+## estático — Game/database/commanders_pool/) porque Comandantes de
+## verdade são gerados, nunca escolhidos de uma lista (mesma auditoria
+## já registrada em test_army_factory.gd). O pool padrão de sandbox
+## reflete isso: o único template real (ativado/boostado se necessário)
+## mais alguns gerados via CommanderGenerator (TestArmyFactory,
+## mesma técnica de EnemyArmyGenerator._build_commander()), cobrindo
+## uma faixa de Patentes pra dar variedade real de escolha.
+func _effective_commander_pool(kingdom: Kingdom) -> Array[CommanderResource]:
+	if not sandbox_mode:
+		return kingdom.commanders
+	if not sandbox_commander_pool.is_empty():
+		return sandbox_commander_pool
+	if _cached_sandbox_catalog_commanders.is_empty():
+		for template: CommanderResource in GameDatabase.commanders:
+			var copy: CommanderResource = template.duplicate()
+			copy.administrative_state = CommanderResource.AdministrativeState.ACTIVE
+			if copy.accumulated_xp <= 0:
+				copy.accumulated_xp = CommanderCareer.PATENTE_THRESHOLDS[-1]["xp"]
+			_cached_sandbox_catalog_commanders.append(copy)
+		for patente: String in ["Capitão", "Major", "Coronel", "General", "Marechal", "Lorde-Comandante"]:
+			_cached_sandbox_catalog_commanders.append(TestArmyFactory.generate_commander(patente))
+	return _cached_sandbox_catalog_commanders
+
+
+## Extraída para engine/army/army_random_composer.gd (ArmyRandomComposer)
+## nesta etapa (Campo de Prova, CAMPO_DE_PROVA.md) — reaproveitada dali
+## agora, nunca duplicada, pra também servir a "Formação Aleatória" do
+## Campo de Prova sem reimplementar a heurística. Mesmo corpo de antes.
+func _random_valid_composition(pool: Array[CardResource], soldo_cap: int) -> Array[CardResource]:
+	return ArmyRandomComposer.random_valid_composition(pool, soldo_cap)
+
+
+## --- Área grande esquerda: filtros + lista/grade, conforme a aba ativa. ---
+func _build_selection_area(parent: Control) -> void:
+	var area := _anchor_new_control(parent, LIST_RECT)
+
+	var margin := MarginContainer.new()
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	margin.add_theme_constant_override("margin_left", 8)
+	margin.add_theme_constant_override("margin_right", 6)
+	margin.add_theme_constant_override("margin_top", 6)
+	margin.add_theme_constant_override("margin_bottom", 6)
+	area.add_child(margin)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 6)
+	margin.add_child(vbox)
+
+	if _mode == "comandante":
+		_build_commander_filters(vbox)
+	else:
+		_build_card_filters(vbox)
 
 	var scroll := ScrollContainer.new()
-	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	add_child(scroll)
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vbox.add_child(scroll)
+	_style_scrollbar(scroll)
+	_list_scroll = scroll
+	# call_deferred: a extensão rolável máxima só fica correta depois do
+	# Godot processar o layout do conteúdo montado logo abaixo (mesma
+	# cautela de timing de sempre nesta tela) — setar na hora clamparia
+	# pra 0 sempre que o conteúdo ainda não tivesse sido medido.
+	scroll.call_deferred("set", "scroll_vertical", _list_scroll_position)
 
-	_root_vbox = VBoxContainer.new()
-	_root_vbox.custom_minimum_size = Vector2(700, 0)
-	_root_vbox.add_theme_constant_override("separation", 16)
-	scroll.add_child(_root_vbox)
-
-	var title := Label.new()
-	title.text = "Editor de Exército"
-	title.add_theme_font_size_override("font_size", 24)
-	_root_vbox.add_child(title)
-
-	var cancel_button := Button.new()
-	cancel_button.text = "Cancelar"
-	cancel_button.pressed.connect(_on_cancel_pressed, CONNECT_DEFERRED)
-	_root_vbox.add_child(cancel_button)
-
-	# --- Fase 1: Comandante + 9 Cartas ---
-	var commander_row := HBoxContainer.new()
-	_root_vbox.add_child(commander_row)
-	var commander_label := Label.new()
-	commander_label.text = "Comandante:"
-	commander_row.add_child(commander_label)
-	_commander_option = OptionButton.new()
-	_commander_option.item_selected.connect(_on_commander_selected, CONNECT_DEFERRED)
-	commander_row.add_child(_commander_option)
-
-	var cards_title := Label.new()
-	cards_title.text = "Escolha exatamente 9 Cartas:"
-	_root_vbox.add_child(cards_title)
-	_cards_container = VBoxContainer.new()
-	_root_vbox.add_child(_cards_container)
-
-	_soldo_label = Label.new()
-	_root_vbox.add_child(_soldo_label)
-
-	_montar_button = Button.new()
-	_montar_button.text = "Montar Exército"
-	_montar_button.pressed.connect(_on_montar_pressed, CONNECT_DEFERRED)
-	_root_vbox.add_child(_montar_button)
-
-	# --- Fase 2: Posicionamento (SEMPRE mostrado, mesmo com 1 só
-	# Formação — Posicionamento é o fator mais importante do jogo,
-	# COMBAT_RULES.md/SOLDO.md: "Posicionamento > Classe > Facção >
-	# Carta > Habilidade". O jogador precisa ver e poder ajustar onde
-	# cada carta cai, não só a ordem em que marcou os checkboxes.) ---
-	_formations_section = VBoxContainer.new()
-	_formations_section.visible = false
-	_root_vbox.add_child(_formations_section)
-
-	var formations_title := Label.new()
-	formations_title.text = "Posicionar Cartas (escolha a carta certa pra cada posição no menu):"
-	_formations_section.add_child(formations_title)
-
-	_formation_tabs_row = HBoxContainer.new()
-	_formations_section.add_child(_formation_tabs_row)
-
-	_slots_grid = GridContainer.new()
-	_slots_grid.columns = 3
-	_formations_section.add_child(_slots_grid)
-
-	_concluir_button = Button.new()
-	_concluir_button.text = "Confirmar Exército"
-	_concluir_button.pressed.connect(_on_concluir_pressed, CONNECT_DEFERRED)
-	_root_vbox.add_child(_concluir_button)
-	_concluir_button.visible = false
+	if _mode == "comandante":
+		_build_commander_list(scroll)
+	else:
+		_build_card_grid(scroll)
 
 
-func _refresh_choice_phase() -> void:
-	var kingdom: Kingdom = KingdomState.kingdom
+## --- Modo Comandante ---
 
-	_eligible_commanders.clear()
-	_commander_option.clear()
-	for commander: CommanderResource in kingdom.commanders:
+func _build_commander_filters(parent: Control) -> void:
+	parent.add_child(_make_label("Filtros de Comandantes", 11, HUD_ACCENT))
+
+	var hbox := HBoxContainer.new()
+	hbox.add_theme_constant_override("separation", 6)
+	parent.add_child(hbox)
+
+	var faction_option := _styled_option_button(FACCAO_VALUES, _filter_cmd_faction)
+	faction_option.item_selected.connect(_on_cmd_faction_selected, CONNECT_DEFERRED)
+	hbox.add_child(_build_labeled_filter("Facção", faction_option))
+
+	var patente_values: Array[String] = _patente_filter_values()
+	var patente_option := _styled_option_button(patente_values, _filter_cmd_patente)
+	patente_option.item_selected.connect(_on_cmd_patente_selected, CONNECT_DEFERRED)
+	hbox.add_child(_build_labeled_filter("Patente", patente_option))
+
+	var soldo_values: Array[String] = _soldo_min_filter_values()
+	var soldo_option := _styled_option_button(soldo_values, _filter_cmd_soldo_min)
+	soldo_option.item_selected.connect(_on_cmd_soldo_selected, CONNECT_DEFERRED)
+	hbox.add_child(_build_labeled_filter("Soldo mínimo", soldo_option))
+
+
+## Cada filtro sempre com uma legenda curta em cima (nunca uma caixa
+## sem identificação) — o jogador precisa ler "isto filtra Facção" sem
+## adivinhar. Legenda não-wrap (curta, uma palavra/duas) — mesma defesa
+## contra texto verticalizado já usada em todo o resto da tela.
+func _build_labeled_filter(caption: String, option_button: OptionButton) -> Control:
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 2)
+	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	column.add_child(_make_label(caption.to_upper(), 9, HUD_MUTED_COLOR))
+	option_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	column.add_child(option_button)
+	return column
+
+
+func _on_cmd_faction_selected(index: int) -> void:
+	_filter_cmd_faction = FACCAO_VALUES[index]
+	_refresh_all()
+
+
+func _on_cmd_patente_selected(index: int) -> void:
+	_filter_cmd_patente = _patente_filter_values()[index]
+	_refresh_all()
+
+
+func _on_cmd_soldo_selected(index: int) -> void:
+	_filter_cmd_soldo_min = _soldo_min_filter_values()[index]
+	_refresh_all()
+
+
+## Fonte real: CommanderCareer.PATENTE_THRESHOLDS (XP.md) — nunca uma
+## segunda lista de Patentes inventada.
+func _patente_filter_values() -> Array[String]:
+	var values: Array[String] = ["(qualquer)"]
+	for entry: Dictionary in CommanderCareer.PATENTE_THRESHOLDS:
+		values.append(entry["patente"])
+	return values
+
+
+## "Soldo mínimo": filtra pelo teto de Soldo (Soldo.CAP_BY_PATENTE) que
+## a Patente do Comandante concede — útil pra achar Comandantes cujo
+## orçamento já cobre uma composição de Cartas em mente, sem o jogador
+## precisar decorar qual Patente equivale a qual teto.
+func _soldo_min_filter_values() -> Array[String]:
+	var values: Array[String] = ["(qualquer)"]
+	for entry: Dictionary in CommanderCareer.PATENTE_THRESHOLDS:
+		values.append(str(Soldo.cap_for_patente(entry["patente"])))
+	return values
+
+
+## Elegibilidade REAL de base (ARMY.md/COMMANDERS.md), sem nenhum dos 3
+## filtros cosméticos por cima — mesmo predicado da versão anterior
+## (OptionButton): Ativo, e (Livre OU já é o Comandante deste Exército
+## sendo editado). Extraído à parte pra _build_commander_list() poder
+## diagnosticar "não existe ninguém elegível de verdade" vs "os filtros
+## esconderam alguém que existe", em vez de uma mensagem genérica.
+func _eligible_commanders_filtered_ignoring_filters(kingdom: Kingdom) -> Array[CommanderResource]:
+	var result: Array[CommanderResource] = []
+	for commander: CommanderResource in _effective_commander_pool(kingdom):
 		var is_this_armys_own_commander: bool = editing_composition and existing_army != null and commander == existing_army.commander
-		if commander.administrative_state == CommanderResource.AdministrativeState.ACTIVE \
-			and (commander.ownership_status == CommanderResource.OwnershipStatus.LIVRE or is_this_armys_own_commander):
-			_eligible_commanders.append(commander)
-			_commander_option.add_item(commander.commander_name)
-	if not _eligible_commanders.is_empty() and _selected_commander == null:
-		_selected_commander = _eligible_commanders[0]
-	if editing_composition and _selected_commander != null and _eligible_commanders.has(_selected_commander):
-		_commander_option.selected = _eligible_commanders.find(_selected_commander)
-
-	_clear_children(_cards_container)
-	var selected_names: Array[String] = []
-	for selected: CardResource in _selected_cards:
-		selected_names.append(selected.card_name)
-	for card: CardResource in kingdom.cards:
-		var is_this_armys_own_card: bool = editing_composition and existing_army != null and existing_army.cards.has(card)
-		if card.ownership_status != CardResource.OwnershipStatus.LIVRE and not is_this_armys_own_card:
+		if commander.administrative_state != CommanderResource.AdministrativeState.ACTIVE:
 			continue
-		var check := CheckBox.new()
-		check.text = "%s (%s, %s)" % [card.card_name, card.rarity, card.faction]
-		check.button_pressed = _selected_cards.has(card)
-		# ARMY.md, "Unicidade de Composição": desabilita qualquer outra
-		# cópia do mesmo Nome já escolhida (nunca a própria, senão o
-		# jogador não conseguiria desmarcar a que já marcou).
-		check.disabled = not check.button_pressed and selected_names.has(card.card_name)
-		check.toggled.connect(_on_card_toggled.bind(card), CONNECT_DEFERRED)
-		_cards_container.add_child(check)
-
-	_update_soldo_label()
+		if commander.ownership_status != CommanderResource.OwnershipStatus.LIVRE and not is_this_armys_own_commander:
+			continue
+		result.append(commander)
+	return result
 
 
-func _update_soldo_label() -> void:
-	var total: int = Soldo.total_for_composition(_selected_cards)
-	if _selected_commander == null:
-		_soldo_label.text = "Soldo: %d (escolha um Comandante para ver o teto)" % total
-		_montar_button.disabled = true
+func _eligible_commanders_filtered(kingdom: Kingdom) -> Array[CommanderResource]:
+	var result: Array[CommanderResource] = []
+	for commander: CommanderResource in _eligible_commanders_filtered_ignoring_filters(kingdom):
+		if _filter_cmd_faction != "(todas)" and commander.faction != _filter_cmd_faction:
+			continue
+		var patente: String = CommanderCareer.patente_for_xp(commander.accumulated_xp)
+		if _filter_cmd_patente != "(qualquer)" and patente != _filter_cmd_patente:
+			continue
+		if _filter_cmd_soldo_min != "(qualquer)" and Soldo.cap_for_patente(patente) < int(_filter_cmd_soldo_min):
+			continue
+		result.append(commander)
+	return result
+
+
+func _build_commander_list(parent: Control) -> void:
+	var kingdom: Kingdom = KingdomState.kingdom
+	_eligible_commanders = _eligible_commanders_filtered(kingdom)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 6)
+	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	parent.add_child(vbox)
+
+	if _eligible_commanders.is_empty():
+		# Diagnóstico real (pedido explícito: nunca aceitar a mensagem
+		# genérica como explicação) — distingue "os filtros escondem
+		# alguém que existe" de "não existe NINGUÉM Ativo e Livre no
+		# Reino ainda" (ex: Kit Inicial — o único Comandante já nasce
+		# ACTIVE, mas EM_EXERCITO liderando o Exército inicial; formar
+		# um 2º Exército exige recrutar/promover outro Comandante
+		# primeiro, em Comandantes — não é bug, é a regra real).
+		if _eligible_commanders_filtered_ignoring_filters(kingdom).is_empty():
+			vbox.add_child(_make_body_label("Nenhum Comandante Ativo e livre no Reino ainda. Recrute e promova um Comandante em \"Comandantes\" antes de montar outro Exército."))
+		else:
+			vbox.add_child(_make_body_label("Nenhum Comandante Ativo disponível com estes filtros."))
 		return
+
+	# Pré-seleciona o 1º elegível na primeira renderização (nenhum
+	# Comandante escolhido ainda) — antes de montar as fileiras, pra já
+	# nascerem com o destaque de seleção correto.
+	if _selected_commander == null:
+		_selected_commander = _eligible_commanders[0]
+
+	for commander: CommanderResource in _eligible_commanders:
+		vbox.add_child(_build_commander_row(commander))
+
+
+func _build_commander_row(commander: CommanderResource) -> Control:
+	var is_selected: bool = commander == _selected_commander
+	var panel := _make_list_row_panel(is_selected)
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	panel.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	panel.gui_input.connect(_on_commander_row_gui_input.bind(commander), CONNECT_DEFERRED)
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(row)
+
+	row.add_child(_make_portrait(_portrait_for(commander), LIST_COMMANDER_PORTRAIT))
+
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 2)
+	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(column)
+
+	var patente: String = CommanderCareer.patente_for_xp(commander.accumulated_xp)
+	column.add_child(_make_label(commander.commander_name, 13, HUD_ACCENT_SELECTED if is_selected else HUD_TEXT_COLOR))
+	column.add_child(_make_label("%s | %s | Soldo: %d" % [patente, commander.faction, Soldo.cap_for_patente(patente)], 11, HUD_MUTED_COLOR))
+
+	var is_own: bool = editing_composition and existing_army != null and commander == existing_army.commander
+	var estado_text: String = "Liderando este Exército" if is_own else "Disponível"
+	column.add_child(_make_label(estado_text, 10, HUD_ACCENT))
+
+	return panel
+
+
+func _on_commander_row_gui_input(event: InputEvent, commander: CommanderResource) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		_on_commander_selected_real(commander)
+
+
+func _on_commander_selected_real(commander: CommanderResource) -> void:
+	if commander == _selected_commander:
+		return
+	_selected_commander = commander
+	_random_army_message = ""
+	_refresh_all()
+
+
+## --- Modo Pelotão ---
+
+func _build_card_filters(parent: Control) -> void:
+	parent.add_child(_make_label("Filtros de Cartas", 11, HUD_ACCENT))
+
+	var row1 := HBoxContainer.new()
+	row1.add_theme_constant_override("separation", 6)
+	parent.add_child(row1)
+
+	var faction_option := _styled_option_button(FACCAO_VALUES, _filter_card_faction)
+	faction_option.item_selected.connect(_on_card_faction_selected, CONNECT_DEFERRED)
+	row1.add_child(_build_labeled_filter("Facção", faction_option))
+
+	var classe_option := _styled_option_button(CLASSE_VALUES, _filter_card_class)
+	classe_option.item_selected.connect(_on_card_class_selected, CONNECT_DEFERRED)
+	row1.add_child(_build_labeled_filter("Classe", classe_option))
+
+	var row2 := HBoxContainer.new()
+	row2.add_theme_constant_override("separation", 6)
+	parent.add_child(row2)
+
+	var raridade_option := _styled_option_button(RARIDADE_VALUES, _filter_card_rarity)
+	raridade_option.item_selected.connect(_on_card_rarity_selected, CONNECT_DEFERRED)
+	row2.add_child(_build_labeled_filter("Raridade", raridade_option))
+
+	var tier_option := _styled_option_button(TIER_VALUES, _filter_card_tier)
+	tier_option.item_selected.connect(_on_card_tier_selected, CONNECT_DEFERRED)
+	row2.add_child(_build_labeled_filter("Tier", tier_option))
+
+
+func _on_card_faction_selected(index: int) -> void:
+	_filter_card_faction = FACCAO_VALUES[index]
+	_refresh_all()
+
+
+func _on_card_class_selected(index: int) -> void:
+	_filter_card_class = CLASSE_VALUES[index]
+	_refresh_all()
+
+
+func _on_card_rarity_selected(index: int) -> void:
+	_filter_card_rarity = RARIDADE_VALUES[index]
+	_refresh_all()
+
+
+func _on_card_tier_selected(index: int) -> void:
+	_filter_card_tier = TIER_VALUES[index]
+	_refresh_all()
+
+
+## BUG REAL CONFIRMADO (auditoria desta etapa): esta função excluía da
+## lista qualquer Carta que não estivesse LIVRE — mas num Reino que só
+## acabou de sair do Kit Inicial, as ÚNICAS Cartas que existem já
+## nasceram EM_EXERCITO (StarterKitResolver.choose_option() forma o
+## Exército inicial na hora, kingdom.gd:form_army() marca as 9 Cartas
+## como EM_EXERCITO no mesmo instante) — resultado: a grade de "Criar
+## Novo Exército" ficava sempre vazia mesmo com Cartas de verdade no
+## Reino, porque elas TODAS já pertenciam a outro Exército. Rastreei
+## Kingdom.cards -> CardResource.ownership_status -> este filtro -> a
+## grade, e a causa era exatamente esta linha.
+##
+## Correção (só apresentação, nenhuma regra mudou): agora só os 4
+## filtros cosméticos (Facção/Classe/Raridade/Tier) decidem o que
+## aparece na grade. A disponibilidade REAL (LIVRE, ou já é desta
+## Formação sendo editada, ou já foi escolhida agora) virou
+## _card_is_owned_elsewhere()/_card_owner_army_display_name() — usadas
+## só pra desenhar a Carta BLOQUEADA (esmaecida, com o motivo real e o
+## Exército dono escritos) em vez de escondê-la, como o pedido
+## explicitamente autorizou.
+func _filtered_available_cards(kingdom: Kingdom) -> Array[CardResource]:
+	var result: Array[CardResource] = []
+	for card: CardResource in _effective_card_pool(kingdom):
+		if _filter_card_faction != "(todas)" and card.faction != _filter_card_faction:
+			continue
+		if _filter_card_class != "(todas)" and card.card_class != _filter_card_class:
+			continue
+		if _filter_card_rarity != "(todas)" and card.rarity != _filter_card_rarity:
+			continue
+		if _filter_card_tier != "(todos)" and card.tier != int(_filter_card_tier):
+			continue
+		result.append(card)
+	return result
+
+
+## True quando a Carta está indisponível pra ESTE Exército (LIVRE, já
+## pertence à composição sendo editada, ou já foi escolhida agora,
+## contam como disponível) — mesma regra de posse de sempre (ARMY.md/
+## CARD.md), só que agora usada pra EXPLICAR em vez de esconder.
+func _card_is_owned_elsewhere(card: CardResource) -> bool:
+	var is_this_armys_own_card: bool = editing_composition and existing_army != null and existing_army.cards.has(card)
+	return card.ownership_status != CardResource.OwnershipStatus.LIVRE and not is_this_armys_own_card and not _selected_cards.has(card)
+
+
+## Localiza QUAL Exército real possui esta Carta — sem tabela paralela:
+## percorre Kingdom.armies (mesma fonte de exercitos_panel.gd) e checa
+## Army.cards.has(card) diretamente. Nome exibido usa a MESMA convenção
+## já usada lá ("army.army_name" com fallback "Exército %d" pela
+## posição em kingdom.armies) — nunca um nome inventado. Nunca aponta
+## pro próprio Exército sendo editado (esse não conta como "outro").
+func _card_owner_army_display_name(card: CardResource) -> String:
+	var kingdom: Kingdom = KingdomState.kingdom
+	for i in range(kingdom.armies.size()):
+		var army: Army = kingdom.armies[i]
+		if editing_composition and existing_army != null and army == existing_army:
+			continue
+		if army.cards.has(card):
+			return army.army_name if army.army_name != "" else "Exército %d" % (i + 1)
+	return ""
+
+
+func _build_card_grid(parent: Control) -> void:
+	var kingdom: Kingdom = KingdomState.kingdom
+	var cards: Array[CardResource] = _filtered_available_cards(kingdom)
+
+	var grid := GridContainer.new()
+	grid.columns = 4
+	grid.add_theme_constant_override("h_separation", 8)
+	grid.add_theme_constant_override("v_separation", 10)
+	parent.add_child(grid)
+
+	if cards.is_empty():
+		if kingdom.cards.is_empty():
+			parent.add_child(_make_body_label("O Reino ainda não possui nenhuma Carta."))
+		else:
+			parent.add_child(_make_body_label("Nenhuma Carta do Reino combina com estes filtros."))
+		return
+
+	for card: CardResource in cards:
+		grid.add_child(_build_list_card_slot(card))
+
+
+func _build_list_card_slot(card: CardResource) -> Control:
+	var slot := ArmyCardSlot.new()
+	slot.custom_minimum_size = Vector2(LIST_CARD_WIDTH, LIST_CARD_WIDTH / BattleCardView.CARD_ASPECT_RATIO + 24)
+	slot.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+
+	var is_selected: bool = _selected_cards.has(card)
+	var owned_elsewhere: bool = not is_selected and _card_is_owned_elsewhere(card)
+	var already_has_same_name: bool = false
+	if not is_selected and not owned_elsewhere:
+		for selected: CardResource in _selected_cards:
+			if selected.card_name == card.card_name:
+				already_has_same_name = true
+	var army_full: bool = not is_selected and not owned_elsewhere and not already_has_same_name and _selected_cards.size() >= 9
+	var over_soldo: bool = not is_selected and not owned_elsewhere and not already_has_same_name and not army_full and not _card_fits_soldo(card)
+	var blocked: bool = not is_selected and (owned_elsewhere or already_has_same_name or army_full or over_soldo)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 2)
+	vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	slot.add_child(vbox)
+
+	var card_slot := Control.new()
+	card_slot.custom_minimum_size = Vector2(LIST_CARD_WIDTH, LIST_CARD_WIDTH / BattleCardView.CARD_ASPECT_RATIO)
+	card_slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vbox.add_child(card_slot)
+
+	var card_view := BattleCardView.new()
+	card_view.set_anchors_preset(Control.PRESET_FULL_RECT)
+	card_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card_slot.add_child(card_view)
+	card_view.set_card(card)
+	card_view.set_stats(card.atk, card.hp, card.esc)
+	card_view.set_compact(true)
+	_force_ignore_mouse_recursive(card_view)
+	if blocked:
+		card_view.modulate = Color(0.45, 0.45, 0.45, 0.85)
+
+	var border := Panel.new()
+	border.set_anchors_preset(Control.PRESET_FULL_RECT)
+	border.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var border_style := StyleBoxFlat.new()
+	border_style.bg_color = Color(0, 0, 0, 0)
+	border_style.border_width_left = 2
+	border_style.border_width_right = 2
+	border_style.border_width_top = 2
+	border_style.border_width_bottom = 2
+	border_style.border_color = HUD_ACCENT_SELECTED if is_selected else Color(HUD_ACCENT.r, HUD_ACCENT.g, HUD_ACCENT.b, 0.5)
+	border_style.corner_radius_top_left = 4
+	border_style.corner_radius_top_right = 4
+	border_style.corner_radius_bottom_left = 4
+	border_style.corner_radius_bottom_right = 4
+	border.add_theme_stylebox_override("panel", border_style)
+	card_slot.add_child(border)
+
+	# "Em outro Exército" ganha uma 2ª linha com o nome REAL do Exército
+	# dono (Army.cards.has(card) -> Army.army_name, nunca uma tabela de
+	# posse paralela) — o motivo precisa ficar legível sem abrir o
+	# tooltip (pedido explícito).
+	if is_selected:
+		vbox.add_child(_make_centered_label("Selecionada", 9, HUD_ACCENT_SELECTED))
+	elif owned_elsewhere:
+		vbox.add_child(_make_centered_label("Em outro Exército", 9, HUD_ERROR_COLOR))
+		var owner_name: String = _card_owner_army_display_name(card)
+		if owner_name != "":
+			vbox.add_child(_make_centered_label(owner_name, 8, HUD_MUTED_COLOR))
+	elif already_has_same_name:
+		vbox.add_child(_make_centered_label("Nome já usado", 9, HUD_ERROR_COLOR))
+	elif army_full:
+		vbox.add_child(_make_centered_label("Exército completo", 9, HUD_ERROR_COLOR))
+	elif over_soldo:
+		vbox.add_child(_make_centered_label("Sem Soldo", 9, HUD_ERROR_COLOR))
+	else:
+		vbox.add_child(_make_centered_label("Soldo %d" % Soldo.cost_for_rarity(card.rarity), 9, HUD_MUTED_COLOR))
+
+	slot.set_tooltip_builder(func() -> Control: return _build_card_tooltip(card))
+
+	if not blocked or is_selected:
+		slot.gui_input.connect(_on_list_card_gui_input.bind(card), CONNECT_DEFERRED)
+		slot.drag_data_builder = func() -> Variant: return {"source": "list", "card": card}
+		slot.drag_preview_builder = func() -> Control: return _build_drag_preview(card)
+
+	return slot
+
+
+## CAUSA-RAIZ do Drag-and-Drop não iniciar (auditoria desta etapa):
+## este handler reagia em event.pressed (mouse PARA BAIXO) e chamava
+## _refresh_all(), que reconstrói a árvore inteira e LIBERA (.free())
+## este mesmíssimo ArmyCardSlot — exatamente o Control que o Godot
+## acabou de registrar como possível origem de um arrasto. Ele nunca
+## sobrevivia até o próximo frame de movimento do mouse pra Godot
+## conseguir detectar o arrasto e chamar _get_drag_data(). Clique
+## isolado (aperta e solta sem mover) parecia funcionar porque o efeito
+## desejado (selecionar a Carta) já tinha acontecido antes do usuário
+## notar. Corrigido reagindo em "solto" (not event.pressed), o mesmo
+## padrão que Button já usa — só confirma o clique se NENHUM arrasto
+## consumiu o evento de soltar antes (Godot entrega esse "solto" como
+## _drop_data no alvo, nunca como gui_input na origem, quando um
+## arrasto de verdade estava em andamento).
+func _on_list_card_gui_input(event: InputEvent, card: CardResource) -> void:
+	if event is InputEventMouseButton and not event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		_on_list_card_clicked(card)
+
+
+func _on_list_card_clicked(card: CardResource) -> void:
+	if _army != null:
+		return  # composição travada depois de Montar/Salvar
+	if _selected_cards.has(card):
+		_on_card_toggled(false, card)
+	else:
+		_on_card_toggled(true, card)
+
+
+func _card_fits_soldo(card: CardResource) -> bool:
+	if _selected_commander == null:
+		return false
+	var patente: String = CommanderCareer.patente_for_xp(_selected_commander.accumulated_xp)
+	var cap: int = Soldo.cap_for_patente(patente)
+	return Soldo.total_for_composition(_selected_cards) + Soldo.cost_for_rarity(card.rarity) <= cap
+
+
+## --- Coluna direita: Comandante + Soldo do Exército + Formação 3x3. ---
+
+func _build_detail_area(parent: Control) -> void:
+	var area := _anchor_new_control(parent, DETAIL_RECT)
+
+	var margin := MarginContainer.new()
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	margin.add_theme_constant_override("margin_left", 6)
+	margin.add_theme_constant_override("margin_right", 10)
+	margin.add_theme_constant_override("margin_top", 6)
+	margin.add_theme_constant_override("margin_bottom", 6)
+	area.add_child(margin)
+
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
+	margin.add_child(scroll)
+	_style_scrollbar(scroll)
+	_detail_scroll = scroll
+	# call_deferred de propósito (ver docstring de _list_scroll) — o
+	# conteúdo desta área ainda vai ser montado pelo resto desta função
+	# (inclusive nos "return" antecipados abaixo), mas isso não importa:
+	# o valor só é aplicado de verdade depois que o Godot processa o
+	# layout inteiro deste frame.
+	scroll.call_deferred("set", "scroll_vertical", _detail_scroll_position)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 6)
+	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(vbox)
+
+	if _random_army_message != "":
+		var error_label := _make_label(_random_army_message, 11, HUD_ERROR_COLOR, true)
+		error_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		error_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		vbox.add_child(error_label)
+		vbox.add_child(_make_separator())
+
+	if _selected_commander == null:
+		vbox.add_child(_make_centered_label("ESCOLHA UM COMANDANTE", 12, HUD_ACCENT))
+		vbox.add_child(_make_body_label("Selecione um Comandante na lista à esquerda, ou use \"Criar Exército Aleatório\" no topo."))
+		return
+
+	# Hierarquia pedida: QUEM é o Comandante -> QUAL a Doutrina -> QUANTO
+	# pode gastar -> QUAL Exército está sendo montado — 4 seções
+	# visualmente separadas (nunca um bloco único de texto corrido).
+	_build_commander_section(vbox)
+	vbox.add_child(_make_separator())
+	if _selected_commander.doctrine != null:
+		_build_doctrine_section(vbox)
+		vbox.add_child(_make_separator())
+	_build_soldo_panel(vbox)
+	vbox.add_child(_make_separator())
+	_build_formation_area(vbox)
+	vbox.add_child(_make_separator())
+	_build_action_buttons(vbox)
+
+
+func _build_commander_section(parent: Control) -> void:
+	parent.add_child(_make_centered_label("COMANDANTE", 12, HUD_ACCENT))
+
+	var portrait_center := CenterContainer.new()
+	parent.add_child(portrait_center)
+	portrait_center.add_child(_make_portrait(_portrait_for(_selected_commander), COMMANDER_PORTRAIT_SIZE))
+
+	# Nome grande — identidade principal do bloco. "Função" é dado real
+	# (nunca inventado): ou já lidera o Exército sendo editado, ou está
+	# livre formando um novo — nunca um 3º estado inventado.
+	parent.add_child(_make_centered_label(_selected_commander.commander_name, 17, HUD_TEXT_COLOR, true))
+
+	var funcao_text: String = "Formando um novo Exército"
+	if editing_composition and existing_army != null:
+		var army_label: String = existing_army.army_name if existing_army.army_name != "" else "este Exército"
+		funcao_text = "Liderando %s" % army_label
+	parent.add_child(_make_centered_label("%s • %s" % [_selected_commander.faction, funcao_text], 11, HUD_MUTED_COLOR, true))
+
+	var patente: String = CommanderCareer.patente_for_xp(_selected_commander.accumulated_xp)
+	parent.add_child(_make_centered_label("Patente: %s" % patente, 13, HUD_ACCENT_SELECTED))
+
+
+## Cada campo da Doutrina como par LEGENDA (pequena, muda) + VALOR
+## (maior, legível) — nunca mais "Restrição: X" tudo numa frase só. O
+## "Bônus" (doctrine.value_description() — SSoT real, nunca calculado
+## de novo aqui) ganha destaque de cor pra nunca mais passar
+## despercebido: antes desta correção ele nem aparecia nesta tela.
+func _build_doctrine_section(parent: Control) -> void:
+	var doctrine: CommanderDoctrine = _selected_commander.doctrine
+	parent.add_child(_make_centered_label("DOUTRINA", 12, HUD_ACCENT))
+
+	_build_doctrine_field(parent, "Restrição", doctrine.restriction_description())
+	_build_doctrine_field(parent, "Requisito", doctrine.requirement_description())
+
+	var target_text: String = doctrine.target.description
+	if doctrine.target.value != "":
+		target_text += " (%s)" % doctrine.target.value
+	_build_doctrine_field(parent, "Alvo", target_text)
+	_build_doctrine_field(parent, "Efeito", doctrine.effect.description)
+	_build_doctrine_field(parent, "Bônus", doctrine.value_description(), HUD_ACCENT_SELECTED, 14)
+
+
+func _build_doctrine_field(parent: Control, caption: String, value_text: String, value_color: Color = HUD_TEXT_COLOR, font_size: int = 11) -> void:
+	parent.add_child(_make_label(caption.to_upper(), 9, HUD_MUTED_COLOR))
+	var value_label := _make_label(value_text, font_size, value_color, true)
+	value_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	parent.add_child(value_label)
+
+
+func _build_soldo_panel(parent: Control) -> void:
+	parent.add_child(_make_centered_label("SOLDO DO EXÉRCITO", 12, HUD_ACCENT))
 
 	var patente: String = CommanderCareer.patente_for_xp(_selected_commander.accumulated_xp)
 	var cap: int = Soldo.cap_for_patente(patente)
-	_soldo_label.text = "Soldo: %d / %d | Cartas escolhidas: %d / 9" % [total, cap, _selected_cards.size()]
-	_montar_button.disabled = _selected_cards.size() != 9 or total > cap
+	var used: int = Soldo.total_for_composition(_selected_cards)
+	var available: int = cap - used
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	var center := CenterContainer.new()
+	center.add_child(row)
+	parent.add_child(center)
+
+	row.add_child(_make_stat_chip("Utilizado", str(used)))
+	row.add_child(_make_stat_chip("Máximo", str(cap)))
+	row.add_child(_make_stat_chip("Disponível", str(maxi(available, 0)), HUD_ERROR_COLOR if available < 0 else HUD_TEXT_COLOR))
+
+	parent.add_child(_make_centered_label("Cartas: %d / 9" % _selected_cards.size(), 11, HUD_ACCENT_SELECTED if _selected_cards.size() == 9 else HUD_MUTED_COLOR))
+
+
+func _build_formation_area(parent: Control) -> void:
+	parent.add_child(_make_centered_label("FORMAÇÃO DE COMBATE", 12, HUD_ACCENT))
+
+	if formation_count > 1 and _army != null:
+		var tabs_center := CenterContainer.new()
+		parent.add_child(tabs_center)
+		var tabs_row := HBoxContainer.new()
+		tabs_row.add_theme_constant_override("separation", 4)
+		tabs_center.add_child(tabs_row)
+		for formation_name: String in FORMATION_NAMES.slice(0, formation_count):
+			var tab_button := _make_tab_button(formation_name, formation_name == _current_formation)
+			tab_button.pressed.connect(_on_formation_tab_pressed.bind(formation_name), CONNECT_DEFERRED)
+			tabs_row.add_child(tab_button)
+
+	var grid_center := CenterContainer.new()
+	parent.add_child(grid_center)
+
+	var grid := GridContainer.new()
+	grid.columns = 3
+	grid.add_theme_constant_override("h_separation", 6)
+	grid.add_theme_constant_override("v_separation", 6)
+	grid_center.add_child(grid)
+
+	var current_cards: Array[CardResource] = _current_grid_source()
+	for visual_index: int in [0, 1, 2, 5, 4, 3, 6, 7, 8]:
+		grid.add_child(_build_formation_slot(current_cards, visual_index))
+
+
+func _on_formation_tab_pressed(formation_name: String) -> void:
+	_current_formation = formation_name
+	_rebuild_detail_content()
+
+
+func _current_grid_source() -> Array[CardResource]:
+	if _army != null:
+		return _formation_cards[_current_formation]
+	return _phase1_slots
+
+
+func _build_formation_slot(current_cards: Array[CardResource], slot_index: int) -> Control:
+	var position_number: int = slot_index + 1
+	var card: CardResource = current_cards[slot_index]
+
+	var slot := ArmyCardSlot.new()
+	slot.custom_minimum_size = Vector2(FORMATION_CARD_WIDTH, FORMATION_CARD_WIDTH / BattleCardView.CARD_ASPECT_RATIO)
+	slot.can_drop_checker = func(data: Variant) -> bool: return _can_drop_on_slot(data, slot_index)
+	slot.drop_handler = func(data: Variant) -> void: _handle_drop_on_slot(data, slot_index)
+
+	if card == null:
+		var placeholder := Panel.new()
+		placeholder.set_anchors_preset(Control.PRESET_FULL_RECT)
+		placeholder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var placeholder_style := StyleBoxFlat.new()
+		placeholder_style.bg_color = Color(0, 0, 0, 0.25)
+		placeholder_style.border_width_left = 1
+		placeholder_style.border_width_right = 1
+		placeholder_style.border_width_top = 1
+		placeholder_style.border_width_bottom = 1
+		placeholder_style.border_color = Color(HUD_MUTED_COLOR.r, HUD_MUTED_COLOR.g, HUD_MUTED_COLOR.b, 0.5)
+		placeholder_style.corner_radius_top_left = 4
+		placeholder_style.corner_radius_top_right = 4
+		placeholder_style.corner_radius_bottom_left = 4
+		placeholder_style.corner_radius_bottom_right = 4
+		placeholder.add_theme_stylebox_override("panel", placeholder_style)
+		slot.add_child(placeholder)
+
+		var position_label := _make_centered_label(str(position_number), 11, HUD_MUTED_COLOR)
+		position_label.set_anchors_preset(Control.PRESET_FULL_RECT)
+		position_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		position_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		slot.add_child(position_label)
+		return slot
+
+	slot.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	slot.gui_input.connect(_on_formation_slot_gui_input.bind(slot_index), CONNECT_DEFERRED)
+	slot.set_tooltip_builder(func() -> Control: return _build_card_tooltip(card))
+	slot.drag_data_builder = func() -> Variant: return {"source": "slot", "slot_index": slot_index}
+	slot.drag_preview_builder = func() -> Control: return _build_drag_preview(card)
+
+	var card_view := BattleCardView.new()
+	card_view.set_anchors_preset(Control.PRESET_FULL_RECT)
+	card_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	slot.add_child(card_view)
+	card_view.set_card(card)
+	card_view.set_stats(card.atk, card.hp, card.esc)
+	card_view.set_compact(true)
+	_force_ignore_mouse_recursive(card_view)
+
+	return slot
+
+
+## Mesma causa-raiz de _on_list_card_gui_input (ver docstring lá) —
+## reage em "solto", nunca em "pressionado", pro Drag-and-Drop entre
+## posições da Formação ter a chance de iniciar.
+func _on_formation_slot_gui_input(event: InputEvent, slot_index: int) -> void:
+	if event is InputEventMouseButton and not event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		_on_formation_slot_clicked(slot_index)
+
+
+## Clicar (sem arrastar) numa posição ocupada da Fase 1 remove aquela
+## Carta do Exército (mesma ação de clicar nela na lista) — depois de
+## Montar/Salvar a composição está travada, só o arrasto reposiciona.
+func _on_formation_slot_clicked(slot_index: int) -> void:
+	if _army != null:
+		return
+	var card: CardResource = _phase1_slots[slot_index]
+	if card == null:
+		return
+	_on_card_toggled(false, card)
+	_phase1_slots[slot_index] = null
+	_refresh_all()
+
+
+## --- Drag-and-Drop: só compõe operações REAIS já existentes
+## (_on_card_toggled para adicionar/remover da composição,
+## _on_slot_card_selected para trocar posições dentro dos 9 já
+## escolhidos) — nunca uma regra nova. ---
+
+## Junto com _place_in_first_empty_phase1_slot() e o Gate de Suporte
+## abaixo, reaproveita as MESMAS duas regras estruturais (nunca uma nova
+## cópia): Máquina de Guerra só na Posição 9 (índice 8 — COMBAT_RULES.md
+## 6.6, mesma convenção de CombatEngine._place_army()/
+## ArmyFormationArchetypes._extract_machine()) e Suporte nunca na Posição
+## 5 (COMBAT_RULES.md 6.5, via Army.would_have_support_at_position_5() —
+## o mesmo método que a Engine usa, nunca reimplementado aqui).
+func _can_drop_on_slot(data: Variant, slot_index: int) -> bool:
+	if typeof(data) != TYPE_DICTIONARY or not data.has("source"):
+		return false
+
+	if _army != null:
+		# Pós-Montar/Salvar: composição travada, só reposicionar entre
+		# slots da MESMA Formação (COMBAT_RULES.md, "Formações") — ainda
+		# sujeito às duas regras estruturais acima, válidas em toda
+		# Formação (α/β/γ/δ/ε), não só na escolha inicial.
+		if data["source"] != "slot":
+			return false
+		var from_index: int = data["slot_index"]
+		if from_index == slot_index:
+			return true
+		var current_cards: Array[CardResource] = _formation_cards[_current_formation]
+		var card_a: CardResource = current_cards[from_index]
+		var card_b: CardResource = current_cards[slot_index]
+		if (card_a != null and card_a.card_class == "Máquina de Guerra") or (card_b != null and card_b.card_class == "Máquina de Guerra"):
+			return false
+		var projected_formation: Array[CardResource] = current_cards.duplicate()
+		projected_formation[slot_index] = card_a
+		projected_formation[from_index] = card_b
+		return not _would_result_in_support_at_position_5(projected_formation)
+
+	if data["source"] == "slot":
+		var from_index: int = data["slot_index"]
+		if from_index == slot_index:
+			return true
+		var card_a: CardResource = _phase1_slots[from_index]
+		var card_b: CardResource = _phase1_slots[slot_index]
+		if (card_a != null and card_a.card_class == "Máquina de Guerra") or (card_b != null and card_b.card_class == "Máquina de Guerra"):
+			return false  # Posição 9 é reservada, não se abre mão dela num swap
+		var projected_slots: Array[CardResource] = _phase1_slots.duplicate()
+		projected_slots[slot_index] = card_a
+		projected_slots[from_index] = card_b
+		return not _would_result_in_support_at_position_5(projected_slots)
+
+	var card: CardResource = data.get("card")
+	if card == null:
+		return false
+
+	if card.card_class == "Máquina de Guerra" and slot_index != 8:
+		return false  # Máquina de Guerra só pode ocupar a Posição 9
+	var occupant: CardResource = _phase1_slots[slot_index]
+	if slot_index == 8 and occupant != null and occupant.card_class == "Máquina de Guerra" and card.card_class != "Máquina de Guerra":
+		return false  # não desaloja a Máquina da Posição 9 por uma carta comum
+
+	if _selected_cards.has(card):
+		var from_index: int = _phase1_slots.find(card)
+		var projected_slots2: Array[CardResource] = _phase1_slots.duplicate()
+		projected_slots2[slot_index] = card
+		if from_index != -1 and from_index != slot_index:
+			projected_slots2[from_index] = occupant
+		return not _would_result_in_support_at_position_5(projected_slots2)  # já escolhida -> mover pra outro slot
+
+	var projected: Array[CardResource] = _selected_cards.duplicate()
+	if occupant != null:
+		projected.erase(occupant)
+
+	for selected: CardResource in projected:
+		if selected.card_name == card.card_name:
+			return false  # ARMY.md, "Unicidade de Composição"
+	if projected.size() >= 9:
+		return false
+
+	if _selected_commander != null:
+		var patente: String = CommanderCareer.patente_for_xp(_selected_commander.accumulated_xp)
+		var cap: int = Soldo.cap_for_patente(patente)
+		if Soldo.total_for_composition(projected) + Soldo.cost_for_rarity(card.rarity) > cap:
+			return false  # SOLDO.md, teto de Soldo da Patente
+
+	var projected_slots3: Array[CardResource] = _phase1_slots.duplicate()
+	projected_slots3[slot_index] = card
+	if _would_result_in_support_at_position_5(projected_slots3):
+		return false
+
+	return true
+
+
+## Monta o Array candidato (ignorando slots ainda vazios, preservando
+## ordem) e delega pro MESMO método que Army/CombatEngine usam pra decidir
+## Posição 5 — nunca uma segunda cópia da regra (COMBAT_RULES.md 6.5).
+func _would_result_in_support_at_position_5(candidate_slots: Array[CardResource]) -> bool:
+	var filled: Array[CardResource] = []
+	for card: CardResource in candidate_slots:
+		if card != null:
+			filled.append(card)
+	return Army.would_have_support_at_position_5(filled)
+
+
+func _handle_drop_on_slot(data: Variant, slot_index: int) -> void:
+	if _army != null:
+		if data["source"] == "slot":
+			var from_index: int = data["slot_index"]
+			if from_index != slot_index:
+				_on_slot_card_selected(from_index, slot_index)
+		_rebuild_detail_content()
+		return
+
+	if data["source"] == "slot":
+		var from_index: int = data["slot_index"]
+		if from_index != slot_index:
+			var temp: CardResource = _phase1_slots[slot_index]
+			_phase1_slots[slot_index] = _phase1_slots[from_index]
+			_phase1_slots[from_index] = temp
+		_refresh_all()
+		return
+
+	var card: CardResource = data["card"]
+	if _selected_cards.has(card):
+		var from_index: int = _phase1_slots.find(card)
+		if from_index != -1 and from_index != slot_index:
+			var temp2: CardResource = _phase1_slots[slot_index]
+			_phase1_slots[slot_index] = card
+			_phase1_slots[from_index] = temp2
+		elif from_index == -1:
+			_phase1_slots[slot_index] = card
+		_refresh_all()
+		return
+
+	var occupant: CardResource = _phase1_slots[slot_index]
+	if occupant != null:
+		_on_card_toggled(false, occupant)
+	_on_card_toggled(true, card)
+	_phase1_slots[slot_index] = card
+	_refresh_all()
+
+
+## GAP ARQUITETURAL CORRIGIDO NESTA ETAPA — mais crítico que o pedido
+## original: CombatEngine._place_army() (chamado ao iniciar QUALQUER
+## batalha) extrai a PRIMEIRA carta de Classe "Máquina de Guerra" de
+## Army.cards e a força pra Posição 9 incondicionalmente, deslocando
+## todas as cartas seguintes — INDEPENDENTE de onde ela estivesse no
+## Array (COMBAT_RULES.md 6.6, confirmado lendo combat_engine.gd:157-176
+## e army_formation_archetypes.gd:143-150, mesma convenção nos dois).
+## O Editor, porém, deixava o jogador arrastar uma Máquina de Guerra pra
+## QUALQUER slot da grade 3x3 e gravava exatamente essa ordem em
+## Army.cards — a tela mostrava uma formação que a batalha nunca
+## respeitaria de verdade (a Máquina "pularia" pra Posição 9 e tudo
+## depois dela deslizaria uma posição, na cara do jogador, parecendo um
+## "bug de movimento" sem ligação nenhuma com a Fase de Avanço real).
+## Corrigido na origem certa (Editor, sem tocar CombatEngine/Army): a
+## Máquina de Guerra agora só pode existir no slot 8 (Posição 9) — nunca
+## uma segunda regra de posicionamento, só a MESMA já usada pelo motor.
+func _place_in_first_empty_phase1_slot(card: CardResource) -> void:
+	# "e slot 8 ainda não é Máquina": ARMY.md só proíbe repetir NOME, não
+	# Classe — uma 2ª Máquina de Guerra (nome diferente) é tratada pelo
+	# próprio CombatEngine._place_army() como carta comum (só a PRIMEIRA
+	# encontrada é especial). Sem esta guarda, duas Máquinas disputando o
+	# slot 8 recursariam infinitamente uma tentando deslocar a outra.
+	var slot_8_is_machine: bool = _phase1_slots[8] != null and _phase1_slots[8].card_class == "Máquina de Guerra"
+	if card.card_class == "Máquina de Guerra" and not slot_8_is_machine:
+		var displaced: CardResource = _phase1_slots[8]
+		_phase1_slots[8] = card
+		if displaced != null:
+			_place_in_first_empty_phase1_slot(displaced)
+		return
+
+	# GAP idêntico ao da Máquina, mas pro clique (COMBAT_RULES.md 6.5): sem
+	# esta guarda, escolher Cartas na ordem "certa" podia deixar a Posição
+	# 5 (índice 4) como primeira vaga livre bem na hora de clicar num
+	# Suporte, violando a regra sem passar por nenhum arrasto — o mesmo
+	# Array/regra de _can_drop_on_slot(), nunca uma checagem nova. Só entra
+	# no índice 4 se ele for a ÚNICA vaga restante (nesse caso, o Gate
+	# final em _build_action_buttons barra "Montar Exército" até o jogador
+	# resolver arrastando — arrasto já sabe corrigir isso).
+	if card.card_class == "Suporte" and _phase1_slots[4] == null:
+		for i in range(9):
+			if i == 4:
+				continue
+			if _phase1_slots[i] == null:
+				_phase1_slots[i] = card
+				return
+		_phase1_slots[4] = card
+		return
+
+	for i in range(9):
+		if _phase1_slots[i] == null:
+			_phase1_slots[i] = card
+			return
+
+
+func _remove_from_phase1_slots(card: CardResource) -> void:
+	for i in range(9):
+		if _phase1_slots[i] == card:
+			_phase1_slots[i] = null
+			return
+
+
+## --- Prévia ampliada (hover) — MUDANÇA DE UX (pedido explícito):
+## nunca mais uma ficha textual numa caixa preta. Agora é a CARTA REAL
+## ampliada — mesmo BattleCardView/CardArtCatalog/CardResource usados
+## em qualquer outro lugar do jogo, em modo NÃO-compacto (arte real +
+## Tier/Tipo+Classe/ATK/ESC/HP desenhados por cima, exatamente como
+## BattleCardView já faz — Nome/Facção/Raridade/texto de Habilidade já
+## vêm na própria arte, nunca redesenhados). Característica/Habilidade
+## III/V/Receita continuam abaixo da carta como legenda curta — são os
+## únicos campos reais que a arte estática NUNCA desenha (Tier é
+## mutável por cópia; a Habilidade só é desbloqueada em Tiers mais
+## altos, então a arte de uma carta Tier I nunca a mostra) — nunca uma
+## 2ª ficha textual competindo com a arte, só o complemento que falta.
+##
+## Hover nativo do Godot (_make_custom_tooltip via ArmyCardSlot) nunca
+## atrapalha Clique/Drag-and-Drop — o próprio motor suspende o tooltip
+## assim que um arrasto começa, e independente disso.
+##
+## Responsivo (nunca uma altura/largura fixa): a carta ampliada usa uma
+## fração da viewport (largura E altura, o menor dos dois, preservando
+## a proporção real de BattleCardView.CARD_ASPECT_RATIO — nunca
+## distorce nem corta). A legenda abaixo mede a própria altura natural
+## (mesma técnica já usada antes: medir só depois de cada Label já ter
+## largura própria, nunca depender do ancestral) e só ganha um teto de
+## viewport se o conteúdo for excepcionalmente longo.
+const _PREVIEW_MAX_WIDTH: float = 220.0
+const _PREVIEW_CAPTION_MAX_HEIGHT_FRACTION: float = 0.35
+
+
+func _build_card_tooltip(card: CardResource) -> Control:
+	var viewport_size: Vector2 = get_viewport_rect().size
+	var width_by_viewport_w: float = viewport_size.x * 0.22
+	var width_by_viewport_h: float = viewport_size.y * 0.5 * BattleCardView.CARD_ASPECT_RATIO
+	var card_width: float = minf(_PREVIEW_MAX_WIDTH, minf(width_by_viewport_w, width_by_viewport_h))
+
+	var panel := _make_card_panel()
+
+	var outer_vbox := VBoxContainer.new()
+	outer_vbox.add_theme_constant_override("separation", 4)
+	panel.add_child(outer_vbox)
+
+	var card_slot := Control.new()
+	card_slot.custom_minimum_size = Vector2(card_width, card_width / BattleCardView.CARD_ASPECT_RATIO)
+	outer_vbox.add_child(card_slot)
+
+	var card_view := BattleCardView.new()
+	card_view.set_anchors_preset(Control.PRESET_FULL_RECT)
+	card_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card_slot.add_child(card_view)
+	card_view.set_card(card)
+	card_view.set_stats(card.atk, card.hp, card.esc)
+	card_view.set_compact(false)  # arte real + Tier/Tipo+Classe/ATK/ESC/HP, nunca uma 2ª versão simplificada
+	_force_ignore_mouse_recursive(card_view)
+
+	var caption_vbox := VBoxContainer.new()
+	caption_vbox.add_theme_constant_override("separation", 3)
+	caption_vbox.custom_minimum_size.x = card_width
+
+	if card.tier_1_trait_name != "":
+		caption_vbox.add_child(_make_tooltip_label("Característica: %s" % card.tier_1_trait_name, 10, HUD_ACCENT, card_width, false))
+		var trait_entry: UnitTraitResource = GameDatabase.traits_by_name.get(card.tier_1_trait_name)
+		if trait_entry != null and trait_entry.base_effect_description != "":
+			caption_vbox.add_child(_make_tooltip_label(trait_entry.base_effect_description, 9, HUD_TEXT_COLOR, card_width, false))
+
+	var ability_slots: Array = [
+		["Habilidade (Tier III)", card.tier_3_ability_name],
+		["Habilidade (Tier V)", card.tier_5_ability_name],
+	]
+	for slot: Array in ability_slots:
+		var ability_name: String = slot[1]
+		if ability_name == "":
+			continue
+		caption_vbox.add_child(_make_tooltip_label("%s: %s" % [slot[0], ability_name], 10, HUD_ACCENT, card_width, false))
+		var ability: AbilityResource = GameDatabase.abilities_by_name.get(ability_name)
+		if ability != null and ability.effect_description != "":
+			caption_vbox.add_child(_make_tooltip_label(ability.effect_description, 9, HUD_TEXT_COLOR, card_width, false))
+
+	if not card.recipe_ingredients.is_empty():
+		caption_vbox.add_child(_make_tooltip_label("Receita: %s" % ", ".join(card.recipe_ingredients), 9, HUD_MUTED_COLOR, card_width, false))
+
+	if caption_vbox.get_child_count() > 0:
+		outer_vbox.add_child(_make_separator())
+		# Mesma técnica de antes: só mede depois de cada Label já ter
+		# largura própria — nunca depende do ancestral ainda não
+		# resolvido (causa raiz do painel gigantesco já corrigida).
+		var natural_caption_height: float = caption_vbox.get_combined_minimum_size().y
+		var caption_scroll := ScrollContainer.new()
+		caption_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		caption_scroll.custom_minimum_size = Vector2(card_width, minf(natural_caption_height, viewport_size.y * _PREVIEW_CAPTION_MAX_HEIGHT_FRACTION))
+		outer_vbox.add_child(caption_scroll)
+		caption_scroll.add_child(caption_vbox)
+
+	return panel
+
+
+## Legenda complementar (nunca a carta inteira) — largura própria
+## explícita, mesma defesa de sempre contra o Label quebrar linha antes
+## do ancestral ter largura resolvida.
+func _make_tooltip_label(text: String, font_size: int, color: Color, width: float, centered: bool = true) -> Label:
+	var label := _make_label(text, font_size, color, true)
+	label.custom_minimum_size.x = width
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if centered else HORIZONTAL_ALIGNMENT_LEFT
+	return label
+
+
+func _build_drag_preview(card: CardResource) -> Control:
+	var preview_width: float = 64.0
+	var slot := Control.new()
+	slot.custom_minimum_size = Vector2(preview_width, preview_width / BattleCardView.CARD_ASPECT_RATIO)
+	slot.modulate = Color(1, 1, 1, 0.85)
+
+	var card_view := BattleCardView.new()
+	card_view.set_anchors_preset(Control.PRESET_FULL_RECT)
+	card_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	slot.add_child(card_view)
+	card_view.set_card(card)
+	card_view.set_stats(card.atk, card.hp, card.esc)
+	card_view.set_compact(true)
+	_force_ignore_mouse_recursive(card_view)
+	return slot
+
+
+## --- Botões de ação. ---
+
+func _build_action_buttons(parent: Control) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	var center := CenterContainer.new()
+	center.add_child(row)
+	parent.add_child(center)
+
+	var cancel_button := _make_small_button("Cancelar")
+	cancel_button.pressed.connect(_on_cancel_pressed, CONNECT_DEFERRED)
+	row.add_child(cancel_button)
+
+	if _army == null:
+		var commit_text: String = "Salvar Alterações" if (editing_composition and existing_army != null) else "Montar Exército"
+		var commit_button := _make_primary_button(commit_text)
+		# BUG REAL CONFIRMADO (auditoria desta etapa, seção "Bugs do
+		# Comandante"): trocar de Comandante DEPOIS de já ter escolhido 9
+		# Cartas nunca revalidava o Soldo contra o teto do novo Comandante
+		# — as Cartas continuavam marcadas "Selecionada" (o bloqueio por
+		# Soldo só se aplica a Cartas AINDA NÃO escolhidas) e este botão só
+		# checava a CONTAGEM (== 9), nunca o Soldo. Kingdom.form_army()
+		# também não valida Soldo (só ownership/estado — confirmado lendo
+		# kingdom.gd) — nada mais no sistema impediria formar um Exército
+		# acima do teto. Corrigido aqui, no mesmo lugar que já bloqueia por
+		# contagem — nenhuma regra de Soldo nova, só a checagem que faltava
+		# no gate final.
+		var over_budget: bool = _selected_commander != null and Soldo.total_for_composition(_selected_cards) > Soldo.cap_for_patente(CommanderCareer.patente_for_xp(_selected_commander.accumulated_xp))
+		# Rede de segurança final (COMBAT_RULES.md 6.5) — na prática nunca
+		# deveria disparar, já que _can_drop_on_slot()/
+		# _place_in_first_empty_phase1_slot() impedem esse estado em toda
+		# via de entrada; mantido aqui só como último Gate antes de
+		# Kingdom.form_army()/re_form_army(), reaproveitando o mesmo
+		# Array que de fato vira Army.cards (_resolved_alpha_order()).
+		var invalid_support: bool = Army.would_have_support_at_position_5(_resolved_alpha_order())
+		commit_button.disabled = _selected_commander == null or _selected_cards.size() != 9 or over_budget or invalid_support
+		commit_button.pressed.connect(_on_montar_pressed, CONNECT_DEFERRED)
+		row.add_child(commit_button)
+	else:
+		var confirm_button := _make_primary_button("Confirmar Exército")
+		confirm_button.pressed.connect(_on_concluir_pressed, CONNECT_DEFERRED)
+		row.add_child(confirm_button)
+
+
+## --- Contrato preservado: mesma lógica funcional de antes,
+## byte-a-byte, só a reconstrução visual no fim de cada função mudou. ---
+
+## ARMY.md, "Unicidade de Composição": nunca duas Cartas com o mesmo
+## Nome no Exército, independente do Tier.
+func _on_card_toggled(pressed: bool, card: CardResource) -> void:
+	_random_army_message = ""
+	if pressed:
+		var already_has_same_name: bool = false
+		for selected: CardResource in _selected_cards:
+			if selected != card and selected.card_name == card.card_name:
+				already_has_same_name = true
+		if not _selected_cards.has(card) and _selected_cards.size() < 9 and not already_has_same_name:
+			_selected_cards.append(card)
+			_place_in_first_empty_phase1_slot(card)
+	else:
+		_selected_cards.erase(card)
+		_remove_from_phase1_slots(card)
+	_refresh_all()
+
+
+func _on_montar_pressed() -> void:
+	if _selected_commander == null or _selected_cards.size() != 9:
+		return
+
+	if sandbox_mode:
+		# Campo de Prova: nunca toca Kingdom.form_army()/re_form_army() —
+		# reaproveita "existing_army" como o mesmo objeto (se houver, ex:
+		# reabrindo o Editor sobre um Army de teste já gerado) ou cria um
+		# Army solto, nunca registrado em Kingdom.armies.
+		_army = existing_army if existing_army != null else Army.new()
+		_army.commander = _selected_commander
+		_army.cards = _selected_cards.duplicate()
+	elif editing_composition and existing_army != null:
+		KingdomState.kingdom.re_form_army(existing_army, _selected_commander, _selected_cards.duplicate())
+		_army = existing_army
+	else:
+		_army = KingdomState.kingdom.form_army(_selected_commander, _selected_cards.duplicate())
+
+	# "α" usa o posicionamento que o jogador já arrastou na Fase 1
+	# (_phase1_slots) quando ele existe e bate com _selected_cards;
+	# cai de volta pra _selected_cards.duplicate() (comportamento
+	# original) quando _phase1_slots não foi tocado — ver
+	# _resolved_alpha_order().
+	_formation_cards["α"] = _resolved_alpha_order()
+	for i in range(1, formation_count):
+		var formation_name: String = FORMATION_NAMES[i]
+		_formation_cards[formation_name] = _army.formations[formation_name] if _army.formations.has(formation_name) else _selected_cards.duplicate()
+
+	_current_formation = "α"
+	# Composição travada a partir daqui — some a escolha de Comandante/
+	# Cartas (mesmo estado visual de _start_formation_edit_mode()), só a
+	# Formação continua editável. Sem isto, clicar num Comandante/Carta
+	# diferente na lista ainda visível reescreveria _selected_commander/
+	# _selected_cards sem nunca re-executar Kingdom.form_army()/
+	# re_form_army() — o Exército já formado ficaria dessincronizado do
+	# que a tela mostra.
+	_commander_option.visible = false
+	_refresh_all()
+
+
+func _resolved_alpha_order() -> Array[CardResource]:
+	var filled: Array[CardResource] = []
+	for card: CardResource in _phase1_slots:
+		if card != null:
+			filled.append(card)
+	if filled.size() == _selected_cards.size():
+		var matches: bool = true
+		for card: CardResource in _selected_cards:
+			if not filled.has(card):
+				matches = false
+				break
+		if matches:
+			return filled
+	return _selected_cards.duplicate()
+
+
+## Troca (swap) o conteúdo de "slot_index" com quem estiver atualmente
+## na posição escolhida — nunca deixa a Formação num estado inválido.
+func _on_slot_card_selected(new_card_index: int, slot_index: int) -> void:
+	var current_cards: Array[CardResource] = _formation_cards[_current_formation]
+	var temp: CardResource = current_cards[slot_index]
+	current_cards[slot_index] = current_cards[new_card_index]
+	current_cards[new_card_index] = temp
+
+
+func _on_concluir_pressed() -> void:
+	_army.cards = _formation_cards["α"]
+	for formation_name: String in _formation_cards:
+		if formation_name == "α":
+			continue
+		_army.formations[formation_name] = _formation_cards[formation_name]
+	army_ready.emit(_army)
+
+
+func _on_cancel_pressed() -> void:
+	if _army != null and existing_army == null and not sandbox_mode:
+		KingdomState.kingdom.disband_army(_army)
+	cancelled.emit()
+
+
+## --- Retratos (cosméticos, determinísticos — mesmo mapeamento de
+## exercitos_panel.gd/comandantes_panel.gd, duplicado localmente). ---
+
+func _portrait_for(commander: CommanderResource) -> Texture2D:
+	if commander == null:
+		return null
+	var variant: int = absi(commander.commander_name.hash()) % 2
+	match commander.faction:
+		"Império":
+			return PORTRAIT_IMPERIO_1 if variant == 0 else PORTRAIT_IMPERIO_2
+		"Natureza":
+			return PORTRAIT_NATUREZA_1 if variant == 0 else PORTRAIT_NATUREZA_2
+		"Mortos-Vivos":
+			return PORTRAIT_MORTOS_VIVOS_1 if variant == 0 else PORTRAIT_MORTOS_VIVOS_2
+		_:
+			return null
+
+
+func _make_portrait(texture: Texture2D, size: float) -> Control:
+	var slot := Control.new()
+	slot.custom_minimum_size = Vector2(size, size)
+	slot.clip_contents = true
+	slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	if texture != null:
+		var rect := TextureRect.new()
+		rect.texture = texture
+		rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+		rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		slot.add_child(rect)
+
+	var border := Panel.new()
+	border.set_anchors_preset(Control.PRESET_FULL_RECT)
+	border.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var border_style := StyleBoxFlat.new()
+	border_style.bg_color = Color(0, 0, 0, 0)
+	border_style.border_width_left = 2
+	border_style.border_width_right = 2
+	border_style.border_width_top = 2
+	border_style.border_width_bottom = 2
+	border_style.border_color = Color(HUD_ACCENT.r, HUD_ACCENT.g, HUD_ACCENT.b, 0.8)
+	border_style.corner_radius_top_left = 6
+	border_style.corner_radius_top_right = 6
+	border_style.corner_radius_bottom_left = 6
+	border_style.corner_radius_bottom_right = 6
+	border.add_theme_stylebox_override("panel", border_style)
+	slot.add_child(border)
+
+	return slot
+
+
+func _force_ignore_mouse_recursive(node: Node) -> void:
+	if node is Control:
+		(node as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for child in node.get_children():
+		_force_ignore_mouse_recursive(child)
 
 
 func _clear_children(container: Node) -> void:
@@ -247,137 +1799,237 @@ func _clear_children(container: Node) -> void:
 		child.free()
 
 
-func _on_commander_selected(index: int) -> void:
-	_selected_commander = _eligible_commanders[index]
-	_update_soldo_label()
+## --- Helpers visuais (duplicados localmente, mesmo padrão de sempre). ---
+
+func _anchor_new_control(parent: Control, rect: Rect2) -> Control:
+	var control := Control.new()
+	control.anchor_left = rect.position.x
+	control.anchor_top = rect.position.y
+	control.anchor_right = rect.position.x + rect.size.x
+	control.anchor_bottom = rect.position.y + rect.size.y
+	control.offset_left = 0.0
+	control.offset_top = 0.0
+	control.offset_right = 0.0
+	control.offset_bottom = 0.0
+	control.clip_contents = true
+	parent.add_child(control)
+	return control
 
 
-## ARMY.md, "Unicidade de Composição": nunca duas Cartas com o mesmo
-## Nome no Exército, independente do Tier — rejeita a marcação se já
-## existir uma carta diferente com o mesmo Nome selecionada.
-func _on_card_toggled(pressed: bool, card: CardResource) -> void:
-	if pressed:
-		var already_has_same_name: bool = false
-		for selected: CardResource in _selected_cards:
-			if selected != card and selected.card_name == card.card_name:
-				already_has_same_name = true
-		if not _selected_cards.has(card) and _selected_cards.size() < 9 and not already_has_same_name:
-			_selected_cards.append(card)
+## wrap=false por padrão (evita o bug de texto verticalizado do Godot —
+## Label com AUTOWRAP_WORD_SMART dentro de um Container ainda sem
+## largura resolvida na primeira passada de layout quebra
+## letra-por-letra). Só texto realmente longo (via _make_body_label)
+## usa wrap=true.
+func _make_label(text: String, font_size: int, color: Color, wrap: bool = false) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART if wrap else TextServer.AUTOWRAP_OFF
+	label.add_theme_font_override("font", HUD_FONT)
+	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_color_override("font_color", color)
+	label.add_theme_color_override("font_outline_color", HUD_OUTLINE_COLOR)
+	label.add_theme_constant_override("outline_size", HUD_OUTLINE_SIZE)
+	label.add_theme_color_override("font_shadow_color", HUD_SHADOW_COLOR)
+	label.add_theme_constant_override("shadow_offset_x", HUD_SHADOW_OFFSET)
+	label.add_theme_constant_override("shadow_offset_y", HUD_SHADOW_OFFSET)
+	return label
+
+
+func _make_centered_label(text: String, font_size: int, color: Color, wrap: bool = false) -> Label:
+	var label := _make_label(text, font_size, color, wrap)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	return label
+
+
+func _make_body_label(text: String) -> Label:
+	var label := _make_label(text, 10, HUD_TEXT_COLOR, true)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	return label
+
+
+func _make_separator() -> Control:
+	var sep := ColorRect.new()
+	sep.color = Color(HUD_ACCENT.r, HUD_ACCENT.g, HUD_ACCENT.b, 0.35)
+	sep.custom_minimum_size = Vector2(0, 1)
+	return sep
+
+
+func _make_card_panel() -> PanelContainer:
+	var panel := PanelContainer.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.03, 0.04, 0.08, 0.97)
+	style.border_width_left = 1
+	style.border_width_right = 1
+	style.border_width_top = 1
+	style.border_width_bottom = 1
+	style.border_color = Color(HUD_ACCENT.r, HUD_ACCENT.g, HUD_ACCENT.b, 0.6)
+	style.corner_radius_top_left = 4
+	style.corner_radius_top_right = 4
+	style.corner_radius_bottom_left = 4
+	style.corner_radius_bottom_right = 4
+	style.content_margin_left = 8.0
+	style.content_margin_right = 8.0
+	style.content_margin_top = 6.0
+	style.content_margin_bottom = 6.0
+	panel.add_theme_stylebox_override("panel", style)
+	return panel
+
+
+func _make_list_row_panel(selected: bool) -> PanelContainer:
+	var panel := PanelContainer.new()
+	var style := StyleBoxFlat.new()
+	if selected:
+		style.bg_color = Color(HUD_ACCENT_SELECTED.r, HUD_ACCENT_SELECTED.g, HUD_ACCENT_SELECTED.b, 0.16)
+		style.border_width_left = 2
+		style.border_width_right = 2
+		style.border_width_top = 2
+		style.border_width_bottom = 2
+		style.border_color = HUD_ACCENT_SELECTED
 	else:
-		_selected_cards.erase(card)
-	_update_soldo_label()
-	_refresh_choice_phase()  # reconstrói pra atualizar quais cópias do mesmo Nome ficam desabilitadas agora
+		style.bg_color = Color(HUD_ACCENT.r, HUD_ACCENT.g, HUD_ACCENT.b, 0.05)
+		style.border_width_left = 1
+		style.border_width_right = 1
+		style.border_width_top = 1
+		style.border_width_bottom = 1
+		style.border_color = Color(HUD_ACCENT.r, HUD_ACCENT.g, HUD_ACCENT.b, 0.4)
+	style.corner_radius_top_left = 6
+	style.corner_radius_top_right = 6
+	style.corner_radius_bottom_left = 6
+	style.corner_radius_bottom_right = 6
+	style.content_margin_left = 8.0
+	style.content_margin_right = 8.0
+	style.content_margin_top = 6.0
+	style.content_margin_bottom = 6.0
+	panel.add_theme_stylebox_override("panel", style)
+	return panel
 
 
-## Cancela o Editor a qualquer momento. Se já tinha passado da Fase 1
-## (Exército já formado via form_army(), aguardando posicionamento),
-## desfaz de verdade — libera o Comandante e as cartas de volta pro
-## Reino, não deixa nada preso.
-## Cancela o Editor a qualquer momento. Se já tinha passado da Fase 1
-## de uma CRIAÇÃO NOVA (Exército já formado via form_army(), aguardando
-## posicionamento), desfaz de verdade — libera o Comandante e as
-## cartas de volta pro Reino, não deixa nada preso. Nunca desfaz
-## quando o modo é EDIÇÃO de um Exército já existente (existing_army
-## != null) — cancelar ali só descarta as edições de Formação não
-## salvas, o Exército em si nunca é tocado.
-func _on_cancel_pressed() -> void:
-	if _army != null and existing_army == null:
-		KingdomState.kingdom.disband_army(_army)
-	cancelled.emit()
+func _make_stat_chip(title_text: String, value_text: String, value_color: Color = HUD_TEXT_COLOR) -> Control:
+	var card := _make_card_panel()
+	var vbox := VBoxContainer.new()
+	card.add_child(vbox)
+	vbox.add_child(_make_centered_label(title_text, 9, HUD_MUTED_COLOR))
+	vbox.add_child(_make_centered_label(value_text, 13, value_color))
+	return card
 
 
-func _on_montar_pressed() -> void:
-	if _selected_commander == null or _selected_cards.size() != 9:
-		return
-
-	if editing_composition and existing_army != null:
-		KingdomState.kingdom.re_form_army(existing_army, _selected_commander, _selected_cards.duplicate())
-		_army = existing_army
-	else:
-		_army = KingdomState.kingdom.form_army(_selected_commander, _selected_cards.duplicate())
-
-	# "α" é sempre a posição base — existe e é editável mesmo com
-	# formation_count=1 (antes disso, o Exército de 1 Formação nunca
-	# passava pelo posicionamento nenhum, só a ordem de marcação dos
-	# checkboxes; agora sempre passa).
-	# ARMY.md, "Arquétipos de Formação": form_army() já populou
-	# _army.formations com β-ε de verdade (Ofensiva/Defensiva/
-	# Equilibrada/Dispersão) — nunca sobrescrever com cópias idênticas
-	# de α aqui. "Nunca formações idênticas" é regra do documento.
-	_formation_cards["α"] = _selected_cards.duplicate()
-	for i in range(1, formation_count):
-		var name: String = FORMATION_NAMES[i]
-		_formation_cards[name] = _army.formations[name] if _army.formations.has(name) else _selected_cards.duplicate()
-
-	_formations_section.visible = true
-	_concluir_button.visible = true
-	_current_formation = "α"
-	_build_formation_tabs()
-	_build_slots_grid()
+func _make_tab_button(text: String, active: bool) -> Button:
+	var button := Button.new()
+	button.text = text
+	button.add_theme_font_size_override("font_size", 13)
+	button.custom_minimum_size = Vector2(90, 34)
+	button.toggle_mode = true
+	button.button_pressed = active
+	_style_office_button(button)
+	if active:
+		var active_style := StyleBoxFlat.new()
+		active_style.bg_color = Color(HUD_ACCENT_SELECTED.r, HUD_ACCENT_SELECTED.g, HUD_ACCENT_SELECTED.b, 0.28)
+		active_style.border_width_left = 2
+		active_style.border_width_right = 2
+		active_style.border_width_top = 2
+		active_style.border_width_bottom = 2
+		active_style.border_color = HUD_ACCENT_SELECTED
+		active_style.corner_radius_top_left = 4
+		active_style.corner_radius_top_right = 4
+		active_style.corner_radius_bottom_left = 4
+		active_style.corner_radius_bottom_right = 4
+		button.add_theme_stylebox_override("normal", active_style)
+		button.add_theme_stylebox_override("pressed", active_style)
+		button.add_theme_stylebox_override("hover", active_style)
+	return button
 
 
-func _build_formation_tabs() -> void:
-	_clear_children(_formation_tabs_row)
-	if formation_count <= 1:
-		return  # só 1 Formação -> sem abas, só o grid da posição base ("α")
-	for i in range(formation_count):
-		var formation_name: String = FORMATION_NAMES[i]
-		var button := Button.new()
-		button.text = ("[%s]" % formation_name) if formation_name == _current_formation else formation_name
-		button.disabled = formation_name == _current_formation  # indicador visual claro de qual está selecionada agora
-		button.pressed.connect(_on_formation_tab_pressed.bind(formation_name), CONNECT_DEFERRED)
-		_formation_tabs_row.add_child(button)
+func _make_small_button(text: String) -> Button:
+	var button := Button.new()
+	button.text = text
+	button.add_theme_font_size_override("font_size", 12)
+	button.custom_minimum_size = Vector2(0, 34)
+	_style_office_button(button)
+	return button
 
 
-func _on_formation_tab_pressed(formation_name: String) -> void:
-	_current_formation = formation_name
-	_build_formation_tabs()
-	_build_slots_grid()
+func _make_primary_button(text: String) -> Button:
+	var button := _make_small_button(text)
+	button.add_theme_font_size_override("font_size", 13)
+
+	var accent_style := StyleBoxFlat.new()
+	accent_style.bg_color = Color(HUD_ACCENT_SELECTED.r, HUD_ACCENT_SELECTED.g, HUD_ACCENT_SELECTED.b, 0.20)
+	accent_style.border_width_left = 2
+	accent_style.border_width_right = 2
+	accent_style.border_width_top = 2
+	accent_style.border_width_bottom = 2
+	accent_style.border_color = HUD_ACCENT_SELECTED
+	accent_style.corner_radius_top_left = 4
+	accent_style.corner_radius_top_right = 4
+	accent_style.corner_radius_bottom_left = 4
+	accent_style.corner_radius_bottom_right = 4
+	accent_style.content_margin_left = 14.0
+	accent_style.content_margin_right = 14.0
+	button.add_theme_stylebox_override("normal", accent_style)
+	button.add_theme_stylebox_override("disabled", accent_style)
+	return button
 
 
-func _build_slots_grid() -> void:
-	_clear_children(_slots_grid)
-	var current_cards: Array[CardResource] = _formation_cards[_current_formation]
+func _style_office_button(button: Button) -> void:
+	button.add_theme_font_override("font", HUD_FONT)
+	button.add_theme_color_override("font_color", HUD_TEXT_COLOR)
+	button.add_theme_color_override("font_hover_color", HUD_ACCENT_SELECTED)
+	button.add_theme_color_override("font_disabled_color", HUD_MUTED_COLOR)
 
-	for visual_index in range(9):
-		var position_number: int = POSITION_LAYOUT[visual_index]
-		var slot_index: int = position_number - 1
+	var normal_style := StyleBoxFlat.new()
+	normal_style.bg_color = Color(0.06, 0.07, 0.11, 0.85)
+	normal_style.border_width_left = 1
+	normal_style.border_width_right = 1
+	normal_style.border_width_top = 1
+	normal_style.border_width_bottom = 1
+	normal_style.border_color = Color(HUD_ACCENT.r, HUD_ACCENT.g, HUD_ACCENT.b, 0.65)
+	normal_style.corner_radius_top_left = 4
+	normal_style.corner_radius_top_right = 4
+	normal_style.corner_radius_bottom_left = 4
+	normal_style.corner_radius_bottom_right = 4
+	normal_style.content_margin_left = 10.0
+	normal_style.content_margin_right = 10.0
+	button.add_theme_stylebox_override("normal", normal_style)
+	button.add_theme_stylebox_override("disabled", normal_style)
 
-		var slot_box := VBoxContainer.new()
-		_slots_grid.add_child(slot_box)
-
-		var position_label := Label.new()
-		var line_number: int = 1 if position_number <= 3 else (2 if position_number <= 6 else 3)
-		position_label.text = "Posição %d (Linha %d)" % [position_number, line_number]
-		slot_box.add_child(position_label)
-
-		var option := OptionButton.new()
-		for i in range(current_cards.size()):
-			option.add_item(current_cards[i].card_name, i)
-		option.selected = slot_index
-		option.item_selected.connect(_on_slot_card_selected.bind(slot_index), CONNECT_DEFERRED)
-		slot_box.add_child(option)
-
-
-## Troca (swap) o conteúdo de "slot_index" com quem estiver atualmente
-## na posição escolhida — nunca deixa a Formação num estado inválido
-## (sempre uma permutação completa das mesmas 9 cartas).
-func _on_slot_card_selected(new_card_index: int, slot_index: int) -> void:
-	var current_cards: Array[CardResource] = _formation_cards[_current_formation]
-	var temp: CardResource = current_cards[slot_index]
-	current_cards[slot_index] = current_cards[new_card_index]
-	current_cards[new_card_index] = temp
-	_build_slots_grid()
+	var hover_style: StyleBoxFlat = normal_style.duplicate()
+	hover_style.bg_color = Color(HUD_ACCENT_SELECTED.r, HUD_ACCENT_SELECTED.g, HUD_ACCENT_SELECTED.b, 0.22)
+	hover_style.border_color = HUD_ACCENT_SELECTED
+	button.add_theme_stylebox_override("hover", hover_style)
+	button.add_theme_stylebox_override("pressed", hover_style)
+	button.add_theme_stylebox_override("focus", hover_style)
 
 
-## Aplica a posição base (possivelmente rearranjada pelo jogador no
-## grid 3x3) de volta no Exército — antes desta correção, um Exército
-## de 1 Formação só nunca mostrava nem deixava ajustar a posição das
-## cartas, usando sempre a ordem de marcação dos checkboxes.
-func _on_concluir_pressed() -> void:
-	_army.cards = _formation_cards["α"]
-	for formation_name: String in _formation_cards:
-		if formation_name == "α":
-			continue
-		_army.formations[formation_name] = _formation_cards[formation_name]
-	army_ready.emit(_army)
+func _styled_option_button(values: Array[String], current: String) -> OptionButton:
+	var option := OptionButton.new()
+	option.add_theme_font_size_override("font_size", 11)
+	option.add_theme_font_override("font", HUD_FONT)
+	for value: String in values:
+		option.add_item(value)
+	var current_index: int = values.find(current)
+	option.selected = current_index if current_index != -1 else 0
+	return option
+
+
+func _style_scrollbar(scroll: ScrollContainer) -> void:
+	var v_scroll: VScrollBar = scroll.get_v_scroll_bar()
+	var grabber_style := StyleBoxFlat.new()
+	grabber_style.bg_color = Color(HUD_ACCENT.r, HUD_ACCENT.g, HUD_ACCENT.b, 0.65)
+	grabber_style.corner_radius_top_left = 4
+	grabber_style.corner_radius_top_right = 4
+	grabber_style.corner_radius_bottom_left = 4
+	grabber_style.corner_radius_bottom_right = 4
+	v_scroll.add_theme_stylebox_override("grabber", grabber_style)
+	var grabber_hover_style: StyleBoxFlat = grabber_style.duplicate()
+	grabber_hover_style.bg_color = Color(HUD_ACCENT.r, HUD_ACCENT.g, HUD_ACCENT.b, 0.9)
+	v_scroll.add_theme_stylebox_override("grabber_highlight", grabber_hover_style)
+	v_scroll.add_theme_stylebox_override("grabber_pressed", grabber_hover_style)
+	var track_style := StyleBoxFlat.new()
+	track_style.bg_color = Color(0.0, 0.0, 0.0, 0.25)
+	track_style.corner_radius_top_left = 4
+	track_style.corner_radius_top_right = 4
+	track_style.corner_radius_bottom_left = 4
+	track_style.corner_radius_bottom_right = 4
+	v_scroll.add_theme_stylebox_override("scroll", track_style)

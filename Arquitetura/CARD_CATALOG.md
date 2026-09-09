@@ -985,7 +985,6 @@ Tier V
 Habilidade
 
 Inspiração
-
 Carta 04
 Nome
 Carvalho Ancião
@@ -1025,6 +1024,7 @@ Sobrevivência
 
 Carta 05
 Nome
+
 Ent Jovem
 Classe
 Mago

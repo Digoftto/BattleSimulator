@@ -1,64 +1,228 @@
 extends Control
 ## CommandCenterPanel (F-017, COMMAND_CENTER_UI.md)
 ##
-## Submenu de navegação do Centro de Comando — a Cidade encaminha para
-## cá em vez de listar Comandantes/Exércitos/Treinamento/Legado/PvE/
-## PvP/Minas como irmãos soltos. Nenhuma lógica de gameplay nova: só
-## encaminha para as 7 cenas já existentes, mesmo padrão de navegação
-## (change_scene_to_file) já usado em toda a árvore de telas do jogo.
+## HUB VISUAL do Centro de Comando — mesmo princípio arquitetural de
+## Academia/Depósito/Biblioteca/Observatório ("A ARTE É A INTERFACE"):
+## centro_de_comando.png preenche a tela inteira (AspectRatioContainer
+## STRETCH_COVER); nenhuma barra/label/painel permanente por cima — só
+## hotspots INVISÍVEIS sobre elementos já presentes na própria arte.
+##
+## Correspondência visual dos 5 hotspots (inspeção direta de
+## centro_de_comando.png, 1672x941 — ver relatório da tarefa):
+## - COMANDANTES: bancada/estante superior esquerda (mesa com livros e
+##   globo) — Gabinete de Recrutamento + Arquivo Militar (COMMAND_CENTER.md).
+## - EXÉRCITOS: mesa circular central com relevo de terreno — elemento
+##   mais isolado/dedicado da sala, ecoa a própria arte de
+##   "Army Management" (mesa com mapa/miniatura).
+## - CAMPO DE PROVA: mesa de trabalho em primeiro plano, canto inferior
+##   esquerdo (pergaminhos, velas) — antes sem uso; completa a simetria
+##   2x2 com Treinamento (canto inferior direito). Mesa isolada, distinta
+##   da mesa central de gestão de forças — combina com "ensaio tático
+##   privado" (CAMPO_DE_PROVA.md).
+## - LEGADO/HALL: bancada superior direita com mapa de parede emoldurado
+##   — ecoa a arte de "Veteran Records" (mesma composição de mesa+mapa).
+## - TREINAMENTO: estátuas/bandeiras inferior direita — **hotspot
+##   provisório, sem asset dedicado** (auditoria de assets não
+##   encontrou nenhuma arte com tema de treino/instrução na pasta
+##   Assets/MVP/Construções/). Escolhido por eliminação/simetria com
+##   Campo de Prova, não por correspondência temática confirmada — a
+##   arte definitiva do Treinamento ainda precisa ser produzida numa
+##   etapa futura.
+##
+## Progressão/Expansão Administrativa NÃO tem hotspot próprio (decisão
+## explícita desta etapa) — a ação "Ativar Próximo Recurso
+## Administrativo" já vive dentro da tela de Comandantes
+## (comandantes_panel.gd), e a Progressão Vertical (Nível do prédio)
+## continua usando o popup genérico de Evoluir da própria Cidade
+## (city_panel.gd), como qualquer outra construção.
+##
+## Campo de Prova: CORREÇÃO ARQUITETURAL desta etapa — decisão anterior
+## (sem hotspot próprio, só um botão futuro na lista de Exércitos) foi
+## revertida explicitamente pelo dono do projeto. Ganha hotspot próprio
+## no hub, como as demais 4 funções.
+##
+## World Map Gate NÃO é mais alcançado a partir daqui (correção
+## arquitetural: é uma localização própria da Cidade, ver
+## WORLD_MAP_GATE.md e city_panel.gd).
+##
+## Cada tela interna é reaproveitada no MESMO padrão de sempre (nunca
+## popup, nunca cena modal) — troca de cena completa via
+## change_scene_to_file, com botão "Voltar para o Centro de Comando"
+## em cada uma.
 
-const PANEL_SCENES: Dictionary = {
-	"Comandantes": "res://scenes/command_center/panels/comandantes_panel.tscn",
-	"Exércitos": "res://scenes/city/panels/exercitos_panel.tscn",
-	"Treinamento": "res://scenes/command_center/panels/treinamento_panel.tscn",
-	"Legado": "res://scenes/command_center/panels/legado_panel.tscn",
-	"PvE": "res://scenes/command_center/panels/pve_panel.tscn",
-	"PvP": "res://scenes/command_center/panels/pvp_panel.tscn",
-	"Minas": "res://scenes/command_center/panels/minas_panel.tscn",
-}
+const COMMAND_CENTER_TEXTURE: Texture2D = preload("res://assets/art/city_buildings/centro_de_comando.png")
+const COMMAND_CENTER_IMAGE_ASPECT_RATIO: float = 1672.0 / 941.0
+
+const HUD_FONT: Font = preload("res://assets/fonts/Cinzel-SemiBold.ttf")
+const HUD_TEXT_COLOR: Color = Color(0.93, 0.93, 0.90)
+const HUD_OUTLINE_COLOR: Color = Color(0.02, 0.02, 0.02, 0.95)
+const HUD_OUTLINE_SIZE: int = 4
+const HUD_SHADOW_COLOR: Color = Color(0.0, 0.0, 0.0, 0.5)
+const HUD_SHADOW_OFFSET: int = 2
+const HUD_ACCENT: Color = Color(0.75, 0.65, 0.45)
+
+const COMANDANTES_SCENE_PATH: String = "res://scenes/command_center/panels/comandantes_panel.tscn"
+const EXERCITOS_SCENE_PATH: String = "res://scenes/city/panels/exercitos_panel.tscn"
+const CAMPO_DE_PROVA_SCENE_PATH: String = "res://scenes/command_center/panels/campo_de_prova_panel.tscn"
+const TREINAMENTO_SCENE_PATH: String = "res://scenes/command_center/panels/treinamento_panel.tscn"
+const LEGADO_SCENE_PATH: String = "res://scenes/command_center/panels/legado_panel.tscn"
+
+## Bancada/estante superior esquerda (mesa com livros e globo).
+const COMANDANTES_HOTSPOT_RECT: Rect2 = Rect2(0.02, 0.22, 0.27, 0.32)
+## Mesa circular central com relevo de terreno.
+const EXERCITOS_HOTSPOT_RECT: Rect2 = Rect2(0.34, 0.38, 0.33, 0.44)
+## Mesa de trabalho em primeiro plano, canto inferior esquerdo.
+const CAMPO_DE_PROVA_HOTSPOT_RECT: Rect2 = Rect2(0.0, 0.60, 0.20, 0.38)
+## Bancada superior direita com mapa de parede emoldurado.
+const LEGADO_HOTSPOT_RECT: Rect2 = Rect2(0.70, 0.22, 0.28, 0.32)
+## Estátuas/bandeiras inferior direita — provisório, ver docstring do topo.
+const TREINAMENTO_HOTSPOT_RECT: Rect2 = Rect2(0.76, 0.60, 0.22, 0.38)
+
+var _hover_name_container: Control
+var _hover_name_label: Label
 
 
 func _ready() -> void:
+	if not KingdomState.is_initialized:
+		KingdomState.initialize_new_kingdom()
+	_build_static_structure()
+	print("[CommandCenterPanel] Pronto.")
+
+
+func _build_static_structure() -> void:
 	var background := ColorRect.new()
-	background.color = Color(0.12, 0.12, 0.16)
+	background.color = Color(0.03, 0.03, 0.05)
 	background.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(background)
 
-	var scroll := ScrollContainer.new()
-	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	add_child(scroll)
+	var command_center_area := Control.new()
+	command_center_area.set_anchors_preset(Control.PRESET_FULL_RECT)
+	command_center_area.clip_contents = true
+	add_child(command_center_area)
 
-	var root_vbox := VBoxContainer.new()
-	root_vbox.custom_minimum_size = Vector2(600, 0)
-	root_vbox.add_theme_constant_override("separation", 16)
-	scroll.add_child(root_vbox)
+	var aspect := AspectRatioContainer.new()
+	aspect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	aspect.ratio = COMMAND_CENTER_IMAGE_ASPECT_RATIO
+	aspect.stretch_mode = AspectRatioContainer.STRETCH_COVER
+	aspect.alignment_horizontal = AspectRatioContainer.ALIGNMENT_CENTER
+	aspect.alignment_vertical = AspectRatioContainer.ALIGNMENT_CENTER
+	command_center_area.add_child(aspect)
 
-	var title := Label.new()
-	title.text = "Centro de Comando"
-	title.add_theme_font_size_override("font_size", 24)
-	root_vbox.add_child(title)
+	var texture_rect := TextureRect.new()
+	texture_rect.texture = COMMAND_CENTER_TEXTURE
+	texture_rect.stretch_mode = TextureRect.STRETCH_SCALE
+	texture_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	texture_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	aspect.add_child(texture_rect)
 
-	var back_button := Button.new()
-	back_button.text = "<- Voltar para a Cidade"
-	back_button.pressed.connect(_on_back_to_city_pressed, CONNECT_DEFERRED)
-	root_vbox.add_child(back_button)
+	# --- 5 hotspots invisíveis, cada um sobre o elemento visual
+	# correspondente já presente na arte (ver docstring do topo). ---
+	_build_hotspot(texture_rect, "Hotspot_Comandantes", COMANDANTES_HOTSPOT_RECT, "Comandantes", COMANDANTES_SCENE_PATH)
+	_build_hotspot(texture_rect, "Hotspot_Exercitos", EXERCITOS_HOTSPOT_RECT, "Exércitos", EXERCITOS_SCENE_PATH)
+	_build_hotspot(texture_rect, "Hotspot_CampoDeProva", CAMPO_DE_PROVA_HOTSPOT_RECT, "Campo de Prova", CAMPO_DE_PROVA_SCENE_PATH)
+	_build_hotspot(texture_rect, "Hotspot_Legado", LEGADO_HOTSPOT_RECT, "Legado / Hall", LEGADO_SCENE_PATH)
+	_build_hotspot(texture_rect, "Hotspot_Treinamento", TREINAMENTO_HOTSPOT_RECT, "Treinamento", TREINAMENTO_SCENE_PATH)
 
-	var nav_title := Label.new()
-	nav_title.text = "Ir para:"
-	root_vbox.add_child(nav_title)
-	var nav_row := HBoxContainer.new()
-	root_vbox.add_child(nav_row)
-	for panel_name: String in PANEL_SCENES:
-		var button := Button.new()
-		button.text = panel_name
-		button.pressed.connect(_on_navigate_pressed.bind(panel_name), CONNECT_DEFERRED)
-		nav_row.add_child(button)
+	var hover_chip: Dictionary = _build_chip()
+	_hover_name_container = hover_chip["container"]
+	_hover_name_label = hover_chip["label"]
+	_hover_name_container.visible = false
+	_hover_name_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_hover_name_container)
+
+	var back_chip: Dictionary = _build_chip()
+	var back_container: Control = back_chip["container"]
+	var back_label: Label = back_chip["label"]
+	back_label.text = "Voltar para a Cidade"
+	back_container.mouse_filter = Control.MOUSE_FILTER_STOP
+	back_container.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	back_container.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	back_container.position = Vector2(16, 16)
+	back_container.size = back_container.get_combined_minimum_size()
+	back_container.gui_input.connect(_on_back_chip_gui_input)
+	add_child(back_container)
 
 
-func _on_navigate_pressed(panel_name: String) -> void:
-	get_tree().change_scene_to_file.call_deferred(PANEL_SCENES[panel_name])
+func _build_chip() -> Dictionary:
+	var chip := PanelContainer.new()
+
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(HUD_ACCENT.r, HUD_ACCENT.g, HUD_ACCENT.b, 0.10)
+	style.border_width_left = 1
+	style.border_width_right = 1
+	style.border_width_top = 1
+	style.border_width_bottom = 1
+	style.border_color = Color(HUD_ACCENT.r, HUD_ACCENT.g, HUD_ACCENT.b, 0.55)
+	style.corner_radius_top_left = 4
+	style.corner_radius_top_right = 4
+	style.corner_radius_bottom_left = 4
+	style.corner_radius_bottom_right = 4
+	style.content_margin_left = 10.0
+	style.content_margin_right = 10.0
+	style.content_margin_top = 5.0
+	style.content_margin_bottom = 5.0
+	chip.add_theme_stylebox_override("panel", style)
+
+	var label := Label.new()
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	label.add_theme_font_override("font", HUD_FONT)
+	label.add_theme_font_size_override("font_size", 14)
+	label.add_theme_color_override("font_color", HUD_TEXT_COLOR)
+	label.add_theme_color_override("font_outline_color", HUD_OUTLINE_COLOR)
+	label.add_theme_constant_override("outline_size", HUD_OUTLINE_SIZE)
+	label.add_theme_color_override("font_shadow_color", HUD_SHADOW_COLOR)
+	label.add_theme_constant_override("shadow_offset_x", HUD_SHADOW_OFFSET)
+	label.add_theme_constant_override("shadow_offset_y", HUD_SHADOW_OFFSET)
+	chip.add_child(label)
+
+	return {"container": chip, "label": label}
 
 
-func _on_back_to_city_pressed() -> void:
-	get_tree().change_scene_to_file.call_deferred("res://scenes/city/city_panel.tscn")
+func _build_hotspot(parent: Control, node_name: String, rect: Rect2, hover_text: String, scene_path: String) -> void:
+	var hotspot := Control.new()
+	hotspot.name = node_name
+	hotspot.anchor_left = rect.position.x
+	hotspot.anchor_top = rect.position.y
+	hotspot.anchor_right = rect.position.x + rect.size.x
+	hotspot.anchor_bottom = rect.position.y + rect.size.y
+	hotspot.offset_left = 0.0
+	hotspot.offset_top = 0.0
+	hotspot.offset_right = 0.0
+	hotspot.offset_bottom = 0.0
+	hotspot.mouse_filter = Control.MOUSE_FILTER_STOP
+	hotspot.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	hotspot.gui_input.connect(_on_hotspot_gui_input.bind(scene_path))
+	hotspot.mouse_entered.connect(_on_hotspot_mouse_entered.bind(hotspot, hover_text))
+	hotspot.mouse_exited.connect(_on_hotspot_mouse_exited)
+	parent.add_child(hotspot)
+
+
+func _on_hotspot_gui_input(event: InputEvent, scene_path: String) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		if ResourceLoader.exists(scene_path):
+			get_tree().change_scene_to_file.call_deferred(scene_path)
+		else:
+			print("[CommandCenterPanel] Hotspot preparado, cena ainda não existe: %s" % scene_path)
+
+
+func _on_hotspot_mouse_entered(hotspot: Control, hover_text: String) -> void:
+	_hover_name_label.text = hover_text
+	var chip_size: Vector2 = _hover_name_container.get_combined_minimum_size()
+	_hover_name_container.size = chip_size
+
+	var hotspot_rect: Rect2 = hotspot.get_global_rect()
+	var x: float = hotspot_rect.position.x + hotspot_rect.size.x / 2.0 - chip_size.x / 2.0
+	var y: float = hotspot_rect.position.y + hotspot_rect.size.y / 2.0 - chip_size.y / 2.0
+
+	_hover_name_container.global_position = Vector2(x, y)
+	_hover_name_container.visible = true
+
+
+func _on_hotspot_mouse_exited() -> void:
+	_hover_name_container.visible = false
+
+
+func _on_back_chip_gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		get_tree().change_scene_to_file.call_deferred("res://scenes/city/city_panel.tscn")

@@ -52,6 +52,13 @@ static func cost_breakdown(building: InstitutionalConstructionConfig.Building, t
 ##   aplica à própria Capital, que não tem teto).
 ## - "insufficient_resources": saldo insuficiente de algum dos recursos
 ##   necessários — nada é gasto (tudo ou nada).
+##
+## Consome primeiro o que já foi reservado pra esta construção via
+## Reserva Antecipada de Evolução (SupplyChainResolver,
+## Kingdom.building_reserved_resources — DEPOSITS.md), só completando
+## com raw_resources (o Depósito) pelo que ainda faltar. Um jogador que
+## nunca usou a Supply Chain tem reserva sempre 0 pra tudo, então o
+## comportamento fica idêntico ao de antes (100% de raw_resources).
 static func evolve(kingdom: Kingdom, building: InstitutionalConstructionConfig.Building) -> Dictionary:
 	var current_level: int = _get_level(kingdom, building)
 
@@ -59,18 +66,56 @@ static func evolve(kingdom: Kingdom, building: InstitutionalConstructionConfig.B
 		if not Capital.can_building_evolve(current_level, kingdom.capital_level):
 			return {"success": false, "reason": "capital_limit"}
 
+	# Academia: teto de Nível 120 (ACADEMY.md, "Progressão da Academia").
+	# Único dos 4 prédios institucionais com teto próprio documentado —
+	# Capital/Centro de Comando/Núcleo de Energia não têm limite de
+	# Nível confirmado, então não recebem este bloqueio.
+	if building == InstitutionalConstructionConfig.Building.ACADEMIA and current_level >= AcademyEconomy.MAX_LEVEL:
+		return {"success": false, "reason": "max_level_reached"}
+
 	var costs: Dictionary = cost_breakdown(building, current_level + 1)
+	var key: String = building_key(building)
 
 	for resource: String in costs:
-		if kingdom.get_raw_resource(resource) < costs[resource]:
+		var reserved: int = kingdom.get_building_reserved(key, resource)
+		var available_total: int = reserved + kingdom.get_raw_resource(resource)
+		if available_total < costs[resource]:
 			return {"success": false, "reason": "insufficient_resources"}
 
 	for resource: String in costs:
-		kingdom.spend_raw_resource(resource, costs[resource])
+		var reserved: int = kingdom.get_building_reserved(key, resource)
+		var needed: int = costs[resource]
+		var used_from_reserved: int = mini(reserved, needed)
+		var used_from_deposit: int = needed - used_from_reserved
+		if used_from_reserved > 0:
+			kingdom.spend_building_reserved(key, resource, used_from_reserved)
+		if used_from_deposit > 0:
+			kingdom.spend_raw_resource(resource, used_from_deposit)
 
 	_increment_level(kingdom, building)
 	_grant_xp(kingdom, building)
 	return {"success": true, "reason": ""}
+
+
+## Chave estável (persistida em Kingdom.building_reserved_resources) —
+## mesmos nomes já usados por city_panel.gd (BUILDING_SCENES/hitboxes).
+static func building_key(building: InstitutionalConstructionConfig.Building) -> String:
+	match building:
+		InstitutionalConstructionConfig.Building.CAPITAL:
+			return "capital"
+		InstitutionalConstructionConfig.Building.CENTRO_DE_COMANDO:
+			return "centro_de_comando"
+		InstitutionalConstructionConfig.Building.ACADEMIA:
+			return "academia"
+		InstitutionalConstructionConfig.Building.NUCLEO_DE_ENERGIA:
+			return "nucleo_de_energia"
+	return ""
+
+
+## Wrapper público de _get_level() — usado por SupplyChainResolver pra
+## não duplicar o mapeamento enum -> campo de Kingdom.
+static func get_current_level(kingdom: Kingdom, building: InstitutionalConstructionConfig.Building) -> int:
+	return _get_level(kingdom, building)
 
 
 static func _split_three_way(total: int) -> Dictionary:

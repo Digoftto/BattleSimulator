@@ -51,6 +51,28 @@ var _unit_traits: Array[UnitTraitResource]
 ## Registro textual estrutural (mesma convenção de CombatState.battle_log).
 var history_log: Array[String] = []
 
+## Instante Unix da última tentativa automática desta Expedição (F-020,
+## Ritmo da Expedição). 0 = nunca tentou automaticamente ainda — a
+## primeira sincronização tenta imediatamente. Lido/escrito
+## exclusivamente por ExpeditionTickResolver.sync().
+var last_tick_unix: int = 0
+
+## Histórico persistente por Fase (F-020, Parte 5/14; F-021 acrescenta
+## formação real): Fase (int) -> {"enemy_id", "enemy_name",
+## "enemy_faction", "commander_name", "category", "victory",
+## "defeat_reason", "attempts", "enemy_commander_faction",
+## "enemy_formation_card_names" (Array[String], 9 posições, "" onde
+## vazio), "player_army_name", "player_formation_name",
+## "player_formation_card_names" (Array[String], 9 posições — só
+## presente em vitória, já que só há uma única Formação vencedora por
+## Tentativa)}. Dado extraído e plano — nomes de carta (String), nunca
+## referências a CardResource/EnemyArmyEntry/PhaseResult — sobrevive a
+## save/load e permite reconstruir a UI (hover sobre Fase já disputada,
+## incluindo a composição real de quem lutou) sem depender do log
+## textual. Sobrescrito a cada nova tentativa da mesma Fase (sempre
+## reflete o resultado mais recente).
+var fase_history: Dictionary = {}
+
 
 func _init(
 	p_squad: Squad,
@@ -97,8 +119,10 @@ func current_fase_is_acampamento() -> bool:
 ## Fase. Estabelece Acampamento automaticamente quando a Fase
 ## conquistada for uma; avança para a próxima Fase em caso de vitória;
 ## retorna ao último Acampamento em caso de derrota total do Squad.
-## Retorna o PhaseResult da tentativa, ou null se não houver Exército
-## compatível no Catálogo ou a Expedição não estiver em andamento.
+## Retorna o PhaseResult da tentativa, ou null se: a Expedição não
+## estiver em andamento; estiver aguardando ordem no Acampamento; a Fase
+## atual for um Acampamento comum resolvido sem combate (decisão 8); ou
+## não houver Exército compatível no Catálogo.
 func attempt_current_fase() -> PhaseResult:
 	if status != Status.EM_ANDAMENTO:
 		return null
@@ -106,6 +130,15 @@ func attempt_current_fase() -> PhaseResult:
 	if is_waiting_at_acampamento:
 		history_log.append("Expedição aguardando ordem do jogador no Acampamento (Fase %d) — nenhuma tentativa realizada." % current_fase)
 		return null
+
+	# F-020, decisão 8: Acampamento comum é parada pura — não exige
+	# combate para se estabelecer. Um Acampamento que coincide com um
+	# Chefe Regional (chefe_type != "") NUNCA cai aqui: continua exigindo
+	# a vitória do Chefe, e estabelecer o Acampamento ali é efeito
+	# colateral dessa vitória (was_acampamento -> establish_acampamento(),
+	# abaixo, inalterado).
+	if current_fase_is_acampamento() and trilha.chefe_type(current_fase) == "":
+		return _arrive_at_camp_without_combat()
 
 	var category: EnemyArmyEntry.Category = _entry_category_for_current_fase()
 	var region: int = trilha.region_for_fase(current_fase)
@@ -124,6 +157,8 @@ func attempt_current_fase() -> PhaseResult:
 	var result: PhaseResult = PhaseResolver.resolve(
 		squad, entry, _battlefields, _abilities_by_name, _unit_traits, "PvE — Fase %d (%s)" % [current_fase, territory.id], "pve"
 	)
+
+	_record_fase_history(current_fase, entry, result)
 
 	if result.victory:
 		var fase_type: String = current_fase_type()
@@ -191,6 +226,63 @@ func attempt_current_fase() -> PhaseResult:
 		# a restauração de todas as Formações já ocorre naturalmente.
 
 	return result
+
+
+## Estabelece um Acampamento comum (não coincidente com Chefe Regional)
+## sem exigir combate — F-020, decisão 8. Espelha deliberadamente o
+## idioma já usado no ramo de vitória logo acima (establish_acampamento()
+## seguido de incremento incondicional de current_fase), para que
+## resume_from_acampamento() nunca reencontre esta mesma Fase depois de
+## "Continuar" (current_fase já avançou antes do jogador ver a parada).
+func _arrive_at_camp_without_combat() -> PhaseResult:
+	history_log.append("Fase %d: Acampamento — estabelecido sem combate." % current_fase)
+	establish_acampamento()
+	current_fase += 1
+	if current_fase > trilha.total_fases():
+		status = Status.CONCLUIDA
+		history_log.append("Trilha concluída na Fase %d." % (current_fase - 1))
+	return null
+
+
+## Grava um registro plano (nunca referências a objetos) do resultado
+## desta tentativa em fase_history, para vitória E derrota — F-020,
+## Parte 5/14 (hover sobre Fase já disputada). F-021: também captura a
+## composição real das duas Formações no INSTANTE da vitória (nomes de
+## carta, nunca referência) — squad.armies[i].get_formation() é mutável
+## depois (o jogador pode reeditar a Formação no Acampamento), então
+## precisa ser fotografado agora, não recalculado depois. Sobrescreve
+## qualquer registro anterior da mesma Fase.
+func _record_fase_history(fase: int, entry: EnemyArmyEntry, result: PhaseResult) -> void:
+	var data: Dictionary = {
+		"enemy_id": entry.id,
+		"enemy_name": entry.army_name,
+		"enemy_faction": entry.faction,
+		"commander_name": entry.commander.commander_name if entry.commander != null else "",
+		"enemy_commander_faction": entry.commander.faction if entry.commander != null else "",
+		"category": EnemyArmyEntry.Category.keys()[entry.category],
+		"victory": result.victory,
+		"defeat_reason": PhaseResult.DefeatReason.keys()[result.defeat_reason],
+		"attempts": result.attempts,
+		"enemy_formation_card_names": _card_names_for(entry.cards),
+	}
+
+	if result.victory:
+		var winning_army: Army = squad.armies[result.winning_army_index]
+		data["player_army_name"] = winning_army.army_name
+		data["player_formation_name"] = result.winning_formation
+		data["player_formation_card_names"] = _card_names_for(winning_army.get_formation(result.winning_formation))
+
+	fase_history[fase] = data
+
+
+## Nomes reais das cartas de uma Formação, na mesma ordem posicional
+## (índice 0 = Posição 1 .. índice 8 = Posição 9, COMBAT_RULES.md) —
+## "" para uma posição sem carta (nunca inventado).
+func _card_names_for(cards: Array[CardResource]) -> Array[String]:
+	var names: Array[String] = []
+	for card: CardResource in cards:
+		names.append(card.card_name if card != null else "")
+	return names
 
 
 ## Categoria de Exército Inimigo correspondente ao tipo da Fase atual
