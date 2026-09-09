@@ -50,7 +50,8 @@ fica só o controle de execução.
 | 21.4.1 — Energia visível durante a Expedição | ✅ Concluída | Dado real existe (`Army.current_energy/max_energy`), agora exibido no header via barra de fadiga (ENERGY.md, "Interface") |
 | 21.4.2 — Estado de "Energia esgotada" comunicado | ✅ Concluída | Reaproveita `HUD_WARNING_COLOR`; texto "ESGOTADA" na própria legenda da barra — sem alterar o motor |
 | 21.5 — Tutorial / Onboarding | ✅ Concluída | 6 dicas contextuais novas (Formação/Campo de Prova/Energia/Acampamento/Mina/Guarnição), independentes da sequência linear de 4 passos já existente |
-| 21.6 — PvP simulado (combate real) | ⬜ Pendente | Depende de 21.2.2 |
+| 21.6 — PvP simulado (combate real) | ✅ Concluída | `CombatEngine` real (`game_mode="pvp"`), defensor IA via `TestArmyFactory` espelhando Soldo/Patente do atacante |
+| 21.7 — Polimento visual e UX do PvP | ✅ Concluída | `pvp_panel.gd` era o único painel de navegação fora do padrão HUD (auditoria FASE 21, cluster E) |
 | 21.7.1 — Estilo visual do `pvp_panel.gd` | ⬜ Pendente | Único painel de navegação fora do padrão HUD (`Cinzel-SemiBold` + `StyleBoxFlat` dourado) |
 | 21.7.2 — Legibilidade do Army Editor | ⬜ Pendente | Achado leve (fonte 8px em `army_editor_panel.gd:966`) |
 | 21.7.3 — Legibilidade da Formação | ⬜ Pendente | Sem achado grave nas 4 resoluções (análise por código, não screenshot) |
@@ -173,6 +174,56 @@ isoladamente antes da rodada completa, ambas 100% ok.
 
 **Status final da 21.5:** ✅ Concluída.
 
+## Checkpoint de versionamento — Fases 21.1–21.5 (2026-09-08)
+
+- **Commit:** `41c0c2b6b584ef152df5fef642580f2419d4b164`
+- **Branch:** `main`
+- **Push:** enviado a `origin/main` (GitHub) — `84cc6e4..41c0c2b main -> main`, confirmado (`git status -sb` mostra `main...origin/main` sem "ahead"/"behind" após o push).
+- **Validação antes do commit:** suíte completa do projeto — **3475 passou, 0 falhou, 0 erros**.
+- **Escopo do commit:** decisão explícita do usuário foi commitar TODO o trabalho pendente do repositório (402 caminhos antes do commit), não só o que pertence estritamente às Fases 21.1–21.5 — o último commit anterior (`84cc6e4`, TUT-001) era de mais de 2 semanas atrás, e havia trabalho acumulado de várias sessões (integração de arte, novos painéis da Cidade, etc.) misturado no working tree sem checkpoints intermediários. Excluídos deliberadamente por serem artefatos transitórios, não conteúdo real (mantidos como untracked): `.scratch4/` (screenshots de depuração), `crop_data.json` (22 bytes, arquivo truncado), `scratch_history_bottom.png`/`scratch_history_top.png`, `CLAUDE.md.bak`, `Game/tools/tmp_check_*.gd.uid` (órfãos, sem `.gd` correspondente), e o lock-file do Excel `~$LBS-BS_MATRIZ_TRADUCAO_VARIACOES_V1.xlsx`. Um arquivo `.xlsx` real (`LBS-BS_CATALOGO_INIMIGOS_GOBLINS_GOLEMS.xlsx`) apareceu como untracked após o commit — não estava capturado na varredura antes do `git add`, ficou de fora deste checkpoint; o usuário pode commitá-lo separadamente quando confirmar que não está mais sendo editado.
+- **Fases incluídas neste checkpoint:** 21.1 (bug de Formação), 21.2 (decisões de produto), 21.3 (evolução de Minas Regionais + auditoria econômica + docs), 21.4 (barra de Energia), 21.5 (dicas contextuais de onboarding) — mais todo o trabalho de sessões anteriores a esta conversa (F-020.x de PvE/Trilha, ART-002 a ART-005, TUT-001, integração de novos painéis da Cidade) que também nunca tinha sido commitado.
+
+## Registro de execução — 21.6 (PvP Simulado com Combate Real + IA local)
+
+**Auditoria antes da implementação:** confirmado que `PlanoCampanhaResolver.select_attack()` já resolve Exército atacante + Campo de Batalha restrito por Energia (`ATTACK_ENERGY_COST=10`, igual ao custo documentado em `ENERGY.md`); `RankingResolver.apply_result()` já trata Empate corretamente (delta 0 de PL, nenhuma regra nova necessária); `campo_de_prova_panel.gd::_run_prova()` é o padrão exato de chamada a `CombatEngine`+`CombatReplayCollector`+`CombatReplayView` a reaproveitar; `TestArmyFactory.generate_random_army(patente)` (já usada pelo Campo de Prova) gera Comandante procedural + 9 Cartas reais do catálogo completo + Formação δ, parametrizado exatamente pelo teto de Soldo/Patente — zero código novo necessário para gerar o defensor.
+
+**LACUNA REGISTRADA (decisão do usuário, não inventada):** `ENERGY.md` ("Consumo de Energia — PvP") documenta que uma partida de PvP é uma "série Melhor de 5", com custo de Energia fixo "independente da quantidade de partidas efetivamente disputadas". Porém `RANKING.md`/`MATCHMAKING.md` (donos reais da regra de PvP) nunca definem como essa série de 5 partidas funciona — mesma Formação a cada partida? o que decide um 2-2? Implementar isso exigiria inventar regras que não existem em documento algum. **Decisão do usuário:** implementar 1 batalha real por partida por enquanto (o custo fixo de 10 Energia já é compatível com N=1); a série de 5 completa fica registrada aqui como pendência de design futura, não implementada.
+
+**Arquitetura adotada (item 18, preparada para o futuro):** `_generate_ai_defender(attacker)` é o único ponto que decide a origem do defensor — retorna um `Army` comum, sem nenhum acoplamento a `CombatEngine` (que só recebe dois `Army` válidos, como sempre). Trocar por um defensor de servidor no futuro significa reescrever só essa função, nunca o motor de combate.
+
+**Arquivos modificados:**
+- `Game/scenes/command_center/panels/pvp_panel.gd`: removidos os 3 botões "Simular Resultado" (Bronze e Plano) e seus handlers (`_on_simulate_bronze_result_pressed`/`_on_simulate_plano_result_pressed`). Adicionados: `_generate_ai_defender()`, `_resolve_pvp_combat()` (núcleo síncrono e testável: gera defensor, roda `CombatEngine.initialize()+run()` com `game_mode="pvp"`, anexa `CombatReplayCollector`, consome a Energia real fixa, deriva o resultado real de `state.winner_side`), `_run_pvp_battle()` (chama o núcleo + mostra `CombatReplayView` real + relatório), `_apply_bronze_ranking_result()`/`_apply_plano_ranking_result()` (extraídos como métodos nomeados — nunca duplicam `RankingResolver.apply_result()`), `_build_battle_result_overlay()` (relatório mínimo: vencedor, os dois Exércitos/Comandantes reais, Campo de Batalha, turnos — nunca "Player Army"/"Enemy Army"/placeholder). Bronze usa "Batalhar" gated por Energia real; Plano ganhou um botão "Batalhar" que só aparece após um sorteio bem-sucedido, usando exatamente o Exército/Campo já sorteados (nunca sorteados de novo). Texto de escopo do topo da tela corrigido (citava os botões "Simular Resultado" removidos).
+- `Game/tests/test_main.gd`: registro da suíte nova.
+
+**Testes:** `Game/tests/unit/test_pvp_battle.gd` (novo, 19 asserções, itens A-H do pedido): combate real (turnos > 0, finalizado, Energia consumida no custo exato); `game_mode == "pvp"`; defensor válido e completo; Formação do defensor com 9 posições reais e sem repetição; resultado do Ranking deriva exatamente de `state.winner_side`; `_apply_bronze_ranking_result()`/`_apply_plano_ranking_result()` produzem exatamente o que `RankingResolver.apply_result()` produziria; `CombatReplayCollector` real captura tabuleiro inicial e eventos; os handlers antigos de resultado artificial não existem mais. Mesmo padrão de `test_campo_de_prova_lifecycle_and_editing.gd`: a fase de replay (assíncrona, depende de frames reais) não é exercitada — só o núcleo síncrono e determinístico, que é onde toda a lógica real mora. **Suíte completa do projeto: 3494 passou, 0 falhou, 0 erros** (era 3475 antes da 21.6).
+
+**Validação visual real:** screenshot do Bronze mostrando "Batalhar (Custo: 10 Energia)" substituindo os 3 botões antigos; screenshot do relatório pós-batalha mostrando nomes reais (Comandante do jogador, Comandante da IA gerado, Campo de Batalha, turnos). **Achado real corrigido:** o título do relatório ("Derrota — Comandante de Teste (Mortos-Vivos) venceu") vazava pra fora da janela sem quebra de linha — corrigido com `autowrap_mode` (mesmo padrão já usado no resto do relatório).
+
+**Não alterado:** regras de combate/dano/atributos/Formação, Economia, Energia (só consumida, nunca a fórmula), Minas, PvE, Trilha, fórmulas de `RankingResolver`, `PlanoCampanhaResolver` (reaproveitado como estava). Nenhum matchmaking online, nenhum servidor.
+
+**Status final da 21.6:** ✅ Concluída.
+
+## Registro de execução — 21.7 (Polimento Visual e UX do PvP)
+
+**Auditoria antes de alterar:** comparado `pvp_panel.gd` com `exercitos_panel.gd` (fonte real dos helpers portados: `_make_label`/`_make_centered_label`/`_make_separator`/`_make_stat_chip`/`_style_office_button`/`_make_primary_button`/`_make_small_button`/`_style_scrollbar`) e `pve_panel.gd` (fonte real de `_card_style()`/`_modal_style()` e do padrão de barra de Energia). Confirmado: nenhum padrão novo foi inventado — os mesmos `HUD_FONT`/`HUD_ACCENT`/`HUD_ACCENT_SELECTED`/`HUD_TEXT_COLOR`/`HUD_MUTED_COLOR` (mesmos valores exatos) e os mesmos componentes StyleBoxFlat já usados em Exércitos/Comandantes/Campo de Prova/PvE/Minas foram duplicados localmente aqui (convenção já estabelecida no projeto: nenhuma classe de estilo compartilhada existe).
+
+**Arquivos modificados:**
+- `Game/scenes/command_center/panels/pvp_panel.gd`: reescrita visual completa, mesma lógica/wiring de sinais preservados 1:1. Cada Exército na Liga Bronze e cada Plano de Campanha agora é um card com moldura dourada (`_card_style()`); Divisão/Pontos de Liga/Liga viram blocos visuais (`_make_stat_chip()`) em vez de uma linha de texto corrida; a barra de Energia real (ENERGY.md, "Interface") aparece em cada card Bronze, com cor de aviso quando insuficiente para o custo da batalha; "Batalhar"/"Inscrever"/"Criar Plano" usam o tratamento de botão principal (`_make_primary_button()`, borda dourada clara); ações secundárias ("Sortear", setas de Ordem de Ataque) usam `_make_small_button()`; seções (Bronze/Planos/Defesa/Ordem de Ataque/Campos Especiais) ganharam títulos e separadores dourados consistentes. O relatório pós-batalha (`_build_battle_result_overlay()`) virou uma janela modal opaca (`_modal_style()`, mesmo padrão dos overlays de Acampamento/Mina em `pve_panel.gd`) com título colorido por resultado (verde/vermelho/dourado) e uma seção nova "IMPACTO NO RANKING" (PL antes -> depois, com sinal, e Divisão, incluindo promoção/rebaixamento quando aplicável) — item 7 do pedido, que a 21.6 ainda não cobria. Texto de escopo do topo revisado de novo (nunca ficou referenciando um componente removido).
+- `Game/tests/unit/test_pvp_battle.gd`: `_apply_bronze_ranking_result()`/`_apply_plano_ranking_result()` passaram a retornar `{pl_before, pl_after, division_before, division_after, promoted, demoted}` (antes `void`) — usado pelo novo relatório; teste F estendido com 2 asserções confirmando que o retorno reflete o antes/depois real.
+- `Game/tests/test_main.gd`: nenhuma mudança nesta etapa (nenhuma suíte nova — só comportamento verificável já coberto por F foi estendido, conforme item 11 do pedido: "não criar testes artificiais de aparência").
+
+**Arquivos não tocados:** `CombatEngine`, `PhaseResolver`, `EnemyArmyGenerator`, `ArmyRandomComposer`, `RankingResolver`, `PlanoCampanhaResolver`, `TestArmyFactory`, regras de Energia/Divisão/Pontos de Liga/matchmaking/geração do defensor/Formação/combate/persistência — nenhuma regra tocada, só apresentação.
+
+**Testes:** suíte `pvp_battle` re-executada (21 asserções, 2 novas desta etapa) + `ranking_and_battlefield_selector` + **suíte completa do projeto: 3496 passou, 0 falhou, 0 erros** (era 3494 antes da 21.7).
+
+**Validação visual real (as 4 resoluções pedidas):** capturados screenshots reais (ambiente com GPU) da tela principal (Bronze inscrito/não-inscrito, Plano com Liga/Divisão/PL, seção "Criar Plano", Defesa/Ordem de Ataque) em 1152×648, 1366×768, 1600×900 e 1920×1080, e do relatório pós-batalha (Vitória e Derrota) em 1152×648 e 1920×1080. Nenhum texto cortado, nenhum botão fora da tela, nenhuma sobreposição, nenhuma barra de Energia deformada, relatório sempre dentro dos limites da janela em todas as resoluções testadas.
+
+**Problemas encontrados e corrigidos nesta etapa:** nenhum problema visual novo restante — os dois achados reais de responsividade (texto do relatório vazando sem quebra de linha) já tinham sido corrigidos durante a própria 21.6, antes deste passe de identidade visual.
+
+**Pendência conhecida (não corrigida, fora de escopo):** o `OptionButton` nativo do Godot (Defesa Preferencial, Mapeamento dos Campos Especiais) recebeu apenas fonte/cor/StyleBox do estado "normal" — o menu suspenso (popup) continua com a aparência padrão do Godot, já que restilizar totalmente um `OptionButton` exige um `Theme` dedicado, não só overrides pontuais. Não é um controle usado com frequência (configuração do Plano, não a ação principal) — registrado aqui para uma eventual passada futura, não urgente.
+
+**Status final da 21.7:** ✅ Concluída.
+
 ## Checklist de saída do MVP compartilhável
 
 - [x] 21.1 — Bug da Formação corrigido e testado
@@ -180,8 +231,8 @@ isoladamente antes da rodada completa, ambas 100% ok.
 - [x] 21.3 — Economia balanceada e documentação sincronizada (recalibração numérica opcional, pendente de decisão do usuário — ver Simulação 4)
 - [x] 21.4 — PvE com feedback de Energia claro
 - [x] 21.5 — Tutorial cobrindo o escopo decidido (6 dicas contextuais + sequência linear original)
-- [ ] 21.6 — PvP simulado com combate real
-- [ ] 21.7 — Identidade visual consistente em todos os painéis, responsividade validada
+- [x] 21.6 — PvP simulado com combate real (série "Melhor de 5" registrada como pendência futura — 1 batalha por partida no MVP)
+- [x] 21.7 — pvp_panel.gd segue a identidade visual do jogo, validado nas 4 resoluções
 - [ ] 21.8 — Auditoria final + sessão de uso real sem problemas bloqueadores
 
 ## Encerramento (só ao concluir TODAS as etapas)
