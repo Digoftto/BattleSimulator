@@ -731,6 +731,27 @@ func _build_relatorio_interior(parent: Control) -> void:
 		], FONT_SIZE_STATE, HUD_MUTED_COLOR
 	))
 
+	# Auditoria FASE 22.1, achado H: CombatState já expõe sobreviventes e
+	# baixas por nome ao final de run() (units_of_side()/eliminated_units)
+	# — nenhuma mudança em CombatEngine/CombatState foi necessária, só
+	# ler o que já existe.
+	var survivors_a: int = _last_state.units_of_side(0, true).size()
+	var survivors_b: int = _last_state.units_of_side(1, true).size()
+	root_vbox.add_child(_make_centered_label(
+		"Seus sobreviventes: %d/9 | Sobreviventes do oponente: %d/9" % [survivors_a, survivors_b],
+		FONT_SIZE_AUX, HUD_TEXT_COLOR
+	))
+
+	var lost_names: Array[String] = []
+	for unit: CombatUnit in _last_state.eliminated_units:
+		if unit.side == 0 and unit.card != null:
+			lost_names.append(unit.card.card_name)
+	if not lost_names.is_empty():
+		root_vbox.add_child(_make_centered_label(
+			"Pelotões seus perdidos: %s" % ", ".join(lost_names),
+			FONT_SIZE_AUX, HUD_TEXT_COLOR
+		))
+
 	root_vbox.add_child(_make_centered_label(
 		"Sessão isolada — nenhum dado dos Exércitos reais foi alterado. Insights táticos ainda não implementados (Log Estruturado pendente, ver CAMPO_DE_PROVA.md).",
 		FONT_SIZE_AUX, HUD_MUTED_COLOR

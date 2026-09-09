@@ -38,6 +38,23 @@ A diferenciação de consumo entre as construções ocorre através da combinaç
 
 Exemplo — Academia (Principal: Essência Vital, Secundário: Ferro Negro): de todo Recurso de Construção que a Academia consumir para evoluir, 70% deve vir de Essência Vital e 30% de Ferro Negro.
 
+### Curva de Entrada (Níveis 2 e 3)
+
+Para Capital, Centro de Comando, Academia e Núcleo de Energia, alcançar
+os **Níveis 2 e 3** custa **5% do valor de $C(n)$** (desconto de 95%),
+exclusivamente para suavizar a progressão inicial de um jogador que
+ainda só tem as 3 Minas Iniciais. **A partir do Nível 4**, o custo volta
+a ser **100% de $C(n)$**, sem nenhuma exceção — esta redução nunca
+altera $b$, $x$, nem $\text{CEG}$.
+
+Aprovado após simulação isolada por construção e simulação agregada
+(as 4 construções competindo pelo mesmo banco de Recursos, 3 perfis de
+gasto, 180 dias) — ver `BALANCING_SIMULATION.md`, "Simulação 5 — Curva
+de Entrada das Construções Institucionais". Implementado em
+`InstitutionalConstructionEntryCurve`
+(`Game/engine/city/institutional_construction_entry_curve.gd`), única
+fonte deste percentual.
+
 ## Produção das Minas
 
 ### Mina Inicial

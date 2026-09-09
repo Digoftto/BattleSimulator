@@ -132,6 +132,7 @@ var _list_scroll: ScrollContainer = null
 var _list_scroll_position: int = 0
 var _detail_scroll: ScrollContainer = null
 var _detail_scroll_position: int = 0
+var _help_popup: Control = null
 
 ## --- Estado novo (livre, não testado por bootstrap.gd) ---
 var _mode: String = "comandante"  # "comandante" | "pelotao"
@@ -173,9 +174,28 @@ const FRAME_IMAGE_ASPECT_RATIO: float = 1536.0 / 1024.0
 
 const TITLE_RECT: Rect2 = Rect2(0.318, 0.133, 0.364, 0.061)
 const CLOSE_BUTTON_RECT: Rect2 = Rect2(0.859, 0.117, 0.072, 0.103)
-const TOP_RECT: Rect2 = Rect2(0.086, 0.242, 0.572, 0.102)     # faixa superior: abas Comandante/Pelotão
-const LIST_RECT: Rect2 = Rect2(0.086, 0.362, 0.572, 0.465)    # área grande esquerda: filtros + lista/grade
-const DETAIL_RECT: Rect2 = Rect2(0.674, 0.242, 0.241, 0.585)  # coluna direita: Comandante + Formação
+## FASE 22.5 — vão livre entre o título (termina em 0.682) e o botão
+## fechar (começa em 0.859): único botão de ajuda PERSISTENTE da tela
+## (os "(?)" pontuais de Soldo/Afinidade continuam existindo — este é
+## só um ponto de entrada visível sem precisar descobrir por acaso).
+const HELP_BUTTON_RECT: Rect2 = Rect2(0.740, 0.133, 0.075, 0.061)
+
+## FASE 22.3 — REDESENHO CONCEITUAL (pedido explícito): a coluna ESQUERDA
+## LARGA da moldura (antes TOP_RECT+LIST_RECT: abas + filtros/lista de
+## seleção) agora hospeda "EXÉRCITO/FORMAÇÃO" — o elemento dominante da
+## tela (Comandante compacto, Formação 3x3 GRANDE, Soldo/Afinidade,
+## ações). A coluna DIREITA ESTREITA (antes DETAIL_RECT: Comandante +
+## Formação) agora hospeda a "Biblioteca de Pelotões/Comandantes" —
+## deliberadamente compacta (linhas de texto, nunca cartas completas;
+## hover mostra a carta real via _build_card_tooltip(), já existente).
+## Nenhuma geometria da MOLDURA em si mudou (mesmo PNG, mesmas 2 colunas
+## visuais já existentes, mesmas larguras) — só qual conteúdo lógico
+## ocupa qual coluna. ARMY_RECT funde a altura de TOP_RECT+LIST_RECT
+## (0.242 a 0.827) na mesma largura larga de antes (0.572) — a Formação
+## já não precisa mais dividir espaço com abas/filtros de seleção.
+const ARMY_RECT: Rect2 = Rect2(0.086, 0.242, 0.572, 0.585)           # coluna esquerda larga: Comandante + Formação + Soldo/Afinidade + ações
+const LIBRARY_TABS_RECT: Rect2 = Rect2(0.674, 0.242, 0.241, 0.060)   # coluna direita estreita: abas Comandante/Pelotão
+const LIBRARY_RECT: Rect2 = Rect2(0.674, 0.302, 0.241, 0.525)        # coluna direita estreita: filtros + lista compacta
 
 const HUD_FONT: Font = preload("res://assets/fonts/Cinzel-SemiBold.ttf")
 const HUD_TEXT_COLOR: Color = Color(0.93, 0.93, 0.90)
@@ -195,10 +215,15 @@ const PORTRAIT_NATUREZA_2: Texture2D = preload("res://assets/art/commanders/comm
 const PORTRAIT_MORTOS_VIVOS_1: Texture2D = preload("res://assets/art/commanders/commander_portrait_mortos_vivos_1.png")
 const PORTRAIT_MORTOS_VIVOS_2: Texture2D = preload("res://assets/art/commanders/commander_portrait_mortos_vivos_2.png")
 
-const FORMATION_CARD_WIDTH: float = 70.0
-const COMMANDER_PORTRAIT_SIZE: float = 84.0
-const LIST_CARD_WIDTH: float = 82.0
-const LIST_COMMANDER_PORTRAIT: float = 46.0
+## Correção FASE 22.3 (item A.6/A.7 — Formação como elemento DOMINANTE):
+## a Formação vivia na antiga coluna estreita (DETAIL_RECT, ~234px) —
+## 70px por carta já era o limite prático ali. Agora vive na coluna
+## larga (ARMY_RECT, ~556px) — aumentada pra realmente dominar a tela,
+## como pedido, mantendo espaço de sobra pra Soldo/Energia/Afinidade e
+## ações abaixo. COMMANDER_PORTRAIT_SIZE reduzido (era 84): o Comandante
+## agora é deliberadamente compacto/secundário à Formação (item A.9).
+const FORMATION_CARD_WIDTH: float = 130.0
+const COMMANDER_PORTRAIT_SIZE: float = 60.0
 
 
 func _ready() -> void:
@@ -212,6 +237,24 @@ func _ready() -> void:
 	CardArtCatalog.preload_all(GameDatabase.cards)
 
 	_build_static_structure()
+	# Correção FASE 22.2 (achado real via screenshot, não só leitura de
+	# código): _formations_section/_commander_option são Controls comuns
+	# ancorados por FRAÇÃO dentro de texture_rect, que só assume seu
+	# tamanho real (972x648 em 1152x648, por causa do AspectRatioContainer
+	# letterboxed) depois de pelo menos 1 passada de layout do Godot. Sem
+	# este frame de espera, _build_detail_area()/_build_top_tabs_area()
+	# resolviam DETAIL_RECT/TOP_RECT/LIST_RECT contra o tamanho ainda não
+	# corrigido de texture_rect (o viewport inteiro, 1152x648) — o
+	# Control resultante (`area`) NUNCA se recalculava depois, mesmo após
+	# texture_rect assumir o tamanho certo (confirmado via prints de
+	# depuração: `area` ficava parado em ~0.241×1152px, quase o dobro da
+	# largura real pretendida, e ainda incorretamente posicionado —
+	# causa raiz do texto cortado na coluna direita, ex.: "COMANDANTE"
+	# virando "COMANDAN"). Esperar 1 frame aqui, antes de qualquer
+	# _build_detail_area()/_build_top_tabs_area(), garante que
+	# texture_rect já processou o layout do AspectRatioContainer.
+	for i in range(3):
+		await get_tree().process_frame
 	if existing_army != null and editing_composition:
 		_selected_commander = existing_army.commander
 		_selected_cards = existing_army.cards.duplicate()
@@ -282,6 +325,7 @@ func _build_static_structure() -> void:
 
 	_build_title(texture_rect, "Editar Exército" if existing_army != null else "Editor de Exército")
 	_build_close_button(texture_rect)
+	_build_help_button(texture_rect)
 
 	# _commander_option: faixa superior (abas) + área grande esquerda
 	# (filtros + lista/grade), como UM SÓ Control — visible=false
@@ -328,6 +372,114 @@ func _on_close_button_gui_input(event: InputEvent) -> void:
 		_on_cancel_pressed()
 
 
+## FASE 22.5 — ponto de entrada de ajuda PERSISTENTE (achado 22.1: só
+## existiam tooltips pontuais, nada visível sem passar o mouse por
+## acaso em cima). O popup é deliberadamente curto — 1-2 linhas por
+## conceito, nunca reescrevendo a regra completa (isso já existe nos
+## "(?)" de SOLDO DO EXÉRCITO/AFINIDADE, nos tooltips de posição 1/5/9 e
+## nas dicas de PG/Fragmentos de city_panel.gd — este popup só aponta
+## pra onde cada explicação completa já mora, pra nunca duplicar texto
+## e criar uma segunda fonte de verdade que possa divergir).
+func _build_help_button(parent: Control) -> void:
+	var hotspot := _anchor_new_control(parent, HELP_BUTTON_RECT)
+	hotspot.mouse_filter = Control.MOUSE_FILTER_STOP
+	hotspot.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	var label := _make_centered_label("(?) Ajuda", 11, HUD_ACCENT)
+	label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hotspot.add_child(label)
+	hotspot.gui_input.connect(_on_help_button_gui_input)
+
+
+func _on_help_button_gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		_show_help_popup()
+
+
+func _show_help_popup() -> void:
+	if _help_popup != null:
+		return
+
+	var overlay := _anchor_new_control(self, Rect2(0, 0, 1, 1))
+	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	overlay.gui_input.connect(_on_help_overlay_gui_input)
+	_help_popup = overlay
+
+	var backdrop := ColorRect.new()
+	backdrop.color = Color(0, 0, 0, 0.55)
+	backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
+	backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	overlay.add_child(backdrop)
+
+	var box_area := _anchor_new_control(overlay, Rect2(0.28, 0.16, 0.44, 0.68))
+	box_area.mouse_filter = Control.MOUSE_FILTER_STOP
+	var panel := _make_card_panel()
+	panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	box_area.add_child(panel)
+
+	var scroll := ScrollContainer.new()
+	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
+	panel.add_child(scroll)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(vbox)
+
+	vbox.add_child(_make_centered_label("AJUDA — CONCEITOS", 14, HUD_ACCENT))
+	vbox.add_child(_make_separator())
+
+	for entry: Dictionary in _help_entries():
+		vbox.add_child(_make_centered_label(entry["title"], 11, HUD_TEXT_COLOR))
+		vbox.add_child(_make_detail_wrap_label(entry["body"], 10, HUD_MUTED_COLOR, true))
+
+	var close_hotspot := _anchor_new_control(box_area, Rect2(0.88, 0.02, 0.10, 0.06))
+	close_hotspot.mouse_filter = Control.MOUSE_FILTER_STOP
+	close_hotspot.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	var close_label := _make_centered_label("X", 14, HUD_ACCENT)
+	close_label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	close_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	close_hotspot.add_child(close_label)
+	close_hotspot.gui_input.connect(_on_help_popup_close_gui_input)
+
+
+## Textos-fonte (nunca reescritos aqui, só resumidos em 1 frase e
+## apontando pra explicação completa já existente na tela ou em
+## city_panel.gd): PG/Fragmentos vêm literalmente de
+## city_panel.gd:_maybe_show_economy_hints() (GENERATION_POINTS.md/
+## RESOURCES.md); Soldo/Afinidade apontam pros próprios cabeçalhos "(?)"
+## desta tela (_build_soldo_panel/_build_affinity_section); Formação e
+## Máquina de Guerra apontam pros tooltips reais de
+## _position_special_note() (COMBAT_RULES.md 6.1/6.2/5.2.2/6.6).
+func _help_entries() -> Array[Dictionary]:
+	return [
+		{"title": "Pontos de Geração (PG)", "body": "PG é um recurso único do Reino, ganho a cada vez que sua Conta sobe de Nível. Usado para evoluir Minas, Depósito, Centro de Comando e Academia."},
+		{"title": "Fragmentos", "body": "Obtidos destruindo Pelotões inimigos em combate, específicos de cada Facção. Usados na Academia para produzir novas Cartas."},
+		{"title": "Soldo", "body": "Orçamento de manutenção do Exército — veja o (?) ao lado de \"SOLDO DO EXÉRCITO\" abaixo para o teto por Patente."},
+		{"title": "Afinidade", "body": "Bônus de Facção acumulado pelos Pelotões escalados — veja o (?) ao lado de \"AFINIDADE\" abaixo para os níveis e efeitos."},
+		{"title": "Formação — posições especiais", "body": "As posições 1, 5 e 9 têm regras próprias (bônus de linha de frente, penalidade de reorganização, Máquina de Guerra) — passe o mouse sobre elas na grade da Formação para ver cada regra."},
+	]
+
+
+func _on_help_popup_close_gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		_hide_help_popup()
+
+
+func _on_help_overlay_gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		_hide_help_popup()
+
+
+func _hide_help_popup() -> void:
+	if _help_popup == null:
+		return
+	_help_popup.get_parent().remove_child(_help_popup)
+	_help_popup.free()
+	_help_popup = null
+
+
 ## Reconstrói as duas regiões alternáveis inteiras — mesmo padrão de
 ## reconstrução total já usado no resto do projeto (nenhum estado de
 ## Control é preservado entre chamadas, só as variáveis desta classe) —
@@ -352,50 +504,43 @@ func _rebuild_detail_content() -> void:
 	_build_detail_area(_formations_section)
 
 
-## --- Faixa superior: abas COMANDANTE / PELOTÃO + ação administrativa
-## "Criar Exército Aleatório" (área própria, nunca competindo com as
-## abas — fica presa à borda direita enquanto as abas continuam
-## centralizadas por dois espaçadores EXPAND_FILL iguais). ---
-## O Comandante precisa ser escolhido primeiro (regra do pedido) — a
-## aba PELOTÃO fica desabilitada até _selected_commander != null.
+## --- Faixa superior da Biblioteca (coluna direita estreita): abas
+## COMANDANTE / PELOTÃO. ---
+## Correção FASE 22.3 (item A.9/A.10): "Criar Exército Aleatório" saiu
+## daqui — competia visualmente com as abas e reforçava a sensação de
+## "3 modos independentes". Virou ação secundária dentro de
+## _build_action_buttons(), na coluna do Exército/Formação (pedido
+## explícito, item A.10). O Comandante precisa ser escolhido primeiro
+## (regra já existente) — a aba PELOTÃO fica desabilitada até
+## _selected_commander != null.
 func _build_top_tabs_area(parent: Control) -> void:
-	var area := _anchor_new_control(parent, TOP_RECT)
+	var area := _anchor_new_control(parent, LIBRARY_TABS_RECT)
 
-	var margin := MarginContainer.new()
-	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	margin.add_theme_constant_override("margin_left", 10)
-	margin.add_theme_constant_override("margin_right", 10)
-	area.add_child(margin)
-
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 10)
-	margin.add_child(row)
-
-	var left_spacer := Control.new()
-	left_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(left_spacer)
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	area.add_child(center)
 
 	var tabs_hbox := HBoxContainer.new()
-	tabs_hbox.add_theme_constant_override("separation", 14)
-	row.add_child(tabs_hbox)
+	tabs_hbox.add_theme_constant_override("separation", 10)
+	center.add_child(tabs_hbox)
 
-	var commander_tab := _make_tab_button("Comandante", _mode == "comandante")
+	var commander_tab := _make_tab_button("Comandante", _mode == "comandante", 100.0)
 	commander_tab.pressed.connect(_on_mode_tab_pressed.bind("comandante"), CONNECT_DEFERRED)
 	tabs_hbox.add_child(commander_tab)
 
-	var pelotao_tab := _make_tab_button("Pelotão", _mode == "pelotao")
+	var pelotao_tab := _make_tab_button("Pelotão", _mode == "pelotao", 100.0)
 	pelotao_tab.disabled = _selected_commander == null
+	# Correção FASE 22 (continuação — Parte 4): a aba desabilitada por si
+	# só não explicava O PORQUÊ pro jogador novo. Tooltip nativo simples
+	# (Control.tooltip_text — mesma técnica já usada pelos "(?)" de
+	# Soldo/Afinidade), nunca um redesenho da estrutura de abas em si
+	# (avaliada e considerada funcionalmente correta: sequência já
+	# reforçada pelo disabled, seleção já visível no cabeçalho do
+	# Exército, resultado já atualiza em tempo real).
+	if pelotao_tab.disabled:
+		pelotao_tab.tooltip_text = "Escolha um Comandante primeiro — o Pelotão faz parte do Exército dele."
 	pelotao_tab.pressed.connect(_on_mode_tab_pressed.bind("pelotao"), CONNECT_DEFERRED)
 	tabs_hbox.add_child(pelotao_tab)
-
-	var right_spacer := Control.new()
-	right_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(right_spacer)
-
-	var random_button := _make_small_button("Criar Exército Aleatório")
-	random_button.disabled = _army != null
-	random_button.pressed.connect(_on_random_army_pressed, CONNECT_DEFERRED)
-	row.add_child(random_button)
 
 
 func _on_mode_tab_pressed(mode: String) -> void:
@@ -554,9 +699,10 @@ func _random_valid_composition(pool: Array[CardResource], soldo_cap: int) -> Arr
 	return ArmyRandomComposer.random_valid_composition(pool, soldo_cap)
 
 
-## --- Área grande esquerda: filtros + lista/grade, conforme a aba ativa. ---
+## --- Biblioteca (coluna direita estreita): filtros + lista compacta,
+## conforme a aba ativa. ---
 func _build_selection_area(parent: Control) -> void:
-	var area := _anchor_new_control(parent, LIST_RECT)
+	var area := _anchor_new_control(parent, LIBRARY_RECT)
 
 	var margin := MarginContainer.new()
 	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -568,6 +714,7 @@ func _build_selection_area(parent: Control) -> void:
 
 	var vbox := VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 6)
+	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	margin.add_child(vbox)
 
 	if _mode == "comandante":
@@ -595,26 +742,26 @@ func _build_selection_area(parent: Control) -> void:
 
 ## --- Modo Comandante ---
 
+## Correção FASE 22.3: filtros lado a lado (HBoxContainer) cabiam na
+## antiga área grande (~556px); a Biblioteca agora é a coluna estreita
+## (~218px úteis) — cada filtro passou a ocupar sua própria linha
+## (empilhados), nunca mais 2-3 lado a lado.
 func _build_commander_filters(parent: Control) -> void:
 	parent.add_child(_make_label("Filtros de Comandantes", 11, HUD_ACCENT))
 
-	var hbox := HBoxContainer.new()
-	hbox.add_theme_constant_override("separation", 6)
-	parent.add_child(hbox)
-
 	var faction_option := _styled_option_button(FACCAO_VALUES, _filter_cmd_faction)
 	faction_option.item_selected.connect(_on_cmd_faction_selected, CONNECT_DEFERRED)
-	hbox.add_child(_build_labeled_filter("Facção", faction_option))
+	parent.add_child(_build_labeled_filter("Facção", faction_option))
 
 	var patente_values: Array[String] = _patente_filter_values()
 	var patente_option := _styled_option_button(patente_values, _filter_cmd_patente)
 	patente_option.item_selected.connect(_on_cmd_patente_selected, CONNECT_DEFERRED)
-	hbox.add_child(_build_labeled_filter("Patente", patente_option))
+	parent.add_child(_build_labeled_filter("Patente", patente_option))
 
 	var soldo_values: Array[String] = _soldo_min_filter_values()
 	var soldo_option := _styled_option_button(soldo_values, _filter_cmd_soldo_min)
 	soldo_option.item_selected.connect(_on_cmd_soldo_selected, CONNECT_DEFERRED)
-	hbox.add_child(_build_labeled_filter("Soldo mínimo", soldo_option))
+	parent.add_child(_build_labeled_filter("Soldo mínimo", soldo_option))
 
 
 ## Cada filtro sempre com uma legenda curta em cima (nunca uma caixa
@@ -731,6 +878,12 @@ func _build_commander_list(parent: Control) -> void:
 		vbox.add_child(_build_commander_row(commander))
 
 
+## Correção FASE 22.3: esta linha rendeirzava na antiga coluna larga
+## (~556px); agora renderiza na Biblioteca estreita (~218px úteis) —
+## retrato reduzido, texto em linhas mais curtas (nunca mais uma única
+## linha "Patente | Facção | Soldo" sem quebra, que ultrapassava a
+## largura disponível e arrastava a coluna inteira, mesma causa raiz já
+## corrigida na coluna de Exército/Formação).
 func _build_commander_row(commander: CommanderResource) -> Control:
 	var is_selected: bool = commander == _selected_commander
 	var panel := _make_list_row_panel(is_selected)
@@ -739,25 +892,29 @@ func _build_commander_row(commander: CommanderResource) -> Control:
 	panel.gui_input.connect(_on_commander_row_gui_input.bind(commander), CONNECT_DEFERRED)
 
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 8)
+	row.add_theme_constant_override("separation", 6)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_child(row)
 
-	row.add_child(_make_portrait(_portrait_for(commander), LIST_COMMANDER_PORTRAIT))
+	row.add_child(_make_portrait(_portrait_for(commander), 34.0))
 
 	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 2)
+	column.add_theme_constant_override("separation", 1)
 	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(column)
 
 	var patente: String = CommanderCareer.patente_for_xp(commander.accumulated_xp)
-	column.add_child(_make_label(commander.commander_name, 13, HUD_ACCENT_SELECTED if is_selected else HUD_TEXT_COLOR))
-	column.add_child(_make_label("%s | %s | Soldo: %d" % [patente, commander.faction, Soldo.cap_for_patente(patente)], 11, HUD_MUTED_COLOR))
+	var name_label := _make_label(commander.commander_name, 11, HUD_ACCENT_SELECTED if is_selected else HUD_TEXT_COLOR)
+	name_label.clip_text = true
+	column.add_child(name_label)
+	var patente_label := _make_label("%s • %s" % [patente, commander.faction], 8, HUD_MUTED_COLOR)
+	patente_label.clip_text = true
+	column.add_child(patente_label)
 
 	var is_own: bool = editing_composition and existing_army != null and commander == existing_army.commander
-	var estado_text: String = "Liderando este Exército" if is_own else "Disponível"
-	column.add_child(_make_label(estado_text, 10, HUD_ACCENT))
+	var estado_text: String = "Liderando" if is_own else "Disponível"
+	column.add_child(_make_label(estado_text, 8, HUD_ACCENT))
 
 	return panel
 
@@ -777,32 +934,27 @@ func _on_commander_selected_real(commander: CommanderResource) -> void:
 
 ## --- Modo Pelotão ---
 
+## Correção FASE 22.3: mesmo ajuste de _build_commander_filters() — os
+## 4 filtros empilhados (1 por linha), nunca mais 2x2 lado a lado
+## (a Biblioteca agora é a coluna estreita, ~218px úteis).
 func _build_card_filters(parent: Control) -> void:
 	parent.add_child(_make_label("Filtros de Cartas", 11, HUD_ACCENT))
 
-	var row1 := HBoxContainer.new()
-	row1.add_theme_constant_override("separation", 6)
-	parent.add_child(row1)
-
 	var faction_option := _styled_option_button(FACCAO_VALUES, _filter_card_faction)
 	faction_option.item_selected.connect(_on_card_faction_selected, CONNECT_DEFERRED)
-	row1.add_child(_build_labeled_filter("Facção", faction_option))
+	parent.add_child(_build_labeled_filter("Facção", faction_option))
 
 	var classe_option := _styled_option_button(CLASSE_VALUES, _filter_card_class)
 	classe_option.item_selected.connect(_on_card_class_selected, CONNECT_DEFERRED)
-	row1.add_child(_build_labeled_filter("Classe", classe_option))
-
-	var row2 := HBoxContainer.new()
-	row2.add_theme_constant_override("separation", 6)
-	parent.add_child(row2)
+	parent.add_child(_build_labeled_filter("Classe", classe_option))
 
 	var raridade_option := _styled_option_button(RARIDADE_VALUES, _filter_card_rarity)
 	raridade_option.item_selected.connect(_on_card_rarity_selected, CONNECT_DEFERRED)
-	row2.add_child(_build_labeled_filter("Raridade", raridade_option))
+	parent.add_child(_build_labeled_filter("Raridade", raridade_option))
 
 	var tier_option := _styled_option_button(TIER_VALUES, _filter_card_tier)
 	tier_option.item_selected.connect(_on_card_tier_selected, CONNECT_DEFERRED)
-	row2.add_child(_build_labeled_filter("Tier", tier_option))
+	parent.add_child(_build_labeled_filter("Tier", tier_option))
 
 
 func _on_card_faction_selected(index: int) -> void:
@@ -885,15 +1037,22 @@ func _card_owner_army_display_name(card: CardResource) -> String:
 	return ""
 
 
+## Correção FASE 22.3 (itens A.3/A.4/A.5 — Biblioteca compacta): a
+## Biblioteca agora é a coluna estreita, e o pedido explícito foi "não
+## transformar a biblioteca de volta numa grade de cartas". Trocado
+## GridContainer (4 colunas de cartas completas) por uma lista vertical
+## de 1 coluna (_build_compact_card_row()) — nome + Tier + Energia/Soldo
+## em texto, nunca a arte completa (BattleCardView). A carta REAL só
+## aparece no hover (_build_card_tooltip(), já existente, reaproveitado
+## sem duplicação — item A.4).
 func _build_card_grid(parent: Control) -> void:
 	var kingdom: Kingdom = KingdomState.kingdom
 	var cards: Array[CardResource] = _filtered_available_cards(kingdom)
 
-	var grid := GridContainer.new()
-	grid.columns = 4
-	grid.add_theme_constant_override("h_separation", 8)
-	grid.add_theme_constant_override("v_separation", 10)
-	parent.add_child(grid)
+	var list := VBoxContainer.new()
+	list.add_theme_constant_override("separation", 4)
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	parent.add_child(list)
 
 	if cards.is_empty():
 		if kingdom.cards.is_empty():
@@ -903,14 +1062,13 @@ func _build_card_grid(parent: Control) -> void:
 		return
 
 	for card: CardResource in cards:
-		grid.add_child(_build_list_card_slot(card))
+		list.add_child(_build_compact_card_row(card))
 
 
-func _build_list_card_slot(card: CardResource) -> Control:
-	var slot := ArmyCardSlot.new()
-	slot.custom_minimum_size = Vector2(LIST_CARD_WIDTH, LIST_CARD_WIDTH / BattleCardView.CARD_ASPECT_RATIO + 24)
-	slot.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-
+## Linha compacta de Pelotão (substitui o antigo _build_list_card_slot()
+## de carta completa). Mesma lógica de bloqueio/seleção de sempre —
+## nunca duplicada — só a apresentação virou texto.
+func _build_compact_card_row(card: CardResource) -> Control:
 	var is_selected: bool = _selected_cards.has(card)
 	var owned_elsewhere: bool = not is_selected and _card_is_owned_elsewhere(card)
 	var already_has_same_name: bool = false
@@ -922,72 +1080,103 @@ func _build_list_card_slot(card: CardResource) -> Control:
 	var over_soldo: bool = not is_selected and not owned_elsewhere and not already_has_same_name and not army_full and not _card_fits_soldo(card)
 	var blocked: bool = not is_selected and (owned_elsewhere or already_has_same_name or army_full or over_soldo)
 
+	var row := ArmyCardSlot.new()
+	row.custom_minimum_size = Vector2(0, 44.0)
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.05, 0.06, 0.10, 0.9) if not is_selected else Color(HUD_ACCENT_SELECTED.r, HUD_ACCENT_SELECTED.g, HUD_ACCENT_SELECTED.b, 0.18)
+	style.border_width_left = 1
+	style.border_width_right = 1
+	style.border_width_top = 1
+	style.border_width_bottom = 1
+	style.border_color = HUD_ACCENT_SELECTED if is_selected else Color(HUD_ACCENT.r, HUD_ACCENT.g, HUD_ACCENT.b, 0.5)
+	style.corner_radius_top_left = 4
+	style.corner_radius_top_right = 4
+	style.corner_radius_bottom_left = 4
+	style.corner_radius_bottom_right = 4
+	style.content_margin_left = 6.0
+	style.content_margin_right = 6.0
+	style.content_margin_top = 3.0
+	style.content_margin_bottom = 3.0
+	var bg := Panel.new()
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bg.add_theme_stylebox_override("panel", style)
+	row.add_child(bg)
+
 	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 2)
+	vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
+	vbox.offset_left = 6.0
+	vbox.offset_right = -6.0
+	vbox.offset_top = 3.0
+	vbox.offset_bottom = -3.0
+	vbox.add_theme_constant_override("separation", 1)
 	vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	slot.add_child(vbox)
+	row.add_child(vbox)
 
-	var card_slot := Control.new()
-	card_slot.custom_minimum_size = Vector2(LIST_CARD_WIDTH, LIST_CARD_WIDTH / BattleCardView.CARD_ASPECT_RATIO)
-	card_slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	vbox.add_child(card_slot)
+	var name_row := HBoxContainer.new()
+	name_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vbox.add_child(name_row)
+	var name_label := _make_label(card.card_name.to_upper(), 10, HUD_MUTED_COLOR if blocked else HUD_TEXT_COLOR)
+	name_label.clip_text = true
+	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_row.add_child(name_label)
+	name_row.add_child(_make_label("T%d" % card.tier, 10, HUD_ACCENT))
 
-	var card_view := BattleCardView.new()
-	card_view.set_anchors_preset(Control.PRESET_FULL_RECT)
-	card_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	card_slot.add_child(card_view)
-	card_view.set_card(card)
-	card_view.set_stats(card.atk, card.hp, card.esc)
-	card_view.set_compact(true)
-	_force_ignore_mouse_recursive(card_view)
-	if blocked:
-		card_view.modulate = Color(0.45, 0.45, 0.45, 0.85)
+	var status_row := HBoxContainer.new()
+	status_row.add_theme_constant_override("separation", 6)
+	status_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vbox.add_child(status_row)
+	# Correção: "EN"/"SD" e o número em Labels SEPARADOS (nunca uma
+	# string combinada) — mesmo padrão de _make_composition_footer(),
+	# consistente entre Biblioteca e Formação.
+	status_row.add_child(_make_label("EN", 8, HUD_MUTED_COLOR))
+	status_row.add_child(_make_label(str(EnergyArmy.card_energy(card.tier)), 8, Color(0.75, 0.85, 1.0)))
+	status_row.add_child(_make_label("SD", 8, HUD_MUTED_COLOR))
+	status_row.add_child(_make_label(str(Soldo.cost_for_rarity(card.rarity)), 8, HUD_ACCENT_SELECTED))
 
-	var border := Panel.new()
-	border.set_anchors_preset(Control.PRESET_FULL_RECT)
-	border.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var border_style := StyleBoxFlat.new()
-	border_style.bg_color = Color(0, 0, 0, 0)
-	border_style.border_width_left = 2
-	border_style.border_width_right = 2
-	border_style.border_width_top = 2
-	border_style.border_width_bottom = 2
-	border_style.border_color = HUD_ACCENT_SELECTED if is_selected else Color(HUD_ACCENT.r, HUD_ACCENT.g, HUD_ACCENT.b, 0.5)
-	border_style.corner_radius_top_left = 4
-	border_style.corner_radius_top_right = 4
-	border_style.corner_radius_bottom_left = 4
-	border_style.corner_radius_bottom_right = 4
-	border.add_theme_stylebox_override("panel", border_style)
-	card_slot.add_child(border)
+	var status_spacer := Control.new()
+	status_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	status_row.add_child(status_spacer)
 
-	# "Em outro Exército" ganha uma 2ª linha com o nome REAL do Exército
-	# dono (Army.cards.has(card) -> Army.army_name, nunca uma tabela de
-	# posse paralela) — o motivo precisa ficar legível sem abrir o
-	# tooltip (pedido explícito).
+	# "Em outro Exército" mostra o nome REAL do Exército dono
+	# (Army.cards.has(card) -> Army.army_name, nunca uma tabela de posse
+	# paralela) — o motivo precisa ficar legível sem abrir o tooltip
+	# (pedido explícito, mantido da versão anterior desta tela).
+	var status_text: String = ""
+	var status_color: Color = HUD_MUTED_COLOR
 	if is_selected:
-		vbox.add_child(_make_centered_label("Selecionada", 9, HUD_ACCENT_SELECTED))
+		status_text = "Selecionada"
+		status_color = HUD_ACCENT_SELECTED
 	elif owned_elsewhere:
-		vbox.add_child(_make_centered_label("Em outro Exército", 9, HUD_ERROR_COLOR))
 		var owner_name: String = _card_owner_army_display_name(card)
-		if owner_name != "":
-			vbox.add_child(_make_centered_label(owner_name, 8, HUD_MUTED_COLOR))
+		status_text = "Em outro Exército (%s)" % owner_name if owner_name != "" else "Em outro Exército"
+		status_color = HUD_ERROR_COLOR
 	elif already_has_same_name:
-		vbox.add_child(_make_centered_label("Nome já usado", 9, HUD_ERROR_COLOR))
+		status_text = "Nome já usado"
+		status_color = HUD_ERROR_COLOR
 	elif army_full:
-		vbox.add_child(_make_centered_label("Exército completo", 9, HUD_ERROR_COLOR))
+		status_text = "Exército completo"
+		status_color = HUD_ERROR_COLOR
 	elif over_soldo:
-		vbox.add_child(_make_centered_label("Sem Soldo", 9, HUD_ERROR_COLOR))
-	else:
-		vbox.add_child(_make_centered_label("Soldo %d" % Soldo.cost_for_rarity(card.rarity), 9, HUD_MUTED_COLOR))
+		status_text = "Sem Soldo"
+		status_color = HUD_ERROR_COLOR
+	if status_text != "":
+		var status_label := _make_label(status_text, 8, status_color)
+		status_label.clip_text = true
+		status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		status_row.add_child(status_label)
 
-	slot.set_tooltip_builder(func() -> Control: return _build_card_tooltip(card))
+	row.set_tooltip_builder(func() -> Control: return _build_card_tooltip(card))
 
 	if not blocked or is_selected:
-		slot.gui_input.connect(_on_list_card_gui_input.bind(card), CONNECT_DEFERRED)
-		slot.drag_data_builder = func() -> Variant: return {"source": "list", "card": card}
-		slot.drag_preview_builder = func() -> Control: return _build_drag_preview(card)
+		row.gui_input.connect(_on_list_card_gui_input.bind(card), CONNECT_DEFERRED)
+		row.drag_data_builder = func() -> Variant: return {"source": "list", "card": card}
+		row.drag_preview_builder = func() -> Control: return _build_drag_preview(card)
 
-	return slot
+	return row
 
 
 ## CAUSA-RAIZ do Drag-and-Drop não iniciar (auditoria desta etapa):
@@ -1028,8 +1217,53 @@ func _card_fits_soldo(card: CardResource) -> bool:
 
 ## --- Coluna direita: Comandante + Soldo do Exército + Formação 3x3. ---
 
+## --- Exército/Formação (coluna esquerda larga) — elemento dominante
+## da tela (FASE 22.3, item A.6/A.7). ---
+## Correção FASE 22.3 (achado real via screenshot): a moldura tem uma
+## linha decorativa dourada horizontal BAKED-IN na própria arte
+## (command_center_army_window_frame.png), na fronteira exata onde
+## ficava a antiga TOP_RECT (faixa de abas) — sempre existiu, mas nunca
+## aparecia por cima de texto porque nada rolava por baixo dela antes.
+## Ao fundir TOP_RECT+LIST_RECT num único scroll contínuo, conteúdo real
+## (ex.: texto de Afinidade) passou a rolar por baixo dessa linha fixa,
+## cortando o texto visualmente. Corrigido reservando essa mesma faixa
+## como cabeçalho ESTÁTICO (só o retrato do Comandante, nunca rolável —
+## reflete a intenção original da própria arte) e iniciando o
+## ScrollContainer exatamente abaixo da linha, nunca por cima dela.
+## 0.174 (fração exata da antiga TOP_RECT) deixava a 1ª linha do scroll
+## tocando a linha decorativa; +0.03 de folga extra evita a sobreposição
+## residual confirmada por screenshot.
+const ARMY_HEADER_FRACTION: float = 0.205
+
 func _build_detail_area(parent: Control) -> void:
-	var area := _anchor_new_control(parent, DETAIL_RECT)
+	var area := _anchor_new_control(parent, ARMY_RECT)
+
+	var header_area := _anchor_new_control(area, Rect2(0, 0, 1, ARMY_HEADER_FRACTION))
+	var header_margin := MarginContainer.new()
+	header_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	header_margin.add_theme_constant_override("margin_left", 6)
+	header_margin.add_theme_constant_override("margin_right", 10)
+	header_area.add_child(header_margin)
+	var header_row := HBoxContainer.new()
+	header_row.add_theme_constant_override("separation", 8)
+	header_margin.add_child(header_row)
+	if _selected_commander != null:
+		header_row.add_child(_make_portrait(_portrait_for(_selected_commander), COMMANDER_PORTRAIT_SIZE))
+		var header_name_col := VBoxContainer.new()
+		header_name_col.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		header_row.add_child(header_name_col)
+		header_name_col.add_child(_make_label(_selected_commander.commander_name, 15, HUD_TEXT_COLOR))
+		# "Função" é dado real (nunca inventado): ou já lidera o Exército
+		# sendo editado, ou está livre formando um novo.
+		var funcao_text: String = "Formando um novo Exército"
+		if editing_composition and existing_army != null:
+			var army_label: String = existing_army.army_name if existing_army.army_name != "" else "este Exército"
+			funcao_text = "Liderando %s" % army_label
+		header_name_col.add_child(_make_label("%s • %s" % [_selected_commander.faction, funcao_text], 9, HUD_MUTED_COLOR))
+		var patente: String = CommanderCareer.patente_for_xp(_selected_commander.accumulated_xp)
+		header_name_col.add_child(_make_label("Patente: %s" % patente, 10, HUD_ACCENT_SELECTED))
+	else:
+		header_row.add_child(_make_centered_label("NENHUM COMANDANTE SELECIONADO", 11, HUD_MUTED_COLOR))
 
 	var margin := MarginContainer.new()
 	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -1037,7 +1271,9 @@ func _build_detail_area(parent: Control) -> void:
 	margin.add_theme_constant_override("margin_right", 10)
 	margin.add_theme_constant_override("margin_top", 6)
 	margin.add_theme_constant_override("margin_bottom", 6)
-	area.add_child(margin)
+
+	var scroll_area := _anchor_new_control(area, Rect2(0, ARMY_HEADER_FRACTION, 1, 1.0 - ARMY_HEADER_FRACTION))
+	scroll_area.add_child(margin)
 
 	var scroll := ScrollContainer.new()
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -1056,54 +1292,33 @@ func _build_detail_area(parent: Control) -> void:
 	vbox.add_theme_constant_override("separation", 6)
 	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(vbox)
-
 	if _random_army_message != "":
-		var error_label := _make_label(_random_army_message, 11, HUD_ERROR_COLOR, true)
-		error_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-		error_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		vbox.add_child(error_label)
+		vbox.add_child(_make_detail_wrap_label(_random_army_message, 11, HUD_ERROR_COLOR, false))
 		vbox.add_child(_make_separator())
 
 	if _selected_commander == null:
 		vbox.add_child(_make_centered_label("ESCOLHA UM COMANDANTE", 12, HUD_ACCENT))
-		vbox.add_child(_make_body_label("Selecione um Comandante na lista à esquerda, ou use \"Criar Exército Aleatório\" no topo."))
+		vbox.add_child(_make_detail_wrap_label("Selecione um Comandante na Biblioteca, à direita, ou monte um Exército aleatoriamente nas ações abaixo.", 10, HUD_TEXT_COLOR, false))
 		return
 
-	# Hierarquia pedida: QUEM é o Comandante -> QUAL a Doutrina -> QUANTO
-	# pode gastar -> QUAL Exército está sendo montado — 4 seções
-	# visualmente separadas (nunca um bloco único de texto corrido).
-	_build_commander_section(vbox)
-	vbox.add_child(_make_separator())
+	# Hierarquia (reordenada — achado real da revalidação visual final da
+	# FASE 22, pendência já registrada desde a Auditoria 22.1: com
+	# Afinidade em 2+ Facções ativas, o bloco Soldo+Afinidade empurrava a
+	# Formação pra fora da área visível sem rolar, contradizendo o
+	# objetivo explícito do redesenho 22.3 de a Formação ser o elemento
+	# DOMINANTE da coluna). Agora: QUAL a Doutrina -> QUAL Exército está
+	# sendo montado (Formação, sempre visível primeiro) -> QUANTO pode
+	# gastar/Afinidade (detalhe de apoio, abaixo). O Comandante em si
+	# (QUEM) já está no cabeçalho estático acima, nunca duplicado aqui.
 	if _selected_commander.doctrine != null:
 		_build_doctrine_section(vbox)
 		vbox.add_child(_make_separator())
-	_build_soldo_panel(vbox)
-	vbox.add_child(_make_separator())
 	_build_formation_area(vbox)
 	vbox.add_child(_make_separator())
+	_build_soldo_panel(vbox)
+	_build_affinity_section(vbox)
+	vbox.add_child(_make_separator())
 	_build_action_buttons(vbox)
-
-
-func _build_commander_section(parent: Control) -> void:
-	parent.add_child(_make_centered_label("COMANDANTE", 12, HUD_ACCENT))
-
-	var portrait_center := CenterContainer.new()
-	parent.add_child(portrait_center)
-	portrait_center.add_child(_make_portrait(_portrait_for(_selected_commander), COMMANDER_PORTRAIT_SIZE))
-
-	# Nome grande — identidade principal do bloco. "Função" é dado real
-	# (nunca inventado): ou já lidera o Exército sendo editado, ou está
-	# livre formando um novo — nunca um 3º estado inventado.
-	parent.add_child(_make_centered_label(_selected_commander.commander_name, 17, HUD_TEXT_COLOR, true))
-
-	var funcao_text: String = "Formando um novo Exército"
-	if editing_composition and existing_army != null:
-		var army_label: String = existing_army.army_name if existing_army.army_name != "" else "este Exército"
-		funcao_text = "Liderando %s" % army_label
-	parent.add_child(_make_centered_label("%s • %s" % [_selected_commander.faction, funcao_text], 11, HUD_MUTED_COLOR, true))
-
-	var patente: String = CommanderCareer.patente_for_xp(_selected_commander.accumulated_xp)
-	parent.add_child(_make_centered_label("Patente: %s" % patente, 13, HUD_ACCENT_SELECTED))
 
 
 ## Cada campo da Doutrina como par LEGENDA (pequena, muda) + VALOR
@@ -1128,13 +1343,31 @@ func _build_doctrine_section(parent: Control) -> void:
 
 func _build_doctrine_field(parent: Control, caption: String, value_text: String, value_color: Color = HUD_TEXT_COLOR, font_size: int = 11) -> void:
 	parent.add_child(_make_label(caption.to_upper(), 9, HUD_MUTED_COLOR))
-	var value_label := _make_label(value_text, font_size, value_color, true)
-	value_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	parent.add_child(value_label)
+	parent.add_child(_make_detail_wrap_label(value_text, font_size, value_color, false))
+
+
+## Ajuda contextual mínima (correção FASE 22.2, item 22.2.11): título de
+## seção + um pequeno indicador "(?)" com tooltip nativo do Godot
+## (Control.tooltip_text — mais simples que o tooltip customizado usado
+## pelas Cartas, suficiente pra uma frase curta). Nunca duplica
+## documentação nem inventa números — cada texto descreve só o que já
+## está confirmado em SOLDO.md/AFFINITY.md.
+func _build_section_header_with_help(parent: Control, title: String, help_text: String) -> void:
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 4)
+	parent.add_child(row)
+	row.add_child(_make_label(title, 12, HUD_ACCENT))
+
+	var info := _make_label("(?)", 10, HUD_MUTED_COLOR)
+	info.mouse_filter = Control.MOUSE_FILTER_STOP
+	info.mouse_default_cursor_shape = Control.CURSOR_HELP
+	info.tooltip_text = help_text
+	row.add_child(info)
 
 
 func _build_soldo_panel(parent: Control) -> void:
-	parent.add_child(_make_centered_label("SOLDO DO EXÉRCITO", 12, HUD_ACCENT))
+	_build_section_header_with_help(parent, "SOLDO DO EXÉRCITO", "Soldo é o orçamento de manutenção do Exército. Cada Carta custa Soldo conforme sua Raridade; o Comandante tem um teto de Soldo que cresce com a Patente. A soma do custo das 9 Cartas nunca pode passar do teto.")
 
 	var patente: String = CommanderCareer.patente_for_xp(_selected_commander.accumulated_xp)
 	var cap: int = Soldo.cap_for_patente(patente)
@@ -1154,8 +1387,87 @@ func _build_soldo_panel(parent: Control) -> void:
 	parent.add_child(_make_centered_label("Cartas: %d / 9" % _selected_cards.size(), 11, HUD_ACCENT_SELECTED if _selected_cards.size() == 9 else HUD_MUTED_COLOR))
 
 
+## Auditoria FASE 22.1, achado A: Afinidade nunca aparecia no Editor —
+## jogador só descobria o efeito mais relevante de composição por
+## Facção dentro do próprio combate. Reaproveita Affinity.
+## calculate_points()/highest_active_level() (engine/combat/affinity.gd,
+## AFFINITY.md) — lógica pura já compartilhada com o Motor de Combate,
+## nunca recalculada ou duplicada aqui. Mostra só Facções realmente
+## presentes na composição atual (Cartas selecionadas + Comandante),
+## nunca as 3 Facções fixas do jogo. Retorna false (nada desenhado)
+## quando ainda não há nenhuma Carta/Comandante — chamador decide se
+## desenha o separador seguinte.
+func _build_affinity_section(parent: Control) -> bool:
+	var factions_present: Array[String] = []
+	for card: CardResource in _selected_cards:
+		if not factions_present.has(card.faction):
+			factions_present.append(card.faction)
+	if _selected_commander != null and not factions_present.has(_selected_commander.faction):
+		factions_present.append(_selected_commander.faction)
+
+	if factions_present.is_empty():
+		return false
+
+	_build_section_header_with_help(parent, "AFINIDADE", "Cada Pelotão (e o Comandante, se da mesma Facção) concede 1 ponto de Afinidade à sua Facção. Ao atingir certos totais, a Facção ativa Níveis de Afinidade cumulativos, cada um com um efeito real em combate.")
+
+	# Correção FASE 22.2 (revisão visual): 1 bloco visualmente distinto
+	# por Facção (título da Facção em destaque, depois pontos/Nível numa
+	# linha própria, depois cada consequência com "✓"), separado das
+	# demais Facções por _make_separator() — nunca mais uma única linha
+	# corrida "Facção — N pontos (Nível X)". A consequência real
+	# continua vindo de Affinity.active_effects() lendo
+	# GameDatabase.affinity_levels — o MESMO catálogo (.tres em
+	# res://database/affinity/) cujo texto já bate exatamente com a
+	# lógica aplicada de verdade em affinity_runtime.gd (conferido: o
+	# texto de Afinidade II do Império aqui é literalmente o mesmo "20%
+	# menos dano" que affinity_runtime.gd aplica). Nunca uma tabela nova,
+	# nunca um resumo inventado — cada Nível cumulativo ativo
+	# (AFFINITY.md, "Progressão Cumulativa") gera sua própria linha,
+	# nunca só o Nível mais alto.
+	for i in range(factions_present.size()):
+		var faction: String = factions_present[i]
+		var points: int = Affinity.calculate_points(faction, _selected_cards, _selected_commander)
+		var level: int = Affinity.highest_active_level(points)
+		var level_text: String = "Nível %d ativo" % level if level > 0 else "Nenhum Nível ativo"
+
+		parent.add_child(_make_centered_label(faction.to_upper(), 12, HUD_TEXT_COLOR))
+		parent.add_child(_make_centered_label("%d ponto(s) de Afinidade" % points, 10, HUD_MUTED_COLOR))
+		parent.add_child(_make_centered_label(level_text, 11, HUD_ACCENT_SELECTED if level > 0 else HUD_MUTED_COLOR))
+
+		var effects: Array[AffinityLevelResource] = Affinity.active_effects(faction, points, GameDatabase.affinity_levels)
+		for effect: AffinityLevelResource in effects:
+			parent.add_child(_make_detail_wrap_label("✓ %s" % effect.effect_description, 10, HUD_TEXT_COLOR, false))
+
+		if i < factions_present.size() - 1:
+			parent.add_child(_make_separator())
+
+	return true
+
+
 func _build_formation_area(parent: Control) -> void:
 	parent.add_child(_make_centered_label("FORMAÇÃO DE COMBATE", 12, HUD_ACCENT))
+	# Correção FASE 22.2 (revisão de UX): uma única linha "passe o mouse"
+	# fazia o jogador descobrir 1/5/9 só por acaso. Legenda curta e
+	# persistente (nunca um texto longo) nomeia as 3 posições — o texto
+	# completo de cada regra (nunca inventado) continua só no tooltip de
+	# _position_special_note(). O contorno dourado nos 3 slots
+	# (_build_formation_slot()) reforça visualmente o mesmo destaque sem
+	# depender de hover.
+	# Correção FASE 22.2 (achado real via screenshot + rastreamento de
+	# vbox.get_combined_minimum_size(), ver docstring de
+	# _make_detail_wrap_label()): 3 posições lado a lado numa
+	# HBoxContainer, mais o texto "wrap=true" sem largura explícita,
+	# causavam o bug de quebra letra-por-letra do Godot (Label
+	# autowrap numa VBoxContainer recém-criada, ainda sem largura
+	# resolvida) — inflava a altura mínima da seção em milhares de
+	# pixels e arrastava a largura de toda a coluna junto (causa raiz
+	# real do texto cortado em toda a coluna, ex.: "COMANDANTE" virando
+	# "COMANDAN"). Empilhado verticalmente, cada item usando
+	# _make_detail_wrap_label() (wrap + largura explícita, mesma técnica
+	# já usada por _make_tooltip_label() nos tooltips das Cartas).
+	for position_number: int in [1, 5, 9]:
+		parent.add_child(_make_detail_wrap_label("%d — %s" % [position_number, _position_short_label(position_number)], 9, HUD_ACCENT))
+	parent.add_child(_make_detail_wrap_label("Passe o mouse sobre uma posição especial para ver a regra completa.", 8, HUD_MUTED_COLOR))
 
 	if formation_count > 1 and _army != null:
 		var tabs_center := CenterContainer.new()
@@ -1164,7 +1476,7 @@ func _build_formation_area(parent: Control) -> void:
 		tabs_row.add_theme_constant_override("separation", 4)
 		tabs_center.add_child(tabs_row)
 		for formation_name: String in FORMATION_NAMES.slice(0, formation_count):
-			var tab_button := _make_tab_button(formation_name, formation_name == _current_formation)
+			var tab_button := _make_tab_button(formation_name, formation_name == _current_formation, 38.0)
 			tab_button.pressed.connect(_on_formation_tab_pressed.bind(formation_name), CONNECT_DEFERRED)
 			tabs_row.add_child(tab_button)
 
@@ -1202,17 +1514,22 @@ func _build_formation_slot(current_cards: Array[CardResource], slot_index: int) 
 	slot.can_drop_checker = func(data: Variant) -> bool: return _can_drop_on_slot(data, slot_index)
 	slot.drop_handler = func(data: Variant) -> void: _handle_drop_on_slot(data, slot_index)
 
+	# Correção FASE 22.2: destaque visual PERSISTENTE das posições 1/5/9
+	# (nunca só descobrível por hover, pedido explícito) — contorno mais
+	# grosso e na cor de destaque do HUD, preenchido ou vazio.
+	var is_special_position: bool = _position_special_note(position_number) != ""
+
 	if card == null:
 		var placeholder := Panel.new()
 		placeholder.set_anchors_preset(Control.PRESET_FULL_RECT)
 		placeholder.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var placeholder_style := StyleBoxFlat.new()
 		placeholder_style.bg_color = Color(0, 0, 0, 0.25)
-		placeholder_style.border_width_left = 1
-		placeholder_style.border_width_right = 1
-		placeholder_style.border_width_top = 1
-		placeholder_style.border_width_bottom = 1
-		placeholder_style.border_color = Color(HUD_MUTED_COLOR.r, HUD_MUTED_COLOR.g, HUD_MUTED_COLOR.b, 0.5)
+		placeholder_style.border_width_left = 2 if is_special_position else 1
+		placeholder_style.border_width_right = 2 if is_special_position else 1
+		placeholder_style.border_width_top = 2 if is_special_position else 1
+		placeholder_style.border_width_bottom = 2 if is_special_position else 1
+		placeholder_style.border_color = HUD_ACCENT if is_special_position else Color(HUD_MUTED_COLOR.r, HUD_MUTED_COLOR.g, HUD_MUTED_COLOR.b, 0.5)
 		placeholder_style.corner_radius_top_left = 4
 		placeholder_style.corner_radius_top_right = 4
 		placeholder_style.corner_radius_bottom_left = 4
@@ -1225,11 +1542,20 @@ func _build_formation_slot(current_cards: Array[CardResource], slot_index: int) 
 		position_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		position_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		slot.add_child(position_label)
-		return slot
+		# Auditoria FASE 22.1, achado C: mesmo vazia, uma posição especial
+		# (1/5/9) já pode ser explicada — o jogador não precisa esperar
+		# ocupá-la para entender por que ela é diferente.
+		if _position_special_note(position_number) != "":
+			slot.set_tooltip_builder(func() -> Control: return _build_position_hint_tooltip(position_number))
+		# Correção FASE 22: mesmo vazio, o slot reserva a mesma altura de
+		# rodapé que um slot preenchido — sem isso, o GridContainer
+		# esticava cada linha pelo cell mais alto (com rodapé) e deixava
+		# um vão vazio desalinhado embaixo dos slots ainda sem carta.
+		return _wrap_formation_slot(slot, null)
 
 	slot.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	slot.gui_input.connect(_on_formation_slot_gui_input.bind(slot_index), CONNECT_DEFERRED)
-	slot.set_tooltip_builder(func() -> Control: return _build_card_tooltip(card))
+	slot.set_tooltip_builder(func() -> Control: return _build_card_tooltip(card, position_number))
 	slot.drag_data_builder = func() -> Variant: return {"source": "slot", "slot_index": slot_index}
 	slot.drag_preview_builder = func() -> Control: return _build_drag_preview(card)
 
@@ -1242,7 +1568,56 @@ func _build_formation_slot(current_cards: Array[CardResource], slot_index: int) 
 	card_view.set_compact(true)
 	_force_ignore_mouse_recursive(card_view)
 
-	return slot
+	if is_special_position:
+		var special_border := Panel.new()
+		special_border.set_anchors_preset(Control.PRESET_FULL_RECT)
+		special_border.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var special_border_style := StyleBoxFlat.new()
+		special_border_style.bg_color = Color(0, 0, 0, 0)
+		special_border_style.border_width_left = 2
+		special_border_style.border_width_right = 2
+		special_border_style.border_width_top = 2
+		special_border_style.border_width_bottom = 2
+		special_border_style.border_color = HUD_ACCENT
+		special_border_style.corner_radius_top_left = 4
+		special_border_style.corner_radius_top_right = 4
+		special_border_style.corner_radius_bottom_left = 4
+		special_border_style.corner_radius_bottom_right = 4
+		special_border.add_theme_stylebox_override("panel", special_border_style)
+		slot.add_child(special_border)
+
+	return _wrap_formation_slot(slot, card)
+
+
+## Correção FASE 22: anexa a barra de Energia/Soldo (_make_composition_footer)
+## logo abaixo do ArmyCardSlot real, sempre na mesma altura reservada
+## (com carta ou não) — "slot" continua sendo o alvo de clique/Drag-and-
+## Drop/tooltip, nunca substituído; o wrapper existe só para o layout.
+func _wrap_formation_slot(slot: ArmyCardSlot, card: CardResource) -> Control:
+	var wrapper := VBoxContainer.new()
+	wrapper.add_theme_constant_override("separation", 0)
+	wrapper.add_child(slot)
+	if card != null:
+		wrapper.add_child(_make_composition_footer(card))
+	else:
+		wrapper.add_child(_make_empty_composition_footer())
+	return wrapper
+
+
+## Mesma altura/estilo de _make_composition_footer(), sem valores — só
+## para o slot vazio ocupar exatamente a mesma altura de um slot
+## preenchido (ver _wrap_formation_slot()).
+func _make_empty_composition_footer() -> Control:
+	var footer := PanelContainer.new()
+	footer.custom_minimum_size = Vector2(0, 20.0)
+	footer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	footer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.05, 0.05, 0.05, 0.5)
+	style.border_width_top = 1
+	style.border_color = Color(HUD_MUTED_COLOR.r, HUD_MUTED_COLOR.g, HUD_MUTED_COLOR.b, 0.4)
+	footer.add_theme_stylebox_override("panel", style)
+	return footer
 
 
 ## Mesma causa-raiz de _on_list_card_gui_input (ver docstring lá) —
@@ -1496,7 +1871,54 @@ const _PREVIEW_MAX_WIDTH: float = 220.0
 const _PREVIEW_CAPTION_MAX_HEIGHT_FRACTION: float = 0.35
 
 
-func _build_card_tooltip(card: CardResource) -> Control:
+## Auditoria FASE 22.1, achado C: Posições 1/5/9 nunca eram explicadas.
+## Texto sempre extraído de regra já confirmada em COMBAT_RULES.md —
+## nunca uma vantagem inventada. Posição 1: bônus estrutural universal
+## por Classe (6.1/6.2, independente de qual arquétipo de Formação está
+## ativo). Posição 5: Penalidade de Reorganização (5.2.2) só se aplica a
+## quem CHEGA ali avançando em combate, nunca a quem já começa
+## posicionado ali — o texto é deliberadamente condicional, nunca afirma
+## que a Carta nesta posição "sofre" a penalidade agora. Posição 9:
+## posicionamento inicial obrigatório da Máquina de Guerra (6.6).
+## Rótulo curto para a legenda persistente (_build_formation_area()) —
+## resumo do mesmo texto de _position_special_note(), nunca uma regra
+## diferente. Vazio para posições sem regra especial.
+func _position_short_label(position_number: int) -> String:
+	match position_number:
+		1:
+			return "Linha de Frente"
+		5:
+			return "Reorganização"
+		9:
+			return "Máquina de Guerra"
+		_:
+			return ""
+
+
+func _position_special_note(position_number: int) -> String:
+	match position_number:
+		1:
+			return "Posição 1 — Linha de Frente: pelotões de Classe Corpo a Corpo recebem aqui +50% de Ataque; pelotões de Classe Barreira recebem +50% de Escudo Base."
+		5:
+			return "Posição 5 — Centro: um pelotão que CHEGAR aqui avançando durante a batalha entra em Reorganização e não pode agir naquele turno. Não se aplica a quem já começa a batalha nesta posição."
+		9:
+			return "Posição 9 — Retaguarda: toda Máquina de Guerra deve começar obrigatoriamente aqui. Depois do início do combate, ela se movimenta normalmente."
+		_:
+			return ""
+
+
+## Tooltip só de texto para uma posição especial ainda VAZIA — mesmo
+## painel/fonte do resto do Editor, sem a Carta (que ainda não existe
+## nesse slot). Nunca chamado para posições sem regra especial.
+func _build_position_hint_tooltip(position_number: int) -> Control:
+	var panel := _make_card_panel()
+	var vbox := VBoxContainer.new()
+	panel.add_child(vbox)
+	vbox.add_child(_make_tooltip_label(_position_special_note(position_number), 10, HUD_TEXT_COLOR, 200.0, false))
+	return panel
+
+
+func _build_card_tooltip(card: CardResource, position_number: int = 0) -> Control:
 	var viewport_size: Vector2 = get_viewport_rect().size
 	var width_by_viewport_w: float = viewport_size.x * 0.22
 	var width_by_viewport_h: float = viewport_size.y * 0.5 * BattleCardView.CARD_ASPECT_RATIO
@@ -1521,9 +1943,28 @@ func _build_card_tooltip(card: CardResource) -> Control:
 	card_view.set_compact(false)  # arte real + Tier/Tipo+Classe/ATK/ESC/HP, nunca uma 2ª versão simplificada
 	_force_ignore_mouse_recursive(card_view)
 
+	# Correção FASE 22, item 6 (Carta ampliada/hover): mesma barra de
+	# Energia/Soldo da lista/Formação, mesma hierarquia estrutural —
+	# nunca uma versão conceitualmente diferente da carta ampliada.
+	outer_vbox.add_child(_make_composition_footer(card))
+
 	var caption_vbox := VBoxContainer.new()
 	caption_vbox.add_theme_constant_override("separation", 3)
 	caption_vbox.custom_minimum_size.x = card_width
+
+	# Auditoria FASE 22.1, achado C — nota da posição especial (1/5/9),
+	# só quando esta Carta está de fato numa Formação (position_number >
+	# 0; a lista de seleção nunca passa isso, card_width é reaproveitado
+	# como largura da legenda, mesma técnica do resto desta função).
+	var position_note: String = _position_special_note(position_number)
+	if position_note != "":
+		caption_vbox.add_child(_make_tooltip_label(position_note, 10, HUD_ACCENT_SELECTED, card_width, false))
+
+	# Auditoria FASE 22.1, achado D — explicação progressiva da Máquina
+	# de Guerra: só aparece quando o jogador já a possui/seleciona (nunca
+	# antes, nunca poluindo cartas de outras Classes). COMBAT_RULES.md 6.6.
+	if card.card_class == "Máquina de Guerra":
+		caption_vbox.add_child(_make_tooltip_label("Máquina de Guerra: deve começar a batalha na Posição 9. Depois disso, movimenta-se normalmente e age conforme seu comportamento único (ver descrição acima).", 9, HUD_TEXT_COLOR, card_width, false))
 
 	if card.tier_1_trait_name != "":
 		caption_vbox.add_child(_make_tooltip_label("Característica: %s" % card.tier_1_trait_name, 10, HUD_ACCENT, card_width, false))
@@ -1591,16 +2032,34 @@ func _build_drag_preview(card: CardResource) -> Control:
 
 ## --- Botões de ação. ---
 
+## Correção FASE 22.2 (achado real via rastreamento de tamanho mínimo):
+## "Cancelar" + "Confirmar Exército"/"Salvar Alterações" lado a lado
+## (HBoxContainer) empurravam a largura mínima da coluna (~265px) além
+## do orçamento real (~218px úteis) — textos de botão não quebram linha
+## de forma legível, então a correção é empilhar verticalmente
+## (VBoxContainer) em vez de forçar lado a lado numa coluna estreita.
 func _build_action_buttons(parent: Control) -> void:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 8)
-	var center := CenterContainer.new()
-	center.add_child(row)
-	parent.add_child(center)
+	parent.add_child(_make_centered_label("AÇÕES", 12, HUD_ACCENT))
+
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 6)
+	col.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	parent.add_child(col)
+
+	# Correção FASE 22.3 (item A.9/A.10): "Criar Exército Aleatório" saiu
+	# da faixa de abas (competia visualmente com Comandante/Pelotão) e
+	# virou ação SECUNDÁRIA aqui, junto de Cancelar/Salvar — nunca mais
+	# competindo pela atenção com a Formação. Mesma condição de sempre:
+	# só faz sentido antes de "Montar"/"Salvar" já ter travado a
+	# composição (_army == null).
+	if _army == null:
+		var random_button := _make_small_button("Montar Aleatoriamente")
+		random_button.pressed.connect(_on_random_army_pressed, CONNECT_DEFERRED)
+		col.add_child(random_button)
 
 	var cancel_button := _make_small_button("Cancelar")
 	cancel_button.pressed.connect(_on_cancel_pressed, CONNECT_DEFERRED)
-	row.add_child(cancel_button)
+	col.add_child(cancel_button)
 
 	if _army == null:
 		var commit_text: String = "Salvar Alterações" if (editing_composition and existing_army != null) else "Montar Exército"
@@ -1626,11 +2085,11 @@ func _build_action_buttons(parent: Control) -> void:
 		var invalid_support: bool = Army.would_have_support_at_position_5(_resolved_alpha_order())
 		commit_button.disabled = _selected_commander == null or _selected_cards.size() != 9 or over_budget or invalid_support
 		commit_button.pressed.connect(_on_montar_pressed, CONNECT_DEFERRED)
-		row.add_child(commit_button)
+		col.add_child(commit_button)
 	else:
 		var confirm_button := _make_primary_button("Confirmar Exército")
 		confirm_button.pressed.connect(_on_concluir_pressed, CONNECT_DEFERRED)
-		row.add_child(confirm_button)
+		col.add_child(confirm_button)
 
 
 ## --- Contrato preservado: mesma lógica funcional de antes,
@@ -1793,6 +2252,33 @@ func _force_ignore_mouse_recursive(node: Node) -> void:
 		_force_ignore_mouse_recursive(child)
 
 
+## Correção FASE 22.2 — causa raiz REAL do texto cortado em toda a
+## coluna direita (achado via screenshot + rastreamento de
+## vbox.get_combined_minimum_size(), nunca só leitura de código): wrap=true
+## sozinho (mesmo com SIZE_EXPAND_FILL) não bastava porque a VBoxContainer
+## da coluna direita é reconstruída do zero a cada refresh
+## (_clear_children + _build_detail_area), e o Label é adicionado e tem
+## seu tamanho mínimo calculado ANTES da primeira passada de layout do
+## Godot resolver a largura real do container recém-criado — o mesmo bug
+## de "quebra letra-por-letra" já documentado no topo de _make_label(),
+## só que none aqui pra textos REALMENTE longos (efeitos de Afinidade,
+## legenda de posições) o efeito é catastrófico: um texto de ~60
+## caracteres virava ~60 linhas de 1 letra, inflando a altura mínima da
+## seção em milhares de pixels e arrastando a largura de toda a coluna
+## junto (confirmado: passou de ~218px pra 466px exatamente ao adicionar
+## a seção de Afinidade). _make_tooltip_label() já evitava isso dando um
+## custom_minimum_size.x EXPLÍCITO (nunca dependendo só de
+## SIZE_EXPAND_FILL) — mesma técnica aplicada aqui pra qualquer texto
+## longo da coluna direita. 200px = largura útil real da coluna (~218px)
+## menos uma margem de segurança.
+func _make_detail_wrap_label(text: String, font_size: int, color: Color, centered: bool = true) -> Label:
+	var label := _make_label(text, font_size, color, true)
+	label.custom_minimum_size.x = 200.0
+	if centered:
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	return label
+
+
 func _clear_children(container: Node) -> void:
 	for child in container.get_children():
 		container.remove_child(child)
@@ -1825,6 +2311,18 @@ func _make_label(text: String, font_size: int, color: Color, wrap: bool = false)
 	var label := Label.new()
 	label.text = text
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART if wrap else TextServer.AUTOWRAP_OFF
+	# Correção FASE 22.2 (achado real via screenshot — texto cortado na
+	# coluna direita, "COMANDAN"/"SOLDO DO" etc.): wrap=true sozinho não
+	# bastava. Sem SIZE_EXPAND_FILL, o Label mantém como "mínimo" a
+	# largura do texto NÃO quebrado — se maior que a coluna (DETAIL_RECT,
+	# ~234px em 1152×648), essa largura vira o mínimo de toda a
+	# VBoxContainer pai, empurrando o conteúdo pra fora da área visível
+	# (cortado pelo clip_contents do ancestral). Alguns call sites já
+	# faziam essa atribuição manualmente (_make_body_label, o value_label
+	# de Doutrina) — agora é automática pra qualquer wrap=true, corrige
+	# todos os sites de uma vez (nenhuma regra de jogo tocada).
+	if wrap:
+		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	label.add_theme_font_override("font", HUD_FONT)
 	label.add_theme_font_size_override("font_size", font_size)
 	label.add_theme_color_override("font_color", color)
@@ -1906,6 +2404,67 @@ func _make_list_row_panel(selected: bool) -> PanelContainer:
 	return panel
 
 
+## Correção FASE 22 (revisão pós-22.1, revisão manual no Godot): o selo
+## externo flutuante de Soldo (versão anterior desta função) não
+## funcionava visualmente — um elemento solto por cima da carta, não
+## parte dela. Substituído por uma barra estrutural anexada logo abaixo
+## da própria carta (pedido explícito: Energia à esquerda, Soldo à
+## direita), nunca mais uma etiqueta solta.
+##
+## CONFLITO DE DOCUMENTAÇÃO REGISTRADO (não resolvido silenciosamente):
+## Fundation/CARD_LAYOUT_BIBLE.md, "I. Identificação Superior", reserva
+## Energia/Soldo pra região SUPERIOR da carta ("elementos condicionais"
+## que "não alteram a geometria"), nunca a barra inferior (que já é
+## Ataque/Escudo/HP, "V — Barra Inferior"). O pedido desta correção pede
+## explicitamente a barra INFERIOR. Resolvido a favor da decisão atual
+## do usuário (PROJECT_INDEX.md, "Autoridade": decisão explícita do
+## usuário no contexto atual > documento Foundation) — implementado como
+## uma barra ANEXADA fora de BattleCardView (nunca dentro dela), pra
+## nunca arriscar a calibração por pixel de ATK/ESC/HP que o próprio
+## docstring de battle_card_view.gd protege. CARD_LAYOUT_BIBLE.md fica
+## desatualizado quanto a este ponto — registrado no relatório, não
+## corrigido ainda (fase em revisão, sem commit).
+##
+## Nunca recalcula Energia/Soldo — sempre EnergyArmy.card_energy()/
+## Soldo.cost_for_rarity(), as mesmas fontes já usadas no resto do
+## Editor (ENERGY.md/SOLDO.md).
+func _make_composition_footer(card: CardResource) -> Control:
+	var footer := PanelContainer.new()
+	footer.custom_minimum_size = Vector2(0, 20.0)
+	footer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.05, 0.05, 0.05, 0.92)
+	style.border_width_top = 1
+	style.border_color = HUD_ACCENT
+	style.content_margin_left = 6.0
+	style.content_margin_right = 6.0
+	style.content_margin_top = 2.0
+	style.content_margin_bottom = 2.0
+	footer.add_theme_stylebox_override("panel", style)
+
+	var row := HBoxContainer.new()
+	footer.add_child(row)
+
+	var energy_box := HBoxContainer.new()
+	energy_box.add_theme_constant_override("separation", 3)
+	row.add_child(energy_box)
+	energy_box.add_child(_make_label("EN", 8, HUD_MUTED_COLOR))
+	energy_box.add_child(_make_label(str(EnergyArmy.card_energy(card.tier)), 10, Color(0.75, 0.85, 1.0)))
+
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(spacer)
+
+	var soldo_box := HBoxContainer.new()
+	soldo_box.add_theme_constant_override("separation", 3)
+	row.add_child(soldo_box)
+	soldo_box.add_child(_make_label(str(Soldo.cost_for_rarity(card.rarity)), 10, HUD_ACCENT_SELECTED))
+	soldo_box.add_child(_make_label("SD", 8, HUD_MUTED_COLOR))
+
+	_force_ignore_mouse_recursive(footer)
+	return footer
+
+
 func _make_stat_chip(title_text: String, value_text: String, value_color: Color = HUD_TEXT_COLOR) -> Control:
 	var card := _make_card_panel()
 	var vbox := VBoxContainer.new()
@@ -1915,11 +2474,22 @@ func _make_stat_chip(title_text: String, value_text: String, value_color: Color 
 	return card
 
 
-func _make_tab_button(text: String, active: bool) -> Button:
+## Correção FASE 22.2 (causa raiz REAL do texto cortado na coluna
+## direita — achado via rastreamento de vbox.get_combined_minimum_size(),
+## nunca só leitura de código): as 5 abas de Formação (α-ε) usavam a
+## MESMA largura fixa das abas Comandante/Pelotão (90px) — 5×90px+
+## separação = 466px, quase o DOBRO da largura útil real da coluna
+## direita (~218px). Godot impõe o tamanho mínimo do conteúdo como piso,
+## mesmo sobre uma âncora fracionária — isso forçava TODA a coluna
+## DETAIL_RECT a crescer além do próprio limite e vazar pelo clip do
+## frame externo. min_width agora é parâmetro (default 90, preserva as
+## 2 abas do topo Comandante/Pelotão) — as abas de Formação (só uma
+## letra grega cada) passam min_width menor.
+func _make_tab_button(text: String, active: bool, min_width: float = 90.0) -> Button:
 	var button := Button.new()
 	button.text = text
 	button.add_theme_font_size_override("font_size", 13)
-	button.custom_minimum_size = Vector2(90, 34)
+	button.custom_minimum_size = Vector2(min_width, 34)
 	button.toggle_mode = true
 	button.button_pressed = active
 	_style_office_button(button)

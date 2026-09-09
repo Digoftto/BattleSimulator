@@ -104,6 +104,7 @@ func _ready() -> void:
 	runner.register("initial_mine_no_conquest", "validate_initial_mine_no_conquest", TestInitialMineNoConquest.run)
 	runner.register("city_deposits", "validate_city_deposits", TestCityDeposits.run)
 	runner.register("institutional_constructions", "validate_institutional_constructions", TestInstitutionalConstructions.run)
+	runner.register("institutional_construction_entry_curve", "validate_institutional_construction_entry_curve", TestInstitutionalConstructionEntryCurve.run)
 	runner.register("command_center_state_machine", "validate_command_center_state_machine", TestCommandCenterStateMachine.run)
 	runner.register("commander_training_xp", "validate_commander_training_xp", TestCommanderTrainingXp.run)
 	runner.register("recruitment_center", "validate_recruitment_center", TestRecruitmentCenter.run)
@@ -174,6 +175,9 @@ func _ready() -> void:
 	runner.register("tutorial_contextual_hints", "validate_tutorial_contextual_hints", preload("res://tests/unit/test_tutorial_contextual_hints.gd").run)
 	runner.register("pvp_battle", "validate_pvp_battle", preload("res://tests/unit/test_pvp_battle.gd").run)
 	runner.register("expedition_persistence_restoration_warning", "validate_expedition_persistence_restoration_warning", preload("res://tests/unit/test_expedition_persistence_restoration_warning.gd").run)
+	runner.register("army_editor_ux_audit_findings", "validate_army_editor_ux_audit_findings", preload("res://tests/unit/test_army_editor_ux_audit_findings.gd").run)
+	runner.register("campo_de_prova_relatorio_baixas", "validate_campo_de_prova_relatorio_baixas", preload("res://tests/unit/test_campo_de_prova_relatorio_baixas.gd").run)
+	runner.register("city_panel_economy_hints", "validate_city_panel_economy_hints", preload("res://tests/unit/test_city_panel_economy_hints.gd").run)
 
 	var suite_filter: String = _arg_value("--suite=")
 	var test_filter: String = _arg_value("--test=")

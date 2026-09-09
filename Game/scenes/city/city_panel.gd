@@ -821,10 +821,49 @@ func refresh() -> void:
 	for faction: String in FACTIONS:
 		_fragmento_labels[faction].text = "%s  %d" % [faction.to_upper(), kingdom.get_fragment(faction)]
 
+	_maybe_show_economy_hints(kingdom)
+
 	# Mantém o painel contextual coerente após um Evoluir (o Nível/
 	# custo mudou) sem exigir um novo clique do jogador na construção.
 	if _selected_building_key != "":
 		_update_contextual_panel()
+
+
+## Auditoria FASE 22.1, achado I: PG e Fragmentos nunca eram explicados
+## em lugar nenhum — só o número nu no HUD (GENERATION_POINTS.md/
+## RESOURCES.md são as SSoT reais; o texto abaixo só resume o que já
+## está lá, nunca inventa uso novo). Chamado a cada refresh() (PG/
+## Fragmentos só passam a existir depois de alguma progressão real, não
+## no primeiro _ready()) — mesma primitiva TutorialHintBanner já usada
+## por _maybe_show_tutorial_hint(), cada dica com sua própria
+## progress_flag, nunca reaparece depois de dispensada. No máximo 1 dica
+## nova por chamada, pra nunca empilhar duas ao mesmo tempo.
+func _maybe_show_economy_hints(kingdom: Kingdom) -> void:
+	if kingdom.generation_points > 0 and not kingdom.has_progress_flag("pg_hint_seen"):
+		_show_hint_banner(
+			"Pontos de Geração (PG)",
+			"PG é um recurso único do Reino, ganho a cada vez que sua Conta sobe de Nível. Ele é usado para evoluir Minas, Depósito, Centro de Comando e Academia — invista onde for mais útil agora.",
+			"pg_hint_seen"
+		)
+		return
+
+	for faction: String in FACTIONS:
+		if kingdom.get_fragment(faction) > 0 and not kingdom.has_progress_flag("fragmentos_hint_seen"):
+			_show_hint_banner(
+				"Fragmentos",
+				"Fragmentos são obtidos destruindo Pelotões inimigos em combate (PvP principalmente, PvE em menor quantidade) e são específicos de cada Facção. Use-os na Academia para produzir novas Cartas.",
+				"fragmentos_hint_seen"
+			)
+			return
+
+
+func _show_hint_banner(title: String, body: String, progress_flag: String) -> void:
+	KingdomState.kingdom.set_progress_flag(progress_flag)
+	var banner = preload("res://scenes/tutorial/tutorial_hint_banner.gd").new()
+	banner.setup(title, body, "")
+	banner.offset_top = TOP_HUD_HEIGHT + 8.0
+	banner.continue_pressed.connect(_on_tutorial_hint_continue.bind(banner), CONNECT_DEFERRED)
+	add_child(banner)
 
 
 func _clear_children(container: Node) -> void:

@@ -361,6 +361,263 @@ Esta simulação **não altera** `b`/`x` nem qualquer valor vigente — apenas q
 
 ---
 
+# Simulação 5 — Curva de Entrada das Construções Institucionais (Níveis 1–3) — FASE 22, ✅ VALORES VIGENTES (Cenário B aprovado e implementado)
+
+## Situação atual
+
+A auditoria da FASE 22 (Editor de Exército + economia inicial) simulou um
+jogador NOVO — só as 3 Minas Iniciais (Império/Natureza/Mortos-Vivos),
+sem nenhuma Mina Regional — usando exclusivamente código real
+(`MineEconomy`, `Deposits`, `GeneralConstructionFormula`,
+`InstitutionalConstructionConfig`, nenhuma fórmula reimplementada) e as
+mesmas premissas de PG/alocação já registradas nas Simulações 2-4 (PG =
+1,3/dia, 80% Minas/20% Depósito, 40% das Minas Iniciais → Construções
+Institucionais, 20/15/30/35% entre Capital/Centro de Comando/Academia/
+Núcleo de Energia).
+
+**Achado:** com os valores `b`/`x` vigentes (Simulação 3), as 3 Minas
+Iniciais maximizam (Nível 4, `MINES.md`) por volta do Dia 14, gerando
+~576 Recursos de Construção/dia no total. O orçamento diário resultante
+para cada Construção fica entre ~35 e ~81 Recursos/dia — nenhuma das 4
+atinge o Nível 2 antes de aproximadamente o **Dia 282-298**. Testar
+cortar custo (-20%) ou dobrar a produção da Mina Inicial isoladamente
+não muda esse resultado de forma perceptível: o problema não é o valor
+de um parâmetro, é uma diferença de escala de ~135-235× entre o
+orçamento que uma economia "só Mina Inicial" consegue gerar e o
+orçamento (3 Trilhas, Minas Regionais já conquistadas) para o qual
+`b`/`x` foram calibrados.
+
+## Problema identificado
+
+Com a curva vigente, um jogador novo nunca vê nenhuma das 4 Construções
+Institucionais sair do Nível 1 antes de conquistar Minas Regionais — o
+que pode levar semanas. Isso contraria a intenção de design: a Mina
+Inicial deveria funcionar como uma "plataforma de progressão inicial",
+dando ao jogador uma sensação real de evolução da Cidade enquanto ele
+ainda está descobrindo o mapa e buscando as primeiras Regionais.
+
+## Metodologia
+
+Simulação dia-a-dia (script descartável, removido após uso — nenhum
+valor oficial foi alterado por ele) testando a hipótese específica
+pedida: **custo artificialmente reduzido só para atingir os Níveis 2 e
+3; a partir do Nível 4, retorno integral à curva vigente** (nunca uma
+segunda fonte de verdade — o Nível 4+ sempre usa
+`GeneralConstructionFormula.upgrade_cost()` com o `b`/`x` real de
+`InstitutionalConstructionConfig`, sem exceção). Testado para as 4
+Construções SEPARADAMENTE (nunca assumindo que uma redução igual produz
+o mesmo resultado, já que os orçamentos diferem por até ~2,3× entre
+Capital/CdC e Academia/Núcleo).
+
+## Cenários simulados
+
+| Cenário | Desconto no custo do Nível 2 | Desconto no custo do Nível 3 | Nível 4+ |
+|---|---|---|---|
+| A — Atual | 0% | 0% | curva vigente |
+| B — Redução forte | 95% | 95% | curva vigente |
+| C — Redução moderada | 85% | 80% | curva vigente |
+| D — Redução progressiva | 95% | 85% | 50% só no Nível 4, depois 0% |
+| E — Custo fixo absoluto | 400 Recursos (fixo, igual pras 4) | 1.200 Recursos (fixo, igual pras 4) | curva vigente |
+
+## Resultados — dia em que cada Nível é atingido, por Construção
+
+| Construção | A (Nível 2 / 3) | B (Nível 2 / 3) | C (Nível 2 / 3) | D (Nível 2 / 3 / 4) | E (Nível 2 / 3) |
+|---|---|---|---|---|---|
+| Capital | dia 290 / não atingido | dia 20 / dia 41 | dia 49 / dia 132 | dia 20 / dia 83 / dia 357 | dia 15 / dia 41 |
+| Centro de Comando | dia 298 / não atingido | dia 21 / dia 42 | dia 50 / dia 135 | dia 21 / dia 84 / dia 364 | dia 18 / dia 52 |
+| Academia | dia 288 / não atingido | dia 20 / dia 41 | dia 48 / dia 132 | dia 20 / dia 83 / dia 358 | dia 12 / dia 29 |
+| Núcleo de Energia | dia 282 / não atingido | dia 20 / dia 40 | dia 47 / dia 129 | dia 20 / dia 81 / dia 352 | dia 11 / dia 26 |
+
+("Não atingido" = não chega ao Nível 3 dentro dos 400 dias simulados.)
+
+## Curva recomendada
+
+**Cenário B (redução de 95% no custo para atingir os Níveis 2 e 3,
+retorno integral à curva vigente a partir do Nível 4), aplicada
+igualmente às 4 Construções.**
+
+Justificativa objetiva:
+
+* **Uniformidade real entre as 4 Construções:** apesar de terem
+  orçamentos diários bem diferentes (Núcleo recebe ~2,3× mais que
+  Centro de Comando), o Cenário B produz Nível 2 entre os dias 20-21 e
+  Nível 3 entre os dias 40-42 para todas — uma diferença de no máximo 1
+  dia entre a mais lenta e a mais rápida. Isso acontece porque a
+  redução é **percentual sobre o custo real de cada uma** (nunca um
+  valor fixo compartilhado) — o Cenário E (custo fixo) foi
+  explicitamente testado e descartado por este motivo: produz uma
+  dispersão real de até 26 dias entre Construções (Núcleo no dia 26,
+  Centro de Comando só no dia 52), porque um valor fixo favorece
+  desproporcionalmente quem já tinha o maior orçamento relativo.
+* **Sensação de progresso dentro da 1ª quinzena/mês:** Nível 2 em ~3
+  semanas e Nível 3 em ~6 semanas — dentro da janela em que um jogador
+  plausivelmente ainda não conquistou nenhuma Mina Regional
+  (`BALANCING_SIMULATION.md`, Resultado 6 da Simulação 1, cita a 1ª
+  mina só por volta do dia 11 num cenário de jogador 100% dedicado;
+  um jogador real, menos otimizado, provavelmente demora mais).
+* **Nenhum impacto no late game:** a partir do Nível 4, o custo volta a
+  ser **exatamente** `GeneralConstructionFormula.upgrade_cost()` com o
+  `b`/`x` vigente da Simulação 3 — a mesma tabela de custo acumulado/dia
+  já publicada ali para os Níveis 4-20 permanece 100% válida sem
+  nenhuma alteração. O Cenário D (que também reduzia parcialmente o
+  Nível 4) foi descartado por introduzir uma zona cinzenta desnecessária
+  — o "degrau" de volta à curva normal fica mais claro sendo abrupto
+  (Nível 3→4) do que gradual.
+* **Minas Regionais continuam extremamente relevantes:** mesmo com o
+  desconto, o Nível 4 (já na curva cheia — 19.320 a 43.720 Recursos
+  conforme a Construção) permanece fora de alcance de uma economia
+  "só Mina Inicial" dentro de qualquer horizonte plausível — só uma
+  economia com Minas Regionais sustenta esse próximo salto.
+
+## Impacto no early game
+
+Nível 2 (evidência de que "algo mudou na Cidade") passa de
+impraticável (~dia 290) para ~3 semanas. Nível 3 (uma "primeira pequena
+conquista", nas palavras do pedido) passa de impraticável para ~6
+semanas — ainda exige jogo real e paciência, nunca instantâneo.
+
+## Impacto no mid/late game
+
+**Nenhum.** O Cenário B não toca nenhum valor a partir do Nível 4 — a
+tabela de custo acumulado/dia da Simulação 3 (Níveis 4-20) permanece
+inalterada, assim como a conclusão da Simulação 4 sobre o Nível 15 não
+ser alcançável dentro de uma Temporada de 180 dias no cenário
+Conservador (esse achado continua de pé, sem relação com este).
+
+## Riscos
+
+* Um desconto de 95% é, por definição, uma redução muito acentuada —
+  se aplicado incorretamente (ex.: esquecido de reverter no Nível 4),
+  poderia mascarar a curva de custo real. A implementação recomendada
+  restringe o desconto explicitamente aos graus até o Nível 3, nunca
+  como uma mudança permanente de `b`/`x`.
+* Esta simulação assume a mesma eficiência/ritmo de conquista de PG já
+  usada nas Simulações 1-4 (1,3 PG/dia, alocação 80/20) — se essas
+  premissas mudarem (ex.: decisão futura da Simulação 4 sobre dividir
+  PG por Trilha), os dias exatos mudam, mas a CONCLUSÃO relativa entre
+  cenários (B uniforme, E desigual) deve se manter.
+
+## Validação Agregada (FASE 22 — antes de oficializar o Cenário B)
+
+A avaliação acima testou cada Construção **isoladamente**, com uma
+fatia fixa (20/15/30/35%) do orçamento diário. Isso prova que a curva é
+uniforme entre Construções, mas não prova que as 4 Construções
+competindo pelo **mesmo banco** de Recursos (sem fatia automática,
+decisão real do jogador sobre onde gastar) funcionam sem uma "esvaziar"
+as outras ou permitir "comprar tudo". Nova simulação dia-a-dia (180
+dias, script descartável, removido após uso, mesmo código real —
+`MineEconomy`/`GeneralConstructionFormula`/
+`InstitutionalConstructionConfig`), 3 perfis de comportamento:
+
+* **Perfil A — Equilibrado:** a cada dia, investe sempre na Construção
+  de MENOR nível atual (empate: ordem fixa Capital → Centro de Comando
+  → Academia → Núcleo).
+* **Perfil B — Focado:** investe exclusivamente no Núcleo de Energia,
+  do início ao fim, ignorando as outras 3.
+* **Perfil C — Cíclico:** segue exatamente o padrão de compra pedido —
+  Capital → Centro de Comando → Academia → Núcleo → repete.
+
+### Resultados
+
+| Perfil | Recursos produzidos | Recursos gastos | Banco final (não gasto) |
+|---|---|---|---|
+| A — Equilibrado | 40.205 | 33.347 (83%) | 6.858 (17%) |
+| B — Focado (só Núcleo) | 40.205 | 2.763 (7%) | 37.442 (93%) |
+| C — Cíclico | 40.205 | 33.347 (83%) | 6.858 (17%) |
+
+| Construção | Perfil A — Nível 2 / 3 / 4 | Perfil B — Nível 2 / 3 / 4 | Perfil C — Nível 2 / 3 / 4 |
+|---|---|---|---|
+| Capital | dia 9 / dia 24 / dia 151 | nunca sai do Nível 1 | dia 9 / dia 24 / dia 151 |
+| Centro de Comando | dia 11 / dia 27 / não atingido | nunca sai do Nível 1 | dia 11 / dia 27 / não atingido |
+| Academia | dia 15 / dia 34 / não atingido | nunca sai do Nível 1 | dia 15 / dia 34 / não atingido |
+| Núcleo de Energia | dia 20 / dia 41 / não atingido | dia 11 / dia 18 / não atingido | dia 20 / dia 41 / não atingido |
+
+("Não atingido" = não chega àquele Nível dentro dos 180 dias simulados.)
+
+### Leitura dos resultados
+
+* **Perfil A e Perfil C são numericamente idênticos.** A heurística "sempre
+  a de menor Nível" e o ciclo fixo Capital→CdC→Academia→Núcleo convergem
+  para o mesmo comportamento — não existe um "truque" de ordem de compra
+  que renda mais que o outro. O ciclo pedido não cria uma rota
+  secretamente ótima nem um jeito errado de jogar.
+* **Nenhuma Construção trava as outras.** Em jogo equilibrado/cíclico,
+  todas as 4 alcançam o Nível 2 entre os dias 9-20 e o Nível 3 entre os
+  dias 24-41 — a mesma janela já vista na avaliação isolada. O banco
+  final de 17% não gasto é folga normal (esperando o próximo grau),
+  não acúmulo patológico.
+* **Focar 100% em uma única Construção NÃO permite "comprar tudo".**
+  Sob o Perfil B, o Núcleo de Energia chega ao Nível 3 rapidamente (dia
+  18) mas **fica travado ali pelo resto dos 180 dias**: o Nível 4 custa
+  43.720 Recursos (curva vigente, sem desconto) — mais do que os 40.205
+  produzidos no período inteiro. Isso deixa 93% de toda a produção
+  parada no banco, sem uso. Ou seja: o desconto de 95% não abre uma
+  rota de progressão infinita nem torna a economia "fácil demais" —
+  ele só acelera os Níveis 2-3; o Nível 4 continua exigindo uma
+  economia real (Minas Regionais), exatamente como pretendido.
+* **Mina Inicial permanece relevante só durante a rampa inicial (~9
+  dias)** — tempo para as 3 Minas Iniciais atingirem seu teto (Nível 4,
+  `MINES.md`). Depois disso a produção fica fixa (576 Recursos/dia
+  brutos, 230,4/dia para as Construções via a fatia de 40%) — ela deixa
+  de crescer, mas continua sendo a ÚNICA fonte de Recursos de
+  Construção até a conquista de uma Mina Regional.
+* **A economia "trava" por volta do dia 24-41** (quando as 4 Construções
+  alcançam o Nível 3 em jogo equilibrado): a partir daí, o próximo passo
+  de qualquer uma delas é o Nível 4 em curva cheia, e o ritmo de
+  progresso cai drasticamente (Capital, a mais barata das 4, ainda leva
+  até o dia 151 para chegar lá com produção só de Mina Inicial).
+* **O que muda ao conquistar a primeira Mina Regional (raciocínio, não
+  simulado aqui — está fora do escopo de "só Mina Inicial"):** mesmo uma
+  única Mina Regional em Nível 1 já produz 5/10/20 Recursos/hora
+  (Região 1/2/3, `MINES.md`) — uma Região 3 Nível 1 sozinha (480/dia,
+  antes de Eficiência) praticamente **iguala a produção bruta das 3
+  Minas Iniciais somadas e maximizadas** (576/dia). Isso confirma que o
+  "degrau" para o Nível 4 foi projetado corretamente para ser
+  Regional-dependente, não Mina-Inicial-dependente — o gargalo do
+  Perfil B (banco parado em 93%) é sanado assim que o jogador conquista
+  território, não por um ajuste adicional na curva de entrada.
+
+### Teste de sensatez dos 95%
+
+**Classificação: ADEQUADO.** Critérios usados (conforme pedido, sem
+reduzir os 95% automaticamente — decisão baseada nos números acima):
+
+* Não é "Muito lento": Nível 2 em 1-3 semanas e Nível 3 em ~1-6 semanas
+  em jogo equilibrado/cíclico é uma evolução perceptível dentro do
+  período em que um jogador novo plausivelmente ainda não tem Mina
+  Regional.
+* Não é "Muito rápido": mesmo dedicando 100% da produção a uma única
+  Construção (Perfil B, o cenário mais agressivo possível), o jogador
+  NÃO consegue "comprar tudo" — trava no Nível 3 daquela Construção e
+  deixa 93% dos Recursos parados, porque o Nível 4 nunca recebe
+  desconto. Não existe combinação de perfil de gasto que destrave a
+  curva cheia (Nível 4+) usando só Mina Inicial.
+* **Conclusão: manter os 95% exatamente como testado — Cenário B
+  aprovado sem alteração.**
+
+## Curva final aprovada e implementada
+
+**Cenário B, oficializado:** para Capital, Centro de Comando, Academia
+e Núcleo de Energia, o custo para alcançar os Níveis 2 e 3 é **5% do
+valor calculado por `GeneralConstructionFormula.upgrade_cost()`**
+(desconto de 95%); a partir do Nível 4, o custo é **100% da curva
+vigente**, sem nenhuma exceção. `b` e `x`
+(`InstitutionalConstructionConfig`) e a fórmula geral
+(`GeneralConstructionFormula`) permanecem exatamente como estavam — o
+desconto é uma camada nova, isolada, aplicada por cima do valor real.
+
+Implementado em `InstitutionalConstructionEntryCurve`
+(`Game/engine/city/institutional_construction_entry_curve.gd`) — única
+fonte desse percentual — e consumido exclusivamente por
+`InstitutionalConstructionResolver.cost_breakdown()`, o único ponto do
+jogo onde o custo das 4 Construções Institucionais é calculado
+(painéis de Capital/Academia/Centro de Comando/Núcleo de Energia e
+`SupplyChainResolver` já leem o custo por esse caminho — nenhum ponto
+de código chama `GeneralConstructionFormula.upgrade_cost()` diretamente
+para estas 4 Construções). Testes: `test_institutional_construction_entry_curve.gd`.
+
+---
+
 # Referências
 
 * **ENERGY.md / ENERGY_NUCLEUS.md:** Energia, consumo, recuperação, Núcleo.

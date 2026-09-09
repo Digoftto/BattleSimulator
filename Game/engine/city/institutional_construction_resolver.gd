@@ -28,12 +28,12 @@ const SECONDARY_SHARE: float = 0.30
 ## Fundamentos da construção, para evoluir até "target_level".
 ## Dictionary: {"ferro_negro": int, "cristais_arcanos": int, "essencia_vital": int}
 ## (chaves ausentes = 0, a construção não consome aquele recurso).
+## O custo total vem de InstitutionalConstructionEntryCurve.total_cost()
+## — não de GeneralConstructionFormula.upgrade_cost() diretamente —
+## porque alcançar os Níveis 2 e 3 tem a Curva de Entrada (FASE 22)
+## aplicada por cima do valor vigente.
 static func cost_breakdown(building: InstitutionalConstructionConfig.Building, target_level: int) -> Dictionary:
-	var total: int = GeneralConstructionFormula.upgrade_cost(
-		target_level,
-		InstitutionalConstructionConfig.b(building),
-		InstitutionalConstructionConfig.x(building)
-	)
+	var total: int = InstitutionalConstructionEntryCurve.total_cost(building, target_level)
 
 	if building == InstitutionalConstructionConfig.Building.CAPITAL:
 		return _split_three_way(total)
