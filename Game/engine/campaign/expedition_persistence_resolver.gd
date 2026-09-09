@@ -31,6 +31,7 @@ static func _hydrate_one(data: Dictionary, kingdom: Kingdom) -> ExpeditionRuntim
 	var season: Season = WorldDatabase.get_season(data.get("season_id", ""))
 	if season == null:
 		push_error("ExpeditionPersistenceResolver: Temporada '%s' não encontrada — Expedição salva não pôde ser restaurada." % data.get("season_id", ""))
+		kingdom.pending_restoration_warnings.append("Uma Expedição salva não pôde ser restaurada porque a Temporada em que ela estava não está mais disponível. Nenhum outro progresso foi afetado — você pode iniciar uma nova Expedição normalmente.")
 		return null
 
 	var territory_id: String = data.get("territory_id", "")
@@ -38,6 +39,7 @@ static func _hydrate_one(data: Dictionary, kingdom: Kingdom) -> ExpeditionRuntim
 	var trilha: Trilha = season.get_trilha(territory_id)
 	if territory == null or trilha == null:
 		push_error("ExpeditionPersistenceResolver: Território/Trilha '%s' não encontrado na Temporada '%s' — Expedição salva não pôde ser restaurada." % [territory_id, data.get("season_id", "")])
+		kingdom.pending_restoration_warnings.append("Uma Expedição salva não pôde ser restaurada porque o Território em que ela estava não está mais disponível. Nenhum outro progresso foi afetado — você pode iniciar uma nova Expedição normalmente.")
 		return null
 
 	var squad_data: Dictionary = data.get("squad", {})

@@ -173,6 +173,7 @@ func _ready() -> void:
 	runner.register("pve_panel_energy_header", "validate_pve_panel_energy_header", preload("res://tests/unit/test_pve_panel_energy_header.gd").run)
 	runner.register("tutorial_contextual_hints", "validate_tutorial_contextual_hints", preload("res://tests/unit/test_tutorial_contextual_hints.gd").run)
 	runner.register("pvp_battle", "validate_pvp_battle", preload("res://tests/unit/test_pvp_battle.gd").run)
+	runner.register("expedition_persistence_restoration_warning", "validate_expedition_persistence_restoration_warning", preload("res://tests/unit/test_expedition_persistence_restoration_warning.gd").run)
 
 	var suite_filter: String = _arg_value("--suite=")
 	var test_filter: String = _arg_value("--test=")

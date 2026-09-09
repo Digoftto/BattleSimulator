@@ -141,6 +141,14 @@ var active_expeditions: Array[ExpeditionRuntime] = []
 ## load). Nunca tocado em nenhum outro lugar.
 var _pending_expedition_saves: Array[Dictionary] = []
 
+## Mensagens para o jogador sobre Expedições salvas que não puderam ser
+## restauradas (ex.: Temporada/Território referenciados no save não
+## existem mais no Mundo atual — Season rotacionada). Runtime-only,
+## nunca serializado: populado por ExpeditionPersistenceResolver.
+## hydrate_pending() a cada load, consumido e esvaziado por quem exibe
+## o aviso (city_panel.gd), nunca sobrevive além dessa exibição.
+var pending_restoration_warnings: Array[String] = []
+
 ## territory_id -> quantas vezes a Trilha daquele Território já foi
 ## concluída inteiramente (PvE.md, "Exigências Estritas de Composição
 ## de Squad": 1ª conclusão exige Squad de 1 Exército, 1º Replay exige

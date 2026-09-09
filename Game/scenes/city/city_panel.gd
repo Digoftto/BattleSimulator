@@ -221,6 +221,7 @@ func _ready() -> void:
 	_build_static_structure()
 	refresh()
 	_maybe_show_tutorial_hint()
+	_maybe_show_restoration_warning()
 	print("[CityPanel] Pronto. Nível de Conta: %d" % KingdomState.kingdom.account_level())
 
 
@@ -235,7 +236,31 @@ func _on_starter_kit_chosen(kit_panel: StarterKitPanel) -> void:
 	_build_static_structure()
 	refresh()
 	_maybe_show_tutorial_hint()
+	_maybe_show_restoration_warning()
 	print("[CityPanel] Pronto (após Kit Inicial). Nível de Conta: %d" % KingdomState.kingdom.account_level())
+
+
+## Achado da Auditoria Final (FASE 21.8): ExpeditionPersistenceResolver
+## descartava Expedições salvas cuja Temporada/Território não existe
+## mais no Mundo atual (ex.: rotação real de Temporada) sem nenhuma
+## comunicação ao jogador — perda de dado silenciosa. Kingdom.
+## pending_restoration_warnings é preenchido só nesse cenário de falha;
+## exibido uma única vez por boot, num AcceptDialog nativo (sem inventar
+## componente visual novo pra um caso raro), e esvaziado logo em
+## seguida — nunca reaparece nem é persistido em disco.
+func _maybe_show_restoration_warning() -> void:
+	var kingdom: Kingdom = KingdomState.kingdom
+	if kingdom.pending_restoration_warnings.is_empty():
+		return
+
+	var dialog := AcceptDialog.new()
+	dialog.dialog_text = "\n\n".join(kingdom.pending_restoration_warnings)
+	dialog.title = "Aviso"
+	kingdom.pending_restoration_warnings.clear()
+	add_child(dialog)
+	dialog.confirmed.connect(dialog.queue_free)
+	dialog.canceled.connect(dialog.queue_free)
+	dialog.popup_centered()
 
 
 ## TUT-001, Passo 1/4 (Cidade): mostrado uma única vez, na primeira vez
