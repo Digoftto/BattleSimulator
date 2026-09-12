@@ -161,6 +161,10 @@ func _load_cards() -> void:
 	dir.list_dir_begin()
 	var file_name: String = dir.get_next()
 	while file_name != "":
+		# Builds exportados convertem .tres em binário e listam o arquivo
+		# como "*.tres.remap" (o .tres original não existe mais no PCK).
+		if file_name.ends_with(".remap"):
+			file_name = file_name.substr(0, file_name.length() - ".remap".length())
 		if not dir.current_is_dir() and file_name.ends_with(".tres"):
 			var card: CardResource = load(CARDS_PATH + file_name)
 			if card != null:
@@ -181,6 +185,10 @@ func _load_commanders() -> void:
 	dir.list_dir_begin()
 	var file_name: String = dir.get_next()
 	while file_name != "":
+		# Builds exportados convertem .tres em binário e listam o arquivo
+		# como "*.tres.remap" (o .tres original não existe mais no PCK).
+		if file_name.ends_with(".remap"):
+			file_name = file_name.substr(0, file_name.length() - ".remap".length())
 		if not dir.current_is_dir() and file_name.ends_with(".tres"):
 			var commander: CommanderResource = load(COMMANDERS_PATH + file_name)
 			if commander != null:
@@ -202,6 +210,10 @@ func _load_all(path: String, out_array: Array) -> void:
 	dir.list_dir_begin()
 	var file_name: String = dir.get_next()
 	while file_name != "":
+		# Builds exportados convertem .tres em binário e listam o arquivo
+		# como "*.tres.remap" (o .tres original não existe mais no PCK).
+		if file_name.ends_with(".remap"):
+			file_name = file_name.substr(0, file_name.length() - ".remap".length())
 		if not dir.current_is_dir() and file_name.ends_with(".tres"):
 			var resource: Resource = load(path + file_name)
 			if resource != null:
