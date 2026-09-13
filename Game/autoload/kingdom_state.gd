@@ -21,6 +21,13 @@ extends Node
 ## mudou) + save na notificação de fechamento da janela. Sem múltiplos
 ## slots, sem versionamento, sem infraestrutura de eventos nova.
 
+## FASE 23.1 (Infraestrutura de Testes): preload() por caminho, nunca o
+## identificador global "UserDataDirGuard" direto — mesmo motivo já
+## documentado em vários outros pontos deste projeto (um class_name
+## novo só entra no cache global de classes quando o Editor do Godot
+## escaneia o projeto).
+const UserDataDirGuardScript = preload("res://engine/testing/user_data_dir_guard.gd")
+
 var kingdom: Kingdom
 var is_initialized: bool = false
 
@@ -34,6 +41,21 @@ var _autosave_accumulator: float = 0.0
 func initialize_new_kingdom() -> void:
 	if is_initialized:
 		return
+
+	# FASE 23.1 (Infraestrutura de Testes) — 2ª linha de defesa contra o
+	# incidente real documentado em UserDataDirGuardScript: só entra em
+	# ação quando "--user-data-dir" aparece nos argumentos DE USUÁRIO
+	# (depois do separador "--" — OS.get_cmdline_user_args(), nunca um
+	# argumento de engine real: só Game/scripts/run_tests.ps1 passa esse
+	# marcador; um jogador real/build exportada nunca o passa, então
+	# isto nunca afeta o jogo real). Cobre qualquer ferramenta de
+	# depuração presente ou futura que acabe chamando
+	# initialize_new_kingdom() transitivamente (a grande maioria
+	# instancia uma cena real de produção), sem precisar lembrar de
+	# repetir a guarda em cada arquivo novo.
+	if UserDataDirGuardScript.should_enforce_from_cmdline(OS.get_cmdline_user_args()):
+		if UserDataDirGuardScript.abort_if_unsafe(get_tree()):
+			return
 
 	kingdom = _load_or_create_kingdom()
 

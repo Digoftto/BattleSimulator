@@ -2,6 +2,13 @@ extends Node
 ## TestMain (F-001, Etapa 0/1) — ponto de entrada headless da nova
 ## suíte de testes nativa.
 ##
+## FASE 23.1 (Infraestrutura de Testes): preload() por caminho (nunca o
+## identificador global "UserDataDirGuard" direto) — mesmo motivo já
+## documentado em vários outros pontos deste projeto (um class_name
+## novo só entra no cache global de classes quando o Editor do Godot
+## escaneia o projeto, o que nunca acontece numa execução --headless).
+const UserDataDirGuardScript = preload("res://engine/testing/user_data_dir_guard.gd")
+##
 ## Uso:
 ##   godot --headless --path Game res://tests/test_main.tscn
 ##   godot --headless --path Game res://tests/test_main.tscn -- --suite=soldo
@@ -52,6 +59,14 @@ extends Node
 ## segunda foi migrada, como canônica (ver test_initial_mine_no_conquest.gd).
 
 func _ready() -> void:
+	# FASE 23.1 (Infraestrutura de Testes) — defesa de última linha:
+	# aborta ANTES de qualquer outra coisa se user:// não for um
+	# diretório isolado reconhecido (ver user_data_dir_guard.gd para o
+	# incidente real que motivou isto). Nunca prosseguir além daqui se
+	# abortou.
+	if UserDataDirGuardScript.abort_if_unsafe(get_tree()):
+		return
+
 	# Mesma inicialização que bootstrap.gd sempre fez incondicionalmente
 	# antes de qualquer validação (Sprint 1) — necessária porque alguns
 	# fluxos de engine (ex.: ExpeditionRuntime.attempt_current_fase(),
@@ -184,6 +199,7 @@ func _ready() -> void:
 	runner.register("acampamento_decision", "validate_acampamento_decision", preload("res://tests/unit/test_acampamento_decision.gd").run)
 	runner.register("affinity_replay_panel", "validate_affinity_replay_panel", preload("res://tests/unit/test_affinity_replay_panel.gd").run)
 	runner.register("battle_replay_persistence", "validate_battle_replay_persistence", preload("res://tests/unit/test_battle_replay_persistence.gd").run)
+	runner.register("user_data_dir_guard", "validate_user_data_dir_guard", preload("res://tests/unit/test_user_data_dir_guard.gd").run)
 
 	var suite_filter: String = _arg_value("--suite=")
 	var test_filter: String = _arg_value("--test=")
