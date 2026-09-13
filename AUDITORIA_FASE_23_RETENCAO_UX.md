@@ -281,6 +281,35 @@ Resumo (relatório completo já entregue na conversa): a mecânica de Minas Regi
 **Esforço:** Médio (sem novo sistema de combate/replay, mas exige decisão de armazenamento + serialização + ajuste de API do View + UX do ponto de acesso).
 **Critério de aceite futuro:** jogador seleciona qualquer Fase já concluída (vitória ou derrota) no histórico de PvE e consegue clicar "REVER BATALHA", vendo a reprodução visual real, idêntica à que ocorreu.
 
+**STATUS: IMPLEMENTADO (Item #17, revisão final aprovada).** Decisões
+de design que estavam pendentes acima, agora resolvidas:
+
+> **POLÍTICA MVP:**
+> 15 replays globais mais recentes.
+
+Armazenamento **global** (`Kingdom.battle_replays`, não por
+Expedição/Trilha), limite `Kingdom.MAX_STORED_BATTLE_REPLAYS = 15`,
+expurgo FIFO determinístico (o mais antigo cai primeiro). Medido em
+produção: ~226 KB por replay no pior caso (64 turnos) — ≈3,4 MB
+adicionais no save no pior caso com os 15 replays cheios. Nunca
+re-simula (persiste o log de eventos gravado por
+`CombatReplayCollector`, exatamente como o item de "Decisões de design
+pendentes" acima já apontava como a única estratégia confiável).
+Vitória e derrota são gravadas de forma idêntica, nunca filtradas.
+Reidentificação por `replay_id` (contador monotônico do Kingdom) —
+nunca reaproveita `CombatState.battle_id`, que não é seguro entre
+sessões. Acesso pela UI: clique real no nó de Fase em `pve_panel.gd`
+(quando `fase_history[fase]` tem `replay_id`) abre a mesma
+`CombatReplayView` já existente — nunca um segundo visualizador.
+
+> **DECISÃO FUTURA:**
+> reavaliar retenção por Expedição/Trilha caso o histórico PvE evolua.
+
+Se o histórico de PvE crescer em importância (ex.: múltiplas
+Expedições simultâneas de fato competindo pelo mesmo teto de 15
+replays globais), reavaliar limite por Expedição/Trilha em vez de
+global. Não implementado agora — fora do escopo desta revisão.
+
 ---
 
 ### F23-18 — Affinity visível em tempo real durante a batalha

@@ -120,6 +120,17 @@ func get_card(card_name: String) -> CardResource:
 	return null
 
 
+## Auditoria pré-pré-alfa (item #17, persistência de replay): mesmo
+## padrão de get_card() — battlefields já é carregado por
+## load_database(), CombatState.battlefield só precisa ser reconstruído
+## por NOME ao carregar um replay salvo (nunca recriado/inventado).
+func get_battlefield(battlefield_name: String) -> BattlefieldResource:
+	for battlefield: BattlefieldResource in battlefields:
+		if battlefield.battlefield_name == battlefield_name:
+			return battlefield
+	return null
+
+
 func get_cards_by_faction(faction: String) -> Array[CardResource]:
 	var result: Array[CardResource] = []
 	for card: CardResource in cards:

@@ -60,6 +60,14 @@ var _camp_overlay: Control = null
 var _mine_overlay: Control = null
 var _tick_timer: Timer = null
 
+## Auditoria pré-pré-alfa (item #17, Replay de Fases PvE): true enquanto
+## um CombatReplayView de "REVER" está na árvore, aguardando
+## replay_finished — nunca guardado num Control próprio como
+## _camp_overlay/_mine_overlay porque a própria CombatReplayView já se
+## remove sozinha (view.queue_free() em _on_fase_replay_pressed()); só
+## serve pra impedir abrir um 2º REVER por cima do primeiro.
+var _replay_view_active: bool = false
+
 ## Baseline do tamanho de history_log por Expedição — usado só para
 ## detectar "uma tentativa automática acabou de acontecer" (o gatilho do
 ## banner do tutorial TUT-001 Passo 4, que antes dependia do clique
@@ -1054,6 +1062,22 @@ func _build_fase_node(expedition: ExpeditionRuntime, state: Dictionary) -> Contr
 		# administração do Acampamento (Squad/Editor de Exército).
 		node.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		node.gui_input.connect(_on_camp_node_gui_input.bind(expedition, fase), CONNECT_DEFERRED)
+	else:
+		# Auditoria pré-pré-alfa (item #17, Replay de Fases PvE, vitória
+		# E derrota): NUNCA condicionado a "is_passed" — depois de uma
+		# derrota total, current_fase volta ao último Acampamento
+		# (ExpeditionRuntime.attempt_current_fase()), o que pode fazer
+		# uma Fase já vencida (com histórico e replay reais) virar
+		# "is_current" de novo, nunca mais "is_passed". O REVER precisa
+		# continuar disponível mesmo assim — depende só de
+		# fase_history[fase] de fato ter um "replay_id" (save anterior a
+		# esta funcionalidade, ou replay já expurgado pelo limite de
+		# armazenamento, nunca tem) — nunca abre um REVER pra um replay
+		# que não existe mais.
+		var history: Variant = state["history"]
+		if history != null and (history as Dictionary).has("replay_id"):
+			node.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+			node.gui_input.connect(_on_fase_node_gui_input.bind(expedition, (history as Dictionary)["replay_id"]), CONNECT_DEFERRED)
 
 	return node
 
@@ -1083,6 +1107,52 @@ func _on_camp_node_gui_input(event: InputEvent, expedition: ExpeditionRuntime, f
 		if fase > expedition.current_fase:
 			return
 		_open_camp_overlay(expedition)
+
+
+func _on_fase_node_gui_input(event: InputEvent, expedition: ExpeditionRuntime, replay_id: String) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		_on_fase_replay_pressed(expedition, replay_id)
+
+
+## Auditoria pré-pré-alfa (item #17, Replay de Fases PvE — vitórias e
+## derrotas): abre a MESMA CombatReplayView já usada por
+## _play_battle_replays() (Conquista de Mina) — nunca um segundo
+## visualizador. O par {state, collector} vem de
+## BattleReplayRecord.from_persisted_dict(), reconstruído por NOME
+## (GameDatabase.get_card()/get_battlefield()) a partir do que foi
+## realmente gravado — nunca uma re-simulação de CombatEngine (Silêncio
+## usa RNG não-seedada, tornar isso não-confiável é justamente por que
+## este item existe).
+func _on_fase_replay_pressed(expedition: ExpeditionRuntime, replay_id: String) -> void:
+	if _camp_overlay != null or _mine_overlay != null or _army_editor_overlay != null or _replay_view_active:
+		return
+	var record: Dictionary = KingdomState.kingdom.battle_replays.get(replay_id, {})
+	if record.is_empty():
+		# Save antigo/replay já expurgado pelo limite de armazenamento
+		# entre o momento do hover e o clique — degrada silenciosamente
+		# (o hint só aparece quando replay_id existia ao abrir o balão).
+		return
+
+	_replay_view_active = true
+	_stop_tick_timer()
+
+	var reconstructed: Dictionary = preload("res://engine/combat/battle_replay_record.gd").from_persisted_dict(record)
+	var view = load("res://scenes/combat/combat_replay_view.tscn").instantiate()
+	view.combat_state = reconstructed["state"]
+	view.replay_collector = reconstructed["collector"]
+	view.player_side = reconstructed["player_side"]
+	if replay_speed_override >= 0.0:
+		view.DELAY_BETWEEN_EVENTS_SECONDS = replay_speed_override
+		view.auto_continue_when_finished = true
+	view.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(view)
+	await view.replay_finished
+	view.queue_free()
+
+	_replay_view_active = false
+	if _screen_state == ScreenState.TRILHA_MAP:
+		_start_tick_timer()
+	refresh()
 
 
 ## Marcador de Mina (F-020, decisão 5, preservada na Fase 20.3): nenhum
@@ -1206,6 +1276,20 @@ func _on_fase_node_mouse_entered(state: Dictionary) -> void:
 
 			if not player_cards.is_empty():
 				_battle_window_vbox.add_child(_build_formation_grid(player_cards))
+
+	# Auditoria pré-pré-alfa (item #17): só um texto informativo dentro
+	# do balão — nunca clicável (_battle_window_vbox usa
+	# MOUSE_FILTER_IGNORE de propósito, ver docstring da seção). O clique
+	# de verdade acontece no próprio nó pequeno da Fase, já sob o cursor
+	# (node.gui_input, ligado em _build_fase_node() apenas quando existe
+	# um replay_id persistido).
+	if history.has("replay_id"):
+		_battle_window_vbox.add_child(_make_gold_separator())
+		var rever_hint := Label.new()
+		rever_hint.text = "[REVER] Clique nesta Fase para assistir à batalha novamente."
+		rever_hint.autowrap_mode = TextServer.AUTOWRAP_WORD
+		_style_plain(rever_hint, 11, HUD_ACCENT)
+		_battle_window_vbox.add_child(rever_hint)
 
 	_battle_window.visible = true
 	# Deferido: o tamanho real do painel só fica correto depois que o

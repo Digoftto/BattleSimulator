@@ -153,6 +153,13 @@ static func _kingdom_to_dict(kingdom: Kingdom) -> Dictionary:
 		"active_expeditions": _expeditions_to_array(kingdom.active_expeditions, kingdom.armies) + kingdom._pending_expedition_saves.duplicate(true),
 		"progress_flags": kingdom.progress_flags.duplicate(),
 		"tutorial_step": kingdom.tutorial_step,
+		# Auditoria pré-pré-alfa (item #17): battle_replays já é
+		# 100% JSON-safe (BattleReplayRecord.to_persistable_dict()) —
+		# nenhuma conversão adicional necessária aqui, mesmo padrão de
+		# fase_history (Dictionary plano salvo direto).
+		"battle_replays": kingdom.battle_replays.duplicate(true),
+		"battle_replay_order": kingdom.battle_replay_order.duplicate(),
+		"next_replay_id_counter": kingdom.next_replay_id_counter,
 	}
 
 
@@ -560,6 +567,16 @@ static func _dict_to_kingdom(data: Dictionary, kingdom: Kingdom) -> void:
 	kingdom.generation_points = data.get("generation_points", 0)
 	kingdom.raw_resources = data.get("raw_resources", {}).duplicate()
 	kingdom.building_reserved_resources = data.get("building_reserved_resources", {}).duplicate(true)
+
+	# Auditoria pré-pré-alfa (item #17): ausentes em saves anteriores a
+	# esta funcionalidade — default {}/[]/1 preserva o carregamento
+	# normal desses saves (nenhum replay disponível, nunca um erro).
+	kingdom.battle_replays = data.get("battle_replays", {}).duplicate(true)
+	var replay_order: Array[String] = []
+	for replay_id in data.get("battle_replay_order", []):
+		replay_order.append(replay_id)
+	kingdom.battle_replay_order = replay_order
+	kingdom.next_replay_id_counter = data.get("next_replay_id_counter", 1)
 
 	kingdom.commanders.clear()
 	for entry in data.get("commanders", []):

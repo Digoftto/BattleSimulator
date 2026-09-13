@@ -183,6 +183,7 @@ func _ready() -> void:
 	runner.register("academia_fila_card_name_rendering", "validate_academia_fila_card_name_rendering", preload("res://tests/unit/test_academia_fila_card_name_rendering.gd").run)
 	runner.register("acampamento_decision", "validate_acampamento_decision", preload("res://tests/unit/test_acampamento_decision.gd").run)
 	runner.register("affinity_replay_panel", "validate_affinity_replay_panel", preload("res://tests/unit/test_affinity_replay_panel.gd").run)
+	runner.register("battle_replay_persistence", "validate_battle_replay_persistence", preload("res://tests/unit/test_battle_replay_persistence.gd").run)
 
 	var suite_filter: String = _arg_value("--suite=")
 	var test_filter: String = _arg_value("--test=")

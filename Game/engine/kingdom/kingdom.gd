@@ -687,6 +687,61 @@ func all_mines() -> Array[Mina]:
 	return result
 
 
+## --- Replay persistido de Fases PvE (Auditoria pré-pré-alfa, item #17) ---
+##
+## Armazenamento GLOBAL (não por Expedição) — decisão de design
+## explícita: o Reino já suporta múltiplas Expedições simultâneas
+## (active_expeditions, sem limite arquitetural), então um
+## armazenamento por Expedição exigiria decidir o que acontece aos
+## replays quando uma Expedição é concluída/removida — um armazenamento
+## global evita essa questão inteiramente e é mais simples de raciocinar.
+##
+## battle_replays: replay_id (String) -> Dictionary JSON-safe
+## (BattleReplayRecord.to_persistable_dict()). battle_replay_order:
+## ordem de inserção (mais antigo primeiro) — único mecanismo de
+## expurgo: ao exceder MAX_STORED_BATTLE_REPLAYS, remove o replay_id
+## mais antigo, nunca por vitória/derrota (ambas igualmente elegíveis a
+## expurgo, por decisão explícita — replay é uma janela recente, não
+## histórico permanente).
+##
+## Limite medido, não assumido: um replay do pior caso (64 turnos,
+## COMBAT_RULES.md, "empate por limite") mede ~167KB em JSON (medido
+## nesta auditoria). 15 replays no pior caso ~= 2,5MB — orçamento
+## deliberadamente conservador (baixo uso de save é prioridade
+## explícita), suficiente pra rever várias batalhas recentes sem
+## crescer sem controle ao longo de uma Trilha de até 9.000 Fases.
+const MAX_STORED_BATTLE_REPLAYS: int = 15
+
+var battle_replays: Dictionary = {}
+var battle_replay_order: Array[String] = []
+var next_replay_id_counter: int = 1
+
+
+## Registra um replay já convertido para Dictionary persistível
+## (BattleReplayRecord.to_persistable_dict(), já com "replay_id"
+## preenchido a partir de generate_replay_id() abaixo) e aplica o
+## expurgo do mais antigo se necessário.
+func record_battle_replay(record: Dictionary) -> void:
+	var replay_id: String = record["replay_id"]
+	battle_replays[replay_id] = record
+	battle_replay_order.append(replay_id)
+
+	while battle_replay_order.size() > MAX_STORED_BATTLE_REPLAYS:
+		var oldest_id: String = battle_replay_order.pop_front()
+		battle_replays.erase(oldest_id)
+
+
+## ID único e persistente-seguro (nunca Time.get_ticks_usec()-based como
+## CombatState.battle_id, que reseta a cada processo e pode colidir
+## entre sessões diferentes) — contador monotônico do próprio Reino,
+## nunca reaproveitado, mesma convenção de next_card_instance_id/
+## next_commander_instance_id abaixo.
+func generate_replay_id() -> String:
+	var id: String = "replay_%d" % next_replay_id_counter
+	next_replay_id_counter += 1
+	return id
+
+
 ## Contador para atribuir instance_id ao Comandante — nunca reaproveitado.
 var next_commander_instance_id: int = 1
 

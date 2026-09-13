@@ -12,6 +12,13 @@ extends RefCounted
 
 enum Status { EM_ANDAMENTO, CONCLUIDA, ENCERRADA }
 
+## preload() por caminho (nunca o identificador global "BattleReplayRecord"
+## direto) — mesmo motivo já documentado em comandantes_panel.gd: um
+## class_name recém-criado só entra no cache global de classes do Godot
+## depois de o projeto ser reaberto/rescaneado pelo Editor, o que nunca
+## acontece numa execução --headless.
+const BattleReplayRecordScript = preload("res://engine/combat/battle_replay_record.gd")
+
 ## Política de Acampamento (PvE.md, "Política de Acampamento") —
 ## configurada previamente pelo jogador, define o comportamento da
 ## Expedição ao alcançar um Acampamento.
@@ -285,6 +292,19 @@ func _arrive_at_camp_without_combat() -> PhaseResult:
 ## depois (o jogador pode reeditar a Formação no Acampamento), então
 ## precisa ser fotografado agora, não recalculado depois. Sobrescreve
 ## qualquer registro anterior da mesma Fase.
+##
+## Auditoria pré-pré-alfa (item #17): também persiste o REPLAY real
+## desta tentativa (BattleReplayRecord, Kingdom.record_battle_replay())
+## — vitória e derrota igualmente, nunca filtrado por result.victory.
+## Usa result.battle_replays[-1] (a ÚLTIMA tentativa de Formação real
+## desta resolução — a que efetivamente decidiu a Fase, vitória ou
+## esgotamento do Squad) como o replay representativo; nunca re-simula
+## nada, só embrulha o {"state","collector"} que PhaseResolver já
+## produziu de verdade. RESULTADO (victory/defeat_reason, já gravado
+## acima) e REPLAY (o que aconteceu) são dados distintos, gravados
+## juntos aqui mas nunca fundidos: fase_history[fase] só GANHA um
+## "replay_id" apontando pro registro real em kingdom.battle_replays,
+## nunca duplica o conteúdo do replay dentro de fase_history.
 func _record_fase_history(fase: int, entry: EnemyArmyEntry, result: PhaseResult) -> void:
 	var data: Dictionary = {
 		"enemy_id": entry.id,
@@ -304,6 +324,24 @@ func _record_fase_history(fase: int, entry: EnemyArmyEntry, result: PhaseResult)
 		data["player_army_name"] = winning_army.army_name
 		data["player_formation_name"] = result.winning_formation
 		data["player_formation_card_names"] = _card_names_for(winning_army.get_formation(result.winning_formation))
+
+	# Sem nenhuma tentativa real (ex: todas as Formações bloqueadas pela
+	# Doutrina do Comandante antes de qualquer combate) — nada a
+	# reproduzir, nunca inventa um replay vazio.
+	if not result.battle_replays.is_empty():
+		var kingdom: Kingdom = KingdomState.kingdom
+		var replay_id: String = kingdom.generate_replay_id()
+		var metadata: Dictionary = {
+			"replay_id": replay_id,
+			"fase": fase,
+			"territory_id": territory.id,
+			"victory": result.victory,
+			"created_unix": GameClock.now_unix(),
+			"player_side": 0,  # PvE: attempt_army sempre é side 0 em CombatEngine.initialize() (PhaseResolver.resolve()).
+		}
+		var record: Dictionary = BattleReplayRecordScript.to_persistable_dict(result.battle_replays[-1], metadata)
+		kingdom.record_battle_replay(record)
+		data["replay_id"] = replay_id
 
 	fase_history[fase] = data
 
