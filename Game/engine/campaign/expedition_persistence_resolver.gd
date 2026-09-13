@@ -61,6 +61,16 @@ static func _hydrate_one(data: Dictionary, kingdom: Kingdom) -> ExpeditionRuntim
 	expedition.acampamento_policy = data.get("acampamento_policy", ExpeditionRuntime.AcampamentoPolicy.AGUARDAR_RECUPERACAO_TOTAL) as ExpeditionRuntime.AcampamentoPolicy
 	expedition.energy_recovery_threshold_percent = data.get("energy_recovery_threshold_percent", 0.4)
 	expedition.is_waiting_at_acampamento = data.get("is_waiting_at_acampamento", false)
+	# Compatibilidade com saves anteriores à auditoria pré-pré-alfa (sem
+	# "camp_state" gravado): nunca reconstrói AWAITING_DECISION por
+	# padrão (apresentaria uma escolha potencialmente já obsoleta) — se
+	# o save antigo já estava parado (is_waiting_at_acampamento true,
+	# sempre por derrota/Energia esgotada nesse código antigo, já que a
+	# política automática nunca deixava essa flag persistir true),
+	# reconstrói como FORCED_UNTIL_FULL (só espera Energia plena, nunca
+	# uma escolha inventada); senão, NONE.
+	var default_camp_state: int = ExpeditionRuntime.CampState.FORCED_UNTIL_FULL if expedition.is_waiting_at_acampamento else ExpeditionRuntime.CampState.NONE
+	expedition.camp_state = data.get("camp_state", default_camp_state) as ExpeditionRuntime.CampState
 	expedition.last_tick_unix = data.get("last_tick_unix", 0)
 
 	var history: Array[String] = []

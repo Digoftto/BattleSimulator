@@ -181,6 +181,7 @@ func _ready() -> void:
 	runner.register("bestiario_energy_soldo", "validate_bestiario_energy_soldo", preload("res://tests/unit/test_bestiario_energy_soldo.gd").run)
 	runner.register("command_center_glow_evolution_tutorial", "validate_command_center_glow_evolution_tutorial", preload("res://tests/unit/test_command_center_glow_evolution_tutorial.gd").run)
 	runner.register("academia_fila_card_name_rendering", "validate_academia_fila_card_name_rendering", preload("res://tests/unit/test_academia_fila_card_name_rendering.gd").run)
+	runner.register("acampamento_decision", "validate_acampamento_decision", preload("res://tests/unit/test_acampamento_decision.gd").run)
 
 	var suite_filter: String = _arg_value("--suite=")
 	var test_filter: String = _arg_value("--test=")

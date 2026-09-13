@@ -43,19 +43,28 @@ const MAX_CATCHUP_ATTEMPTS_PER_SYNC: int = 10000
 
 static func sync(kingdom: Kingdom, now_unix: int) -> void:
 	for expedition: ExpeditionRuntime in kingdom.active_expeditions:
-		_tick_one(expedition, now_unix)
+		_tick_one(expedition, kingdom, now_unix)
 
 
-static func _tick_one(expedition: ExpeditionRuntime, now_unix: int) -> void:
+static func _tick_one(expedition: ExpeditionRuntime, kingdom: Kingdom, now_unix: int) -> void:
 	if expedition.status != ExpeditionRuntime.Status.EM_ANDAMENTO:
 		return
 
 	if expedition.is_waiting_at_acampamento:
-		# Evita uma rajada de tentativas no instante em que o jogador
-		# manda "Continuar" depois de ficar parado por muito tempo —
-		# o relógio da Expedição só volta a contar a partir de agora.
-		expedition.last_tick_unix = now_unix
-		return
+		# Auditoria pré-pré-alfa: antes de aceitar a parada, tenta
+		# liberar RESTING_UNTIL_FULL/FORCED_UNTIL_FULL automaticamente
+		# assim que a Energia real (Army.sync_energy_recovery(), nunca
+		# uma fórmula nova) atingir o máximo — AWAITING_DECISION nunca é
+		# afetado (guardado dentro do próprio método: exige sempre uma
+		# ação explícita do jogador, não importa quanta Energia haja).
+		# Se liberar agora, cai direto no resto desta função na MESMA
+		# passagem de sync(), sem esperar a chamada seguinte.
+		if not expedition.try_release_camp_wait_if_fully_rested(now_unix, kingdom.energy_nucleus_level):
+			# Evita uma rajada de tentativas no instante em que a marcha
+			# é liberada depois de ficar parada por muito tempo — o
+			# relógio da Expedição só volta a contar a partir de agora.
+			expedition.last_tick_unix = now_unix
+			return
 
 	# BUG REAL encontrado e corrigido durante este teste (achado real, não
 	# hipotético): last_tick_unix == 0 é o sentinela "nunca tentou

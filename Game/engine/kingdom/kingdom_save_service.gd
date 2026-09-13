@@ -482,6 +482,7 @@ static func _expedition_to_dict(expedition: ExpeditionRuntime, all_armies: Array
 		"acampamento_policy": expedition.acampamento_policy,
 		"energy_recovery_threshold_percent": expedition.energy_recovery_threshold_percent,
 		"is_waiting_at_acampamento": expedition.is_waiting_at_acampamento,
+		"camp_state": expedition.camp_state,
 		"last_tick_unix": expedition.last_tick_unix,
 		"history_log": expedition.history_log.duplicate(),
 		"fase_history": fase_history_dict,

@@ -48,6 +48,16 @@ static func run(ctx: TestRunner.Context) -> bool:
 			log_mentions_no_combat = true
 	ctx.check(log_mentions_no_combat, "O log deve registrar explicitamente que o Acampamento foi estabelecido sem combate (log completo: %s)" % str(expedition.history_log))
 
+	# Auditoria pré-pré-alfa: desde que TODO Acampamento (com ou sem
+	# combate) passou a aguardar uma decisão real do jogador
+	# (AWAITING_DECISION, nunca mais resolvido sozinho pela Política
+	# antiga), attempt_current_fase() bloqueia até uma escolha explícita
+	# — sem isso, a pré-condição abaixo (vencer a Fase 999) nunca
+	# rodaria. Escolher Continuar aqui é só destravar o teste para a
+	# parte 2 (Chefe Regional), nunca uma mudança na regra sendo testada.
+	ctx.check(expedition.camp_state == ExpeditionRuntime.CampState.AWAITING_DECISION, "Pré-condição: o Acampamento sem combate também deve aguardar decisão (AWAITING_DECISION)")
+	expedition.choose_continue_immediately()
+
 	# Fase 1000: Chefe Regional, também Acampamento — continua exigindo
 	# vitória real (comportamento pré-existente, inalterado).
 	expedition.current_fase = 999

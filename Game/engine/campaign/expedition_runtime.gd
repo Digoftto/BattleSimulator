@@ -38,11 +38,38 @@ var status: Status = Status.EM_ANDAMENTO
 var acampamento_policy: AcampamentoPolicy = AcampamentoPolicy.AGUARDAR_RECUPERACAO_TOTAL
 var energy_recovery_threshold_percent: float = 0.4
 
-## True quando a Expedição está parada em um Acampamento aguardando
-## decisão manual do jogador (política AGUARDAR_ORDEM). Nenhuma outra
-## política deixa a Expedição neste estado — todas as demais se
-## resolvem sozinhas no momento em que o Acampamento é estabelecido.
+## True quando a Expedição está parada em um Acampamento por qualquer
+## motivo (ver CampState abaixo) — nunca avança sozinha enquanto true.
 var is_waiting_at_acampamento: bool = false
+
+## Estado da decisão no Acampamento atual (auditoria pré-pré-alfa,
+## decisão explícita do dono do projeto: a escolha Continuar/Parar
+## acontece de novo em CADA Acampamento — nunca uma configuração
+## permanente da Expedição; AcampamentoPolicy acima permanece intacta
+## e testada isoladamente, mas o jogo real não a consulta mais — ver
+## establish_acampamento_and_await_decision() abaixo).
+##
+## NONE: não está aguardando nada no momento.
+## AWAITING_DECISION: chegada normal a um Acampamento — aguarda o
+##   jogador escolher CONTINUAR (segue com a Energia atual, nunca a
+##   recupera) ou PARAR (passa a RESTING_UNTIL_FULL). Nunca se resolve
+##   sozinho, não importa quanta Energia o Squad já tenha.
+## RESTING_UNTIL_FULL: jogador escolheu PARAR — aguarda Energia real
+##   (Army.sync_energy_recovery(), nunca uma fórmula nova) atingir o
+##   máximo em TODOS os Exércitos do Squad; sem opção de mudar de ideia
+##   antes disso (PvE.md, "Decisão Estratégica no Acampamento": "não
+##   continua enquanto Energia < Energia máxima").
+## FORCED_UNTIL_FULL: parada obrigatória após o Squad inteiro ser
+##   incapacitado (PhaseResult.DefeatReason.COMBAT_LOSS ou
+##   ENERGY_EXHAUSTED, PvE.md §"Hierarquia de Substituição") — nunca
+##   apresenta escolha, mesmo comportamento de espera de
+##   RESTING_UNTIL_FULL.
+##
+## Ambos RESTING_UNTIL_FULL e FORCED_UNTIL_FULL são liberados
+## automaticamente assim que o Squad estiver plenamente recuperado —
+## ver ExpeditionTickResolver/try_release_camp_wait_if_fully_rested().
+enum CampState { NONE, AWAITING_DECISION, RESTING_UNTIL_FULL, FORCED_UNTIL_FULL }
+var camp_state: CampState = CampState.NONE
 
 var _battlefields: Array[BattlefieldResource]
 var _abilities_by_name: Dictionary
@@ -135,8 +162,8 @@ func attempt_current_fase() -> PhaseResult:
 	# combate para se estabelecer. Um Acampamento que coincide com um
 	# Chefe Regional (chefe_type != "") NUNCA cai aqui: continua exigindo
 	# a vitória do Chefe, e estabelecer o Acampamento ali é efeito
-	# colateral dessa vitória (was_acampamento -> establish_acampamento(),
-	# abaixo, inalterado).
+	# colateral dessa vitória (was_acampamento ->
+	# establish_acampamento_and_await_decision(), abaixo).
 	if current_fase_is_acampamento() and trilha.chefe_type(current_fase) == "":
 		return _arrive_at_camp_without_combat()
 
@@ -202,7 +229,7 @@ func attempt_current_fase() -> PhaseResult:
 			])
 
 		if was_acampamento:
-			establish_acampamento()
+			establish_acampamento_and_await_decision()
 
 		current_fase += 1
 		if current_fase > trilha.total_fases():
@@ -221,6 +248,11 @@ func attempt_current_fase() -> PhaseResult:
 		# e o recálculo de Energia (Army.sync_energy_recovery) dependem
 		# desta flag pra saber que o Exército está seguro.
 		is_waiting_at_acampamento = true
+		# Auditoria pré-pré-alfa: parada OBRIGATÓRIA (Squad inteiro
+		# incapacitado — derrota em combate OU Energia esgotada, PvE.md
+		# §"Hierarquia de Substituição") nunca apresenta a escolha
+		# Continuar/Parar — só a espera por Energia plena.
+		camp_state = CampState.FORCED_UNTIL_FULL
 		# Nenhum estado de "Formação esgotada" persiste entre Tentativas de
 		# Fase (PhaseResolver.resolve sempre reinicia o Squad do zero) —
 		# a restauração de todas as Formações já ocorre naturalmente.
@@ -230,13 +262,14 @@ func attempt_current_fase() -> PhaseResult:
 
 ## Estabelece um Acampamento comum (não coincidente com Chefe Regional)
 ## sem exigir combate — F-020, decisão 8. Espelha deliberadamente o
-## idioma já usado no ramo de vitória logo acima (establish_acampamento()
-## seguido de incremento incondicional de current_fase), para que
-## resume_from_acampamento() nunca reencontre esta mesma Fase depois de
-## "Continuar" (current_fase já avançou antes do jogador ver a parada).
+## idioma já usado no ramo de vitória logo acima
+## (establish_acampamento_and_await_decision() seguido de incremento
+## incondicional de current_fase), para que resume_from_acampamento()
+## nunca reencontre esta mesma Fase depois de "Continuar" (current_fase
+## já avançou antes do jogador ver a parada).
 func _arrive_at_camp_without_combat() -> PhaseResult:
 	history_log.append("Fase %d: Acampamento — estabelecido sem combate." % current_fase)
-	establish_acampamento()
+	establish_acampamento_and_await_decision()
 	current_fase += 1
 	if current_fase > trilha.total_fases():
 		status = Status.CONCLUIDA
@@ -299,17 +332,41 @@ func _entry_category_for_current_fase() -> EnemyArmyEntry.Category:
 
 ## Estabelece a Fase atual como um novo Acampamento (checkpoint
 ## permanente) e aplica a Política de Acampamento configurada.
+##
+## MECANISMO ANTIGO (F-020), preservado intacto e ainda testado
+## isoladamente por test_acampamento_policies.gd — desde a auditoria
+## pré-pré-alfa (decisão explícita do dono do projeto: a escolha deixou
+## de ser uma configuração feita uma vez para toda a Expedição e passou
+## a ser uma decisão real repetida em CADA Acampamento, ver CampState),
+## nenhum fluxo real de jogo chama mais este método diretamente — os 2
+## pontos reais de chegada a um Acampamento (attempt_current_fase(),
+## _arrive_at_camp_without_combat()) chamam
+## establish_acampamento_and_await_decision() abaixo. Nada foi deletado
+## para não quebrar o teste existente; a Política simplesmente não é
+## mais consultada pelo jogo real.
 func establish_acampamento() -> void:
 	last_acampamento_fase = current_fase
 	history_log.append("Acampamento estabelecido na Fase %d." % current_fase)
 	_apply_acampamento_policy()
 
 
-## Aplica a Política de Acampamento ativa (PvE.md). Apenas
-## AGUARDAR_ORDEM deixa a Expedição parada — as demais se resolvem
-## imediatamente (recuperando ou não a Energia, conforme a política),
-## já que a simulação de passagem real de tempo pertence a uma Sprint
-## própria (Ritmo/Tempo da Expedição), fora de escopo aqui.
+## Estabelece a Fase atual como um novo Acampamento (checkpoint
+## permanente) — SEMPRE aguarda uma decisão real do jogador
+## (AWAITING_DECISION), nunca resolve sozinho (auditoria pré-pré-alfa,
+## decisão explícita do dono do projeto: PvE.md, "Decisão Estratégica
+## no Acampamento" — "Ao atingir... um Acampamento, o jogador pode:
+## Continuar Imediatamente... ou Permanecer em Repouso"). Chamado pelos
+## 2 pontos reais de chegada a um Acampamento, no lugar de
+## establish_acampamento() (preservado acima, intocado, só para
+## test_acampamento_policies.gd).
+func establish_acampamento_and_await_decision() -> void:
+	last_acampamento_fase = current_fase
+	history_log.append("Acampamento estabelecido na Fase %d." % current_fase)
+	is_waiting_at_acampamento = true
+	camp_state = CampState.AWAITING_DECISION
+	history_log.append("Aguardando decisão do jogador: Continuar ou Parar.")
+
+
 func _apply_acampamento_policy() -> void:
 	match acampamento_policy:
 		AcampamentoPolicy.SEGUIR_AUTOMATICO:
@@ -332,15 +389,79 @@ func _apply_acampamento_policy() -> void:
 
 
 ## Ordem manual do jogador para continuar a partir de um Acampamento
-## onde a Expedição estava parada (política AGUARDAR_ORDEM). Recupera
-## a Energia do Squad antes de liberar a marcha — o repouso que
-## justificava a espera já aconteceu.
+## onde a Expedição estava parada (política AGUARDAR_ORDEM, mecanismo
+## ANTIGO — ver nota em establish_acampamento()). Preservado intacto e
+## ainda testado isoladamente por test_acampamento_policies.gd; o jogo
+## real não chama mais este método — usa choose_continue_immediately()
+## abaixo. Recupera a Energia do Squad antes de liberar a marcha — o
+## repouso que justificava a espera já aconteceu.
 func resume_from_acampamento() -> void:
 	if not is_waiting_at_acampamento:
 		return
 	_recover_squad_energy()
 	is_waiting_at_acampamento = false
 	history_log.append("Jogador ordenou a continuação a partir do Acampamento (Fase %d) — Energia recuperada." % current_fase)
+
+
+## Decisão do jogador de CONTINUAR imediatamente a partir de um
+## Acampamento (auditoria pré-pré-alfa) — só válida a partir de
+## AWAITING_DECISION, nunca de RESTING_UNTIL_FULL/FORCED_UNTIL_FULL
+## (essas exigem Energia plena antes de qualquer avanço, sem opção de
+## ignorar a espera). NUNCA recupera Energia — "utiliza a Energia
+## disponível naquele momento; não espera chegar a 100%" — segue com o
+## valor atual, seja ele qual for. Chamado pelo fluxo real do jogo, no
+## lugar de resume_from_acampamento() (preservado acima, intocado, só
+## para test_acampamento_policies.gd).
+func choose_continue_immediately() -> void:
+	if camp_state != CampState.AWAITING_DECISION:
+		return
+	is_waiting_at_acampamento = false
+	camp_state = CampState.NONE
+	history_log.append("Jogador escolheu Continuar a partir do Acampamento (Fase %d) — Energia mantida no valor atual (sem recuperação instantânea)." % current_fase)
+
+
+## Decisão do jogador de PARAR e permanecer em repouso (auditoria
+## pré-pré-alfa) — só válida a partir de AWAITING_DECISION. Nunca
+## recupera Energia diretamente: apenas transiciona para
+## RESTING_UNTIL_FULL, onde a recuperação real e contínua já acontece
+## sozinha (Kingdom.is_army_locked_for_editing() já desbloqueia o
+## Exército para Army.sync_energy_recovery() enquanto
+## is_waiting_at_acampamento for true — nenhuma lógica nova); a marcha
+## só é liberada de volta quando o Squad atingir Energia plena, nunca
+## por uma 2ª chamada a este método.
+func choose_stop_and_rest() -> void:
+	if camp_state != CampState.AWAITING_DECISION:
+		return
+	camp_state = CampState.RESTING_UNTIL_FULL
+	history_log.append("Jogador escolheu Parar e permanecer em repouso no Acampamento (Fase %d) até Energia plena." % current_fase)
+
+
+## Chamado a cada ExpeditionTickResolver.sync(), independente do
+## intervalo de 60s entre tentativas de Fase (checar Energia não é uma
+## "tentativa") — libera RESTING_UNTIL_FULL/FORCED_UNTIL_FULL
+## automaticamente assim que TODOS os Exércitos do Squad atingirem
+## Energia máxima, usando a MESMA recuperação real por tempo decorrido
+## já existente (Army.sync_energy_recovery(), nunca uma fórmula nova).
+## AWAITING_DECISION nunca é afetado (guardado abaixo) — só uma ação
+## explícita do jogador (resume_from_acampamento()/choose_stop_and_rest())
+## sai desse estado, não importa quanta Energia haja.
+## Retorna true se a marcha foi liberada agora nesta chamada — quem
+## chama pode então tentar a próxima Fase na mesma passagem de sync(),
+## sem esperar a chamada seguinte.
+func try_release_camp_wait_if_fully_rested(now_unix: int, energy_nucleus_level: int) -> bool:
+	if camp_state != CampState.RESTING_UNTIL_FULL and camp_state != CampState.FORCED_UNTIL_FULL:
+		return false
+
+	for army: Army in squad.armies:
+		army.sync_energy_recovery(now_unix, energy_nucleus_level)
+
+	if not _squad_all_above_threshold(1.0):
+		return false
+
+	history_log.append("Energia plena recuperada no Acampamento (Fase %d) — marcha liberada automaticamente." % current_fase)
+	is_waiting_at_acampamento = false
+	camp_state = CampState.NONE
+	return true
 
 
 func _recover_squad_energy() -> void:

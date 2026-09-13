@@ -1396,7 +1396,7 @@ func _build_camp_overlay(expedition: ExpeditionRuntime) -> Control:
 	window.add_child(vbox)
 
 	var camp_hint: Control = _build_inline_hint(
-		"Aqui a marcha para: seu Exército recupera Energia (ou de acordo com a Política escolhida) e você pode reorganizar a Formação antes de seguir.",
+		"Aqui a marcha para: você escolhe Continuar (com a Energia atual) ou Parar (aguardar Energia plena) a cada Acampamento, e pode reorganizar a Formação antes de seguir.",
 		"tutorial_hint_acampamento_visto"
 	)
 	if camp_hint != null:
@@ -1416,19 +1416,7 @@ func _build_camp_overlay(expedition: ExpeditionRuntime) -> Control:
 	vbox.add_child(title)
 
 	_build_squad_rows(vbox, expedition)
-
-	if expedition.is_waiting_at_acampamento:
-		var continue_button := Button.new()
-		continue_button.text = "Continuar Expedição"
-		_style_button(continue_button)
-		continue_button.pressed.connect(_on_camp_continue_pressed.bind(expedition), CONNECT_DEFERRED)
-		vbox.add_child(continue_button)
-	else:
-		var info_label := Label.new()
-		info_label.text = "A Expedição já continuou automaticamente a partir deste Acampamento."
-		info_label.autowrap_mode = TextServer.AUTOWRAP_WORD
-		_style_plain(info_label, 12, HUD_MUTED_COLOR)
-		vbox.add_child(info_label)
+	_build_camp_decision_section(vbox, expedition)
 
 	var close_button := Button.new()
 	close_button.text = "Fechar"
@@ -1439,10 +1427,68 @@ func _build_camp_overlay(expedition: ExpeditionRuntime) -> Control:
 	return overlay
 
 
-## Squad do Acampamento — reordenação e Energia só editáveis enquanto a
-## Expedição está de fato parada (AGUARDAR_ORDEM); "Editar Formações"
-## sempre disponível (mesmo Editor de Exército de sempre, nunca
-## duplicado).
+## Energia (do Exército Ativo do Squad) + a decisão real do Acampamento
+## (auditoria pré-pré-alfa, ExpeditionRuntime.CampState) — nunca preenche
+## Energia sozinho, nunca apresenta os 2 botões numa parada obrigatória
+## (FORCED_UNTIL_FULL) ou já resolvida por escolha (RESTING_UNTIL_FULL).
+func _build_camp_decision_section(vbox: VBoxContainer, expedition: ExpeditionRuntime) -> void:
+	var active_army: Army = expedition.squad.armies[expedition.squad.active_index]
+
+	var energy_label := Label.new()
+	energy_label.text = "Energia: %d / %d" % [active_army.current_energy, active_army.max_energy]
+	_style_plain(energy_label, 14, HUD_TEXT_COLOR)
+	vbox.add_child(energy_label)
+
+	match expedition.camp_state:
+		ExpeditionRuntime.CampState.AWAITING_DECISION:
+			var continue_button := Button.new()
+			continue_button.text = "Continuar Expedição"
+			_style_button(continue_button)
+			continue_button.pressed.connect(_on_camp_continue_pressed.bind(expedition), CONNECT_DEFERRED)
+			vbox.add_child(continue_button)
+			var continue_caption := Label.new()
+			continue_caption.text = "Continua imediatamente com a Energia atual — não espera chegar a 100%."
+			continue_caption.autowrap_mode = TextServer.AUTOWRAP_WORD
+			_style_plain(continue_caption, 11, HUD_MUTED_COLOR)
+			vbox.add_child(continue_caption)
+
+			var stop_button := Button.new()
+			stop_button.text = "Parar Expedição"
+			_style_button(stop_button)
+			stop_button.pressed.connect(_on_camp_stop_pressed.bind(expedition), CONNECT_DEFERRED)
+			vbox.add_child(stop_button)
+			var stop_caption := Label.new()
+			stop_caption.text = "Aguarda a Energia chegar a 100% antes de continuar."
+			stop_caption.autowrap_mode = TextServer.AUTOWRAP_WORD
+			_style_plain(stop_caption, 11, HUD_MUTED_COLOR)
+			vbox.add_child(stop_caption)
+
+		ExpeditionRuntime.CampState.RESTING_UNTIL_FULL:
+			var resting_label := Label.new()
+			resting_label.text = "Você optou por permanecer em repouso. A Expedição continuará automaticamente assim que a Energia atingir o máximo."
+			resting_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+			_style_plain(resting_label, 12, HUD_MUTED_COLOR)
+			vbox.add_child(resting_label)
+
+		ExpeditionRuntime.CampState.FORCED_UNTIL_FULL:
+			var forced_label := Label.new()
+			forced_label.text = "Você precisa recuperar sua Energia antes de continuar."
+			forced_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+			_style_plain(forced_label, 12, HUD_WARNING_COLOR)
+			vbox.add_child(forced_label)
+
+		ExpeditionRuntime.CampState.NONE:
+			var resolved_label := Label.new()
+			resolved_label.text = "Este Acampamento já foi resolvido — a Expedição já seguiu adiante."
+			resolved_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+			_style_plain(resolved_label, 12, HUD_MUTED_COLOR)
+			vbox.add_child(resolved_label)
+
+
+## Squad do Acampamento — reordenação só editável enquanto a Expedição
+## está de fato parada (is_waiting_at_acampamento, qualquer CampState);
+## "Editar Formações" sempre disponível (mesmo Editor de Exército de
+## sempre, nunca duplicado).
 func _build_squad_rows(vbox: VBoxContainer, expedition: ExpeditionRuntime) -> void:
 	var squad_title := Label.new()
 	squad_title.text = "SQUAD (ORDEM DE SUBSTITUIÇÃO)"
@@ -1510,8 +1556,13 @@ func _rebuild_camp_overlay_if_open(expedition: ExpeditionRuntime) -> void:
 
 
 func _on_camp_continue_pressed(expedition: ExpeditionRuntime) -> void:
-	expedition.resume_from_acampamento()
+	expedition.choose_continue_immediately()
 	_close_camp_overlay()
+
+
+func _on_camp_stop_pressed(expedition: ExpeditionRuntime) -> void:
+	expedition.choose_stop_and_rest()
+	_rebuild_camp_overlay_if_open(expedition)
 
 
 func _on_camp_overlay_close_pressed() -> void:
