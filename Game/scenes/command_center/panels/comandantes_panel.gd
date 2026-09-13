@@ -59,6 +59,51 @@ var _roster_container: VBoxContainer
 var _expanded_commander: CommanderResource = null
 var _expanded_detail_tab: String = "historico"  # "historico" | "doutrina"
 
+## Auditoria pré-pré-alfa: "Ativar Próximo Recurso Administrativo"
+## (Expansão Administrativa, COMMAND_CENTER_PROGRESS.md) já era
+## totalmente implementado e testado (CommandCenterResolver.activate_next())
+## — achado real: o único botão que o disparava tinha sido removido da
+## apresentação junto com um botão de debug não relacionado ("[DEBUG]
+## Gerar Candidato"), deixando a mecânica sem NENHUM ponto de acesso
+## pro jogador (nunca dava pra ativar Cargo Ativo/Vaga Reserva além da
+## Exceção Inicial gratuita do Nível 1). Restaurado só o acesso — nenhum
+## resolver/regra nova.
+var _activate_next_status_text: String = ""
+
+## --- Tutorial de Comandantes (Ativo x Reserva) — auditoria pré-pré-alfa ---
+##
+## Fonte de verdade: Arquitetura/TUTORIAL.md, "Etapa 4 — O Alto-Comando"
+## (recrutar, Estado Reserva, Cargo Ativo/Vaga da Reserva) — texto
+## adaptado, nenhum conceito novo inventado. Gatilho: 1º Comandante
+## recrutado (kingdom.commanders.size() >= 1), nunca a simples abertura
+## da tela. Reaproveita TutorialHintBanner como referência de linguagem
+## visual e o mecanismo já existente de progress_flags (mesmo usado por
+## TUT-001/dicas contextuais de PG-Fragmentos) — nenhuma segunda
+## arquitetura de persistência.
+##
+## LACUNA DE REGRA REAL (não inventada, verificada em código):
+## CommissioningResolver.commission()/commission_from_pve_offer() SEMPRE
+## exigem Vaga da Reserva (nunca Cargo Ativo) — todo Comandante recém-
+## recrutado entra em Reserva, nunca Ativo automaticamente, mesmo com a
+## Exceção Inicial do Nível 1 (COMMAND_CENTER_PROGRESS.md) já concedendo
+## 1 Cargo Ativo livre e vazio. Por isso o tutorial ensina Ativo/Reserva
+## através da ação REAL "Promover" do próprio primeiro Comandante — não
+## foi alterada nenhuma regra de recrutamento (isso exigiria decisão do
+## dono do projeto, registrada no relatório final).
+var _tutorial_target_commander: CommanderResource = null
+var _tutorial_reserve_card: Control = null
+var _tutorial_promote_button: Control = null
+var _tutorial_active_card: Control = null
+var _tutorial_overlay: Control = null
+
+## preload() por caminho (nunca o nome global TutorialSpotlight direto):
+## um class_name recém-criado só entra no cache global de classes do
+## Godot depois de o projeto ser reaberto/rescaneado pelo editor real —
+## rodando headless/CLI nesta mesma sessão, o nome global ainda não
+## resolve ("Identifier not declared"), confirmado por erro real. Mesmo
+## componente, só referenciado de forma robusta independente desse cache.
+const TutorialSpotlightScript: GDScript = preload("res://scenes/tutorial/tutorial_spotlight.gd")
+
 
 func _ready() -> void:
 	if not KingdomState.is_initialized:
@@ -102,7 +147,114 @@ func _build_static_structure(kingdom: Kingdom) -> void:
 
 	_build_title(texture_rect, "COMANDANTES")
 	_build_close_button(texture_rect)
+
+	_tutorial_reserve_card = null
+	_tutorial_promote_button = null
+	_tutorial_active_card = null
+	_tutorial_target_commander = _resolve_tutorial_target_commander(kingdom)
+
 	_build_interior(texture_rect, kingdom)
+
+	_maybe_build_commander_tutorial(kingdom)
+
+
+## Comandante que o Tutorial de Comandantes (Ativo x Reserva) acompanha
+## — sempre o 1º da lista (kingdom.commanders, ordem de recrutamento).
+## null quando o tutorial não deve rodar (ainda sem nenhum Comandante,
+## já concluído, ou — caso de segurança pra um Reino já existente antes
+## desta funcionalidade — encerrado em silêncio, sem nunca aparecer).
+##
+## BUG REAL encontrado e corrigido nesta auditoria: a versão anterior
+## re-derivava o alvo pelo Estado Administrativo ATUAL (procurava quem
+## estivesse em Reserva) a cada reconstrução — um jogador que clicasse
+## em "Promover" (botão real, sempre clicável) ANTES de dispensar o
+## Passo A fazia o próprio alvo "desaparecer" (não estava mais em
+## Reserva), e o tutorial travava — nunca mostrava a confirmação
+## (Passo C), nunca marcava commander_tutorial_completed. Corrigido:
+## uma vez que o tutorial já começou de verdade (Passo A visto OU
+## promoção real já registrada), o alvo é sempre o mesmo Comandante até
+## o fim, independente do Estado Administrativo mudar DURANTE o próprio
+## tutorial (ver também a correção de prioridade em
+## _maybe_build_commander_tutorial()).
+func _resolve_tutorial_target_commander(kingdom: Kingdom) -> CommanderResource:
+	if kingdom.commanders.is_empty() or kingdom.has_progress_flag("commander_tutorial_completed"):
+		return null
+
+	var candidate: CommanderResource = kingdom.commanders[0]
+	if kingdom.has_progress_flag("commander_tutorial_step_a_seen") or kingdom.has_progress_flag("commander_tutorial_promoted"):
+		return candidate
+
+	if candidate.administrative_state == CommanderResource.AdministrativeState.RESERVE:
+		return candidate
+
+	# Comandante já Ativo sem NENHUMA flag de tutorial marcada — Reino
+	# de desenvolvimento anterior a esta funcionalidade (nunca um
+	# jogador real passando pelo fluxo normal). Encerra em silêncio.
+	kingdom.set_progress_flag("commander_tutorial_completed", true)
+	return null
+
+
+func _maybe_build_commander_tutorial(kingdom: Kingdom) -> void:
+	if _tutorial_target_commander == null:
+		return
+
+	var step_a_seen: bool = kingdom.has_progress_flag("commander_tutorial_step_a_seen")
+	var promoted: bool = kingdom.has_progress_flag("commander_tutorial_promoted")
+
+	# ORDEM DE PRIORIDADE corrigida (achado real, ver docstring de
+	# _resolve_tutorial_target_commander()): "promoted" SEMPRE vem
+	# primeiro. A ação REAL de promover pode acontecer mesmo sem o
+	# Passo A ter sido dispensado (o botão "Promover" real nunca fica
+	# bloqueado esperando o tutorial) — checar "not step_a_seen" antes
+	# travava o tutorial nesse caso, porque o Passo A não tem mais um
+	# alvo em Reserva pra destacar. Verificar "promoted" primeiro garante
+	# que o Passo C sempre apareça quando a ação real já ocorreu,
+	# independente de qual Passo o jogador viu antes.
+	if promoted:
+		if _tutorial_active_card == null:
+			return
+		_tutorial_overlay = TutorialSpotlightScript.new()
+		add_child(_tutorial_overlay)
+		_tutorial_overlay.continue_pressed.connect(_on_tutorial_step_c_continue, CONNECT_DEFERRED)
+		_tutorial_overlay.setup(
+			_tutorial_active_card,
+			"COMANDANTE ALTERADO",
+			"O novo Comandante agora está Ativo.",
+			true
+		)
+	elif not step_a_seen:
+		if _tutorial_reserve_card == null:
+			return
+		_tutorial_overlay = TutorialSpotlightScript.new()
+		add_child(_tutorial_overlay)
+		_tutorial_overlay.continue_pressed.connect(_on_tutorial_step_a_continue, CONNECT_DEFERRED)
+		_tutorial_overlay.setup(
+			_tutorial_reserve_card,
+			"COMANDANTE RECRUTADO",
+			"Este Comandante está na Reserva. Você também tem 1 Cargo de Comando Ativo livre — Comandantes Ativos são os que lideram Exércitos em combate.",
+			true
+		)
+	else:
+		if _tutorial_promote_button == null:
+			return
+		_tutorial_overlay = TutorialSpotlightScript.new()
+		add_child(_tutorial_overlay)
+		_tutorial_overlay.setup(
+			_tutorial_promote_button,
+			"TROCAR COMANDANTE",
+			"Clique em \"Promover\" para tornar este Comandante Ativo.",
+			false
+		)
+
+
+func _on_tutorial_step_a_continue() -> void:
+	KingdomState.kingdom.set_progress_flag("commander_tutorial_step_a_seen", true)
+	refresh()
+
+
+func _on_tutorial_step_c_continue() -> void:
+	KingdomState.kingdom.set_progress_flag("commander_tutorial_completed", true)
+	refresh()
 
 
 func _build_title(parent: Control, text: String) -> void:
@@ -184,6 +336,42 @@ func _build_resumo_bar(parent: Control, kingdom: Kingdom) -> void:
 
 	hbox.add_child(_make_stat_chip("Cargo Ativo", "%d / %d" % [cargo_ativo_used, cargo_ativo_cap]))
 	hbox.add_child(_make_stat_chip("Vaga Reserva", "%d / %d" % [vaga_reserva_used, vaga_reserva_cap]))
+	hbox.add_child(_build_activate_next_chip(kingdom))
+
+	if _activate_next_status_text != "":
+		var status_label := _make_centered_label(_activate_next_status_text, 10, HUD_ACCENT_SELECTED)
+		parent.add_child(status_label)
+
+
+## Chip com botão real (Expansão Administrativa, COMMAND_CENTER_PROGRESS.md):
+## mostra o próximo recurso a ser ativado (Ativo/Reserva, ordem
+## automática — nunca escolha do jogador), o custo em PG (fonte única:
+## CommandCenterProgress.pg_cost_per_activation()) e o PG disponível.
+## Nunca permite clicar sem recurso pendente ou PG suficiente.
+func _build_activate_next_chip(kingdom: Kingdom) -> Control:
+	var card := _make_card_panel()
+	var vbox := VBoxContainer.new()
+	card.add_child(vbox)
+
+	var infrastructure: Dictionary = CommandCenterProgressScript.infrastructure_at_level(kingdom.command_center_level)
+	var pending_ativo: int = infrastructure["ativo"] - kingdom.cargo_ativo_activated
+	var pending_reserva: int = infrastructure["reserva"] - kingdom.vaga_reserva_activated
+	var nothing_pending: bool = pending_ativo <= 0 and pending_reserva <= 0
+	var cost: int = CommandCenterProgressScript.pg_cost_per_activation(kingdom.command_center_level)
+	var next_type: String = "Cargo Ativo" if pending_ativo > 0 else "Vaga Reserva"
+
+	if nothing_pending:
+		vbox.add_child(_make_centered_label("Expansão Administrativa", 10, HUD_MUTED_COLOR))
+		vbox.add_child(_make_centered_label("Tudo ativado neste Nível", 11, HUD_MUTED_COLOR))
+	else:
+		vbox.add_child(_make_centered_label("Próximo: %s" % next_type, 10, HUD_MUTED_COLOR))
+		vbox.add_child(_make_centered_label("Custo: %d PG (tem %d)" % [cost, kingdom.generation_points], 11, HUD_TEXT_COLOR))
+		var activate_button := _make_small_button("Ativar")
+		activate_button.disabled = kingdom.generation_points < cost
+		activate_button.pressed.connect(_on_activate_next_pressed, CONNECT_DEFERRED)
+		vbox.add_child(activate_button)
+
+	return card
 
 
 ## --- Coluna esquerda: Candidatos. ---
@@ -334,6 +522,9 @@ func _refresh_reserva(kingdom: Kingdom) -> void:
 		column.add_theme_constant_override("separation", 4)
 		card.add_child(column)
 
+		if commander == _tutorial_target_commander:
+			_tutorial_reserve_card = card
+
 		var header_row := HBoxContainer.new()
 		header_row.add_theme_constant_override("separation", 8)
 		column.add_child(header_row)
@@ -357,6 +548,9 @@ func _refresh_reserva(kingdom: Kingdom) -> void:
 		var promote_button := _make_small_button("Promover")
 		promote_button.pressed.connect(_on_promote_pressed.bind(commander), CONNECT_DEFERRED)
 		actions_row.add_child(promote_button)
+
+		if commander == _tutorial_target_commander:
+			_tutorial_promote_button = promote_button
 
 		var active_commanders: Array[CommanderResource] = []
 		for c: CommanderResource in kingdom.commanders:
@@ -387,6 +581,9 @@ func _refresh_ativos(kingdom: Kingdom) -> void:
 		var column := VBoxContainer.new()
 		column.add_theme_constant_override("separation", 4)
 		card.add_child(column)
+
+		if commander == _tutorial_target_commander:
+			_tutorial_active_card = card
 
 		var header_row := HBoxContainer.new()
 		header_row.add_theme_constant_override("separation", 8)
@@ -541,7 +738,13 @@ func _first_occupied_recruitment_slot(kingdom: Kingdom) -> int:
 
 
 func _on_activate_next_pressed() -> void:
-	CommandCenterResolver.activate_next(KingdomState.kingdom)
+	var result: Dictionary = CommandCenterResolver.activate_next(KingdomState.kingdom)
+	if result["success"]:
+		_activate_next_status_text = "%s ativado(a)." % ("Cargo Ativo" if result["type"] == "ativo" else "Vaga da Reserva")
+	elif result["reason"] == "insufficient_pg":
+		_activate_next_status_text = "PG insuficiente para ativar."
+	elif result["reason"] == "nothing_to_activate":
+		_activate_next_status_text = "Toda a Infraestrutura deste Nível já foi ativada."
 	refresh()
 
 
@@ -568,7 +771,14 @@ func _on_decline_offer_pressed(offer: RecruitmentOffer) -> void:
 
 
 func _on_promote_pressed(commander: CommanderResource) -> void:
-	CommandCenterResolver.move_to_active(KingdomState.kingdom, commander)
+	var kingdom: Kingdom = KingdomState.kingdom
+	var result: Dictionary = CommandCenterResolver.move_to_active(kingdom, commander)
+	# Tutorial de Comandantes: a ação REAL de promover (nunca um botão
+	# "Continuar" fingindo a ação) é o que avança do passo B pro C —
+	# só quando essa promoção pertence de fato ao Comandante que o
+	# tutorial está acompanhando.
+	if result["success"] and commander == _tutorial_target_commander:
+		kingdom.set_progress_flag("commander_tutorial_promoted", true)
 	refresh()
 
 

@@ -52,7 +52,7 @@ Existe exatamente **1 Mina Inicial para cada tipo de recurso**, integrando a arq
 * **Propósito:** Introduzir o Sistema de Minas e fornecer a base econômica inicial do jogador.
 * **Requisito:** Não exige exército defensor ou Guarnição da Mina.
 * **Evolução:** Possui regras próprias de evolução, com nível máximo 4.
-* **Progressão:** Geométrica (dobra a produção por nível: 1, 2, 4, 8 por hora).
+* **Progressão:** Geométrica (dobra a produção por nível, a partir de 5/hora no Nível 1: 5, 10, 20, 40 por hora).
 
 A arquitetura permite que temporadas futuras adicionem novas regiões e minas sem modificar as regras gerais do sistema.
 

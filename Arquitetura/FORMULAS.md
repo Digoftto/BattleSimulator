@@ -59,9 +59,9 @@ fonte deste percentual.
 
 ### Mina Inicial
 
-A produção evolui em progressão geométrica (dobra a cada nível):
+A produção evolui em progressão geométrica (dobra a cada nível), com produção base de 5 Recursos/hora no Nível 1:
 
-$$P(n) = 2^{n-1}$$
+$$P(n) = 5 \times 2^{n-1}$$
 
 ### Minas das Regiões
 

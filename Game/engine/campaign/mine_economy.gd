@@ -60,8 +60,8 @@ static func region_for_mina(mina: Mina) -> Region:
 static func base_production_for_mina(mina: Mina) -> int:
 	return base_production_per_hour(region_for_mina(mina), mina.structure_level)
 ## (FORMULAS.md, "Produção das Minas"):
-## - Mina Inicial: progressão geométrica P(n) = 2^(n-1), nível máximo 4
-##   (MINES.md, "Mina Inicial").
+## - Mina Inicial: progressão geométrica P(n) = 5 × 2^(n-1), nível
+##   máximo 4 (MINES.md, "Mina Inicial").
 ## - Minas Regionais: progressão aritmética P(n) = n × P(1), onde P(1)
 ##   é 5/10/20 conforme a Região.
 static func base_production_per_hour(region: Region, level: int) -> int:
@@ -69,7 +69,7 @@ static func base_production_per_hour(region: Region, level: int) -> int:
 	match region:
 		Region.MINA_INICIAL:
 			assert(level <= 4, "MineEconomy: Mina Inicial tem nível máximo 4 (MINES.md).")
-			return int(pow(2, level - 1))
+			return 5 * int(pow(2, level - 1))
 		Region.REGIAO_1:
 			return level * 5
 		Region.REGIAO_2:

@@ -222,7 +222,32 @@ const PORTRAIT_MORTOS_VIVOS_2: Texture2D = preload("res://assets/art/commanders/
 ## como pedido, mantendo espaço de sobra pra Soldo/Energia/Afinidade e
 ## ações abaixo. COMMANDER_PORTRAIT_SIZE reduzido (era 84): o Comandante
 ## agora é deliberadamente compacto/secundário à Formação (item A.9).
-const FORMATION_CARD_WIDTH: float = 130.0
+##
+## Correção FASE 22 (revisão pós-22.3, achado real via screenshot +
+## rastreamento de vbox/scroll — nunca só leitura de código): 130.0
+## media 200px de carta (130/0,65) + 20px do rodapé de Energia/Soldo
+## (_make_composition_footer) = 220px por linha. No ScrollContainer real
+## (_detail_scroll), a área visível ANTES de qualquer rolagem começa em
+## 289px de altura na resolução mínima suportada (1152×648) — 97px já
+## consumidos pelo título "FORMAÇÃO DE COMBATE" + as 3 legendas de
+## posição especial + a dica "Passe o mouse..." (todas acima da grade),
+## sobrando só 192px pra grade. Com 220px por linha, a Linha 1 inteira
+## cabia (o card, 200px), mas o rodapé de Energia/Soldo — o elemento
+## desta própria correção — ficava 100% abaixo da dobra, invisível sem
+## rolar (nunca cortado pela metade: current_offset+200 já passava dos
+## 289px disponíveis). Reduzido para 100.0 (150px de carta + 20px de
+## rodapé = 170px) — a Linha 1 completa, COM seu rodapé de Energia/
+## Soldo, agora cabe nos 192px sem precisar rolar, em todas as 4
+## resoluções mínimas suportadas (1152×648 é a mais apertada — as
+## demais têm mais espaço, ARMY_RECT escala com a resolução, esta
+## constante não). Linhas 2/3 continuam exigindo rolagem (ScrollContainer
+## já existente, comportamento deliberado desde a FASE 22.3 — nunca
+## alterado aqui). Nunca toca a calibração por pixel de ATK/ESC/HP de
+## BattleCardView: a grade sempre usa set_compact(true) (esconde esses
+## labels por completo) e a carta ampliada/hover usa card_width
+## calculado à parte, a partir do viewport (_build_card_tooltip()),
+## nunca desta constante.
+const FORMATION_CARD_WIDTH: float = 100.0
 const COMMANDER_PORTRAIT_SIZE: float = 60.0
 
 
@@ -1132,10 +1157,15 @@ func _build_compact_card_row(card: CardResource) -> Control:
 	# Correção: "EN"/"SD" e o número em Labels SEPARADOS (nunca uma
 	# string combinada) — mesmo padrão de _make_composition_footer(),
 	# consistente entre Biblioteca e Formação.
+	# Auditoria pré-pré-alfa (achado: "Energia/Soldo aparecem, mas estão
+	# sutis demais"): o NÚMERO (a informação que o jogador precisa comparar
+	# entre Cartas) sobe pra 10pt, igual ao valor já usado em
+	# _make_composition_footer() — o rótulo "EN"/"SD" continua em 8pt
+	# (hierarquia: valor > rótulo), nunca os dois no mesmo tamanho pequeno.
 	status_row.add_child(_make_label("EN", 8, HUD_MUTED_COLOR))
-	status_row.add_child(_make_label(str(EnergyArmy.card_energy(card.tier)), 8, Color(0.75, 0.85, 1.0)))
+	status_row.add_child(_make_label(str(EnergyArmy.card_energy(card.tier)), 10, Color(0.75, 0.85, 1.0)))
 	status_row.add_child(_make_label("SD", 8, HUD_MUTED_COLOR))
-	status_row.add_child(_make_label(str(Soldo.cost_for_rarity(card.rarity)), 8, HUD_ACCENT_SELECTED))
+	status_row.add_child(_make_label(str(Soldo.cost_for_rarity(card.rarity)), 10, HUD_ACCENT_SELECTED))
 
 	var status_spacer := Control.new()
 	status_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL

@@ -1,12 +1,16 @@
 class_name TestExpeditionTickResolver
 extends RefCounted
-## TestExpeditionTickResolver (F-020, decisões 9/10)
+## TestExpeditionTickResolver (F-020, decisão 9; catch-up: auditoria
+## pré-pré-alfa, reverte F-020/decisão 10 por decisão explícita do dono
+## do projeto)
 ##
-## ExpeditionTickResolver dispara no máximo 1 tentativa automática por
-## chamada de sync(), gateada por um intervalo de ~60s, SEM catch-up —
-## mesmo após uma lacuna de horas, só 1 tentativa dispara por vez
-## (decisão 10: a Expedição fica pausada enquanto o jogo está fechado,
-## nunca acumula tentativas).
+## ExpeditionTickResolver dispara uma tentativa automática por chamada de
+## sync() a cada ~60s efetivamente decorrido, COM catch-up: uma lacuna de
+## horas (jogo fechado) processa múltiplas tentativas em sequência —
+## nunca apenas 1 — até que Energia se esgote, a Trilha termine, um
+## Acampamento passe a aguardar ordem manual, ou o tempo decorrido se
+## esgote (o que ocorrer primeiro). Usa relógio injetável (parâmetro
+## `now_unix`), nunca espera real.
 
 static func run(ctx: TestRunner.Context) -> bool:
 	print("[F-020] Validando ExpeditionTickResolver (ritmo automático, sem catch-up)...")
@@ -46,20 +50,39 @@ static func run(ctx: TestRunner.Context) -> bool:
 	ctx.check(expedition.current_fase == 2, "sync() antes de 60s não deve disparar nova tentativa")
 	ctx.check(expedition.last_tick_unix == now, "sync() antes de 60s não deve avançar last_tick_unix (obtido: %d, esperado: %d)" % [expedition.last_tick_unix, now])
 
-	# 3) sync() depois de uma lacuna de HORAS -> exatamente 1 tentativa
-	# nova, nunca uma rajada de várias (decisão 10, sem catch-up).
+	# 3) sync() depois de uma lacuna de HORAS -> CATCH-UP: múltiplas
+	# tentativas processadas em sequência (nunca apenas 1), até um motivo
+	# real de parada já existente no motor (Energia esgotada, Acampamento
+	# aguardando ordem, Trilha concluída) ou até o tempo decorrido
+	# acabar — o que ocorrer primeiro. Nada aqui INVENTA quantas Fases
+	# deveriam ocorrer: o resultado é lido do motor real (PhaseResolver/
+	# ExpeditionRuntime), nunca hard-coded a partir de suposição.
+	var fase_before_gap: int = expedition.current_fase
+	var energy_before_gap: int = army.current_energy
 	var much_later: int = now + (6 * 3600)
 	ExpeditionTickResolver.sync(kingdom, much_later)
-	print("  sync() após 6h de lacuna -> exatamente 1 tentativa nova (Fase 2 -> 3, nunca mais)? %s | last_tick_unix == much_later? %s (esperado: true, true)" % [
-		str(expedition.current_fase == 3), str(expedition.last_tick_unix == much_later)
+
+	var fases_advanced: int = expedition.current_fase - fase_before_gap
+	var energy_consumed: int = energy_before_gap - army.current_energy
+	var stopped_for_real_reason: bool = (
+		expedition.status != ExpeditionRuntime.Status.EM_ANDAMENTO
+		or expedition.is_waiting_at_acampamento
+		or (much_later - expedition.last_tick_unix) < ExpeditionTickResolver.TICK_INTERVAL_SECONDS
+	)
+	print("  sync() após 6h de lacuna -> Fases avançadas: %d (esperado: > 1, prova de catch-up) | Energia consumida: %d | parou por motivo real (Energia/Acampamento/Trilha/tempo esgotado)? %s" % [
+		fases_advanced, energy_consumed, stopped_for_real_reason
 	])
-	ctx.check(expedition.current_fase == 3, "sync() após uma lacuna de horas deve disparar exatamente 1 tentativa nova (obtido: Fase %d)" % expedition.current_fase)
-	ctx.check(expedition.last_tick_unix == much_later, "sync() deve atualizar last_tick_unix para o 'now' mais recente, sem processar cada minuto intermediário (obtido: %d)" % expedition.last_tick_unix)
+	ctx.check(fases_advanced > 1, "Uma lacuna de 6h deve processar MAIS de 1 Fase (catch-up real, não apenas 1 tentativa) — obtido: %d Fase(s)" % fases_advanced)
+	ctx.check(energy_consumed > 0, "O catch-up deve consumir Energia real via PhaseResolver (ENERGY_COST_PER_ATTEMPT), nunca sem custo")
+	ctx.check(stopped_for_real_reason, "O catch-up deve parar por um motivo real já existente no motor (Energia esgotada, Acampamento aguardando ordem, Trilha concluída) ou por falta de tempo decorrido — nunca continuar indefinidamente nem parar sem motivo")
+	ctx.check((expedition.last_tick_unix - now) % ExpeditionTickResolver.TICK_INTERVAL_SECONDS == 0, "last_tick_unix deve avançar em passos exatos de TICK_INTERVAL_SECONDS (nunca pular direto para 'now', perdendo o tempo intermediário) — obtido resto: %d" % ((expedition.last_tick_unix - now) % ExpeditionTickResolver.TICK_INTERVAL_SECONDS))
 
 	# Confirma que uma 2ª sync() no MESMO instante não dispara outra
-	# tentativa — prova que não há acúmulo/rajada.
+	# tentativa — prova que não há acúmulo/rajada além do tempo realmente
+	# decorrido (idempotência).
+	var fase_after_first_catchup: int = expedition.current_fase
 	ExpeditionTickResolver.sync(kingdom, much_later)
-	print("  2ª sync() no mesmo instante -> nenhuma tentativa extra (Fase permanece 3)? %s (esperado: true)" % str(expedition.current_fase == 3))
-	ctx.check(expedition.current_fase == 3, "sync() repetida no mesmo instante não deve disparar tentativa extra")
+	print("  2ª sync() no mesmo instante -> nenhuma tentativa extra (Fase permanece %d)? %s (esperado: true)" % [fase_after_first_catchup, expedition.current_fase == fase_after_first_catchup])
+	ctx.check(expedition.current_fase == fase_after_first_catchup, "sync() repetida no mesmo instante não deve disparar tentativa extra além do tempo já processado")
 
 	return true

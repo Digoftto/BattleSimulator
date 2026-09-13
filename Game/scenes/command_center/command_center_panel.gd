@@ -29,12 +29,30 @@ extends Control
 ##   arte definitiva do Treinamento ainda precisa ser produzida numa
 ##   etapa futura.
 ##
-## Progressão/Expansão Administrativa NÃO tem hotspot próprio (decisão
-## explícita desta etapa) — a ação "Ativar Próximo Recurso
-## Administrativo" já vive dentro da tela de Comandantes
-## (comandantes_panel.gd), e a Progressão Vertical (Nível do prédio)
-## continua usando o popup genérico de Evoluir da própria Cidade
-## (city_panel.gd), como qualquer outra construção.
+## Expansão Administrativa NÃO tem hotspot próprio aqui — a ação
+## "Ativar Próximo Recurso Administrativo" vive dentro da tela de
+## Comandantes (comandantes_panel.gd).
+##
+## CORREÇÃO REAL (auditoria pré-pré-alfa): a docstring anterior desta
+## seção afirmava que a Progressão Vertical (Nível do prédio) "continua
+## usando o popup genérico de Evoluir da própria Cidade... como
+## qualquer outra construção" — FALSO, comprovado por clique real
+## simulado via Input.parse_input_event() (nunca chamada direta de
+## método interno): city_panel.gd::_on_hitbox_gui_input() hoje chama
+## _navigate_to_building(), que entra DIRETO nesta tela — o popup
+## contextual da Cidade (_update_contextual_panel(), com os botões
+## "Abrir"/"Evoluir") está desconectado do clique real desde uma
+## mudança arquitetural anterior (só chamado por validações legadas de
+## bootstrap.gd, fora do fluxo real do jogador — ver o próprio
+## docstring de city_panel.gd::_on_hitbox_gui_input()). Ou seja: a
+## Evolução Vertical do CdC era INACESSÍVEL a qualquer jogador real.
+## Corrigido com um botão real "Evoluir" nesta própria tela (mesmo
+## padrão já usado internamente por capital_panel.gd, "Evoluir
+## Capital") — reaproveita EXATAMENTE InstitutionalConstructionResolver.
+## evolve()/cost_breakdown() (mesma fonte de verdade de Capital/
+## Academia/Núcleo, nenhuma fórmula nova), com HotspotGlow igual aos
+## outros 5 hotspots. "Abrir Centro de Comando" (na Cidade) continua
+## intocado — os dois caminhos coexistem, nunca um substitui o outro.
 ##
 ## Campo de Prova: CORREÇÃO ARQUITETURAL desta etapa — decisão anterior
 ## (sem hotspot próprio, só um botão futuro na lista de Exércitos) foi
@@ -81,12 +99,38 @@ const TREINAMENTO_HOTSPOT_RECT: Rect2 = Rect2(0.76, 0.60, 0.22, 0.38)
 var _hover_name_container: Control
 var _hover_name_label: Label
 
+## Auditoria pré-pré-alfa: HotspotGlow (engine/presentation/hotspot_glow.gd)
+## já é o sinal luminoso reutilizável usado em Cidade/Biblioteca/
+## Academia/Capital/Depósito/Núcleo de Energia/Observatório/World Map
+## Gate — nunca foi ligado ao Centro de Comando (achado real: nenhuma
+## referência a HotspotGlow existia neste arquivo). Corrigido reusando
+## exatamente o mesmo componente/padrão (Dictionary node_name -> HotspotGlow,
+## attach_to_region() na mesma região fracionária já calibrada dos 5
+## hotspots, toggle HOVER/AVAILABLE nos mesmos handlers mouse_entered/
+## mouse_exited já existentes) — nenhuma segunda implementação criada.
+var _hotspot_glows: Dictionary = {}
+
+## Feedback do botão "Evoluir" (F-019, mesmo padrão já usado em outros
+## painéis — nunca só um print() que o jogador nunca vê).
+var _evolve_status_text: String = ""
+
 
 func _ready() -> void:
 	if not KingdomState.is_initialized:
 		KingdomState.initialize_new_kingdom()
-	_build_static_structure()
+	refresh()
 	print("[CommandCenterPanel] Pronto.")
+
+
+func refresh() -> void:
+	_clear_children(self)
+	_build_static_structure()
+
+
+func _clear_children(node: Node) -> void:
+	for child in node.get_children():
+		node.remove_child(child)
+		child.free()
 
 
 func _build_static_structure() -> void:
@@ -142,6 +186,65 @@ func _build_static_structure() -> void:
 	back_container.gui_input.connect(_on_back_chip_gui_input)
 	add_child(back_container)
 
+	_build_evolve_chip()
+
+
+## Evolução Vertical do CdC (Progressão do Nível do prédio, custo em
+## Recursos) — NUNCA confundir com Expansão Administrativa (Cargo
+## Ativo/Vaga Reserva, custo em PG, dentro de Comandantes). Mesma fonte
+## de verdade de Capital/Academia/Núcleo: InstitutionalConstructionResolver.
+## evolve()/cost_breakdown(), FORMULAS.md — nenhum valor/fórmula nova.
+## Canto oposto ao "Voltar para a Cidade", mesmo padrão visual de chip,
+## com HotspotGlow (mesmo componente dos outros 5 hotspots desta tela).
+func _build_evolve_chip() -> void:
+	var kingdom: Kingdom = KingdomState.kingdom
+	var current_level: int = kingdom.command_center_level
+	var costs: Dictionary = InstitutionalConstructionResolver.cost_breakdown(InstitutionalConstructionConfig.Building.CENTRO_DE_COMANDO, current_level + 1)
+	# Mesmo mapeamento de rótulos já usado em city_panel.gd
+	# (RAW_RESOURCE_LABELS), duplicado localmente por convenção do
+	# projeto — nunca importado entre telas.
+	var raw_resource_labels: Dictionary = {"ferro_negro": "Ferro Negro", "cristais_arcanos": "Cristais Arcanos", "essencia_vital": "Essência Vital"}
+	var cost_text: String = ", ".join(costs.keys().map(func(k: String) -> String: return "%s: %d" % [raw_resource_labels.get(k, k), costs[k]]))
+
+	var evolve_chip: Dictionary = _build_chip()
+	var container: Control = evolve_chip["container"]
+	var label: Label = evolve_chip["label"]
+	label.text = "Evoluir (Nível %d → %d | %s)" % [current_level, current_level + 1, cost_text]
+	container.mouse_filter = Control.MOUSE_FILTER_STOP
+	container.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	container.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	container.size = container.get_combined_minimum_size()
+	container.position = Vector2(-16 - container.size.x, 16)
+	container.gui_input.connect(_on_evolve_chip_gui_input, CONNECT_DEFERRED)
+	add_child(container)
+
+	# attach_to_region() posiciona relativo ao PARENT informado — usar o
+	# próprio chip como parent (região 0..1 = seu próprio retângulo)
+	# evita qualquer matemática manual de pixel/viewport (causa raiz já
+	# documentada do bug de desalinhamento do aro de seleção da Academia
+	# nesta mesma auditoria — nunca repetir esse padrão).
+	preload("res://engine/presentation/hotspot_glow.gd").new().attach_to_region(container, Rect2(0.0, 0.0, 1.0, 1.0), 12.0)
+
+	if _evolve_status_text != "":
+		var status_label := Label.new()
+		status_label.text = _evolve_status_text
+		status_label.add_theme_font_override("font", HUD_FONT)
+		status_label.add_theme_font_size_override("font_size", 12)
+		status_label.add_theme_color_override("font_color", Color(0.92, 0.45, 0.40))
+		status_label.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+		status_label.position = Vector2(-16 - status_label.get_combined_minimum_size().x, 16 + container.size.y + 4)
+		add_child(status_label)
+
+
+func _on_evolve_chip_gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		var result: Dictionary = InstitutionalConstructionResolver.evolve(KingdomState.kingdom, InstitutionalConstructionConfig.Building.CENTRO_DE_COMANDO)
+		if not result["success"]:
+			_evolve_status_text = "Não foi possível evoluir: %s" % result["reason"]
+		else:
+			_evolve_status_text = ""
+		refresh()
+
 
 func _build_chip() -> Dictionary:
 	var chip := PanelContainer.new()
@@ -180,6 +283,11 @@ func _build_chip() -> Dictionary:
 
 
 func _build_hotspot(parent: Control, node_name: String, rect: Rect2, hover_text: String, scene_path: String) -> void:
+	# Mesma fábrica reutilizável já usada em Cidade/Biblioteca/Academia/
+	# Capital/Depósito/Núcleo de Energia/Observatório/World Map Gate —
+	# mesma região fracionária (rect) já calibrada para o hotspot real.
+	_hotspot_glows[node_name] = preload("res://engine/presentation/hotspot_glow.gd").new().attach_to_region(parent, rect)
+
 	var hotspot := Control.new()
 	hotspot.name = node_name
 	hotspot.anchor_left = rect.position.x
@@ -193,8 +301,8 @@ func _build_hotspot(parent: Control, node_name: String, rect: Rect2, hover_text:
 	hotspot.mouse_filter = Control.MOUSE_FILTER_STOP
 	hotspot.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	hotspot.gui_input.connect(_on_hotspot_gui_input.bind(scene_path))
-	hotspot.mouse_entered.connect(_on_hotspot_mouse_entered.bind(hotspot, hover_text))
-	hotspot.mouse_exited.connect(_on_hotspot_mouse_exited)
+	hotspot.mouse_entered.connect(_on_hotspot_mouse_entered.bind(hotspot, hover_text, node_name))
+	hotspot.mouse_exited.connect(_on_hotspot_mouse_exited.bind(node_name))
 	parent.add_child(hotspot)
 
 
@@ -206,7 +314,9 @@ func _on_hotspot_gui_input(event: InputEvent, scene_path: String) -> void:
 			print("[CommandCenterPanel] Hotspot preparado, cena ainda não existe: %s" % scene_path)
 
 
-func _on_hotspot_mouse_entered(hotspot: Control, hover_text: String) -> void:
+func _on_hotspot_mouse_entered(hotspot: Control, hover_text: String, node_name: String = "") -> void:
+	if _hotspot_glows.has(node_name):
+		_hotspot_glows[node_name].set_hotspot_state(preload("res://engine/presentation/hotspot_glow.gd").State.HOVER)
 	_hover_name_label.text = hover_text
 	var chip_size: Vector2 = _hover_name_container.get_combined_minimum_size()
 	_hover_name_container.size = chip_size
@@ -219,7 +329,9 @@ func _on_hotspot_mouse_entered(hotspot: Control, hover_text: String) -> void:
 	_hover_name_container.visible = true
 
 
-func _on_hotspot_mouse_exited() -> void:
+func _on_hotspot_mouse_exited(node_name: String = "") -> void:
+	if _hotspot_glows.has(node_name):
+		_hotspot_glows[node_name].set_hotspot_state(preload("res://engine/presentation/hotspot_glow.gd").State.AVAILABLE)
 	_hover_name_container.visible = false
 
 

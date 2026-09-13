@@ -41,6 +41,30 @@ const HUD_ACCENT_SELECTED: Color = Color(0.95, 0.80, 0.35)
 const HUD_ERROR_COLOR: Color = Color(0.92, 0.45, 0.40)
 const HUD_ACCENT: Color = Color(0.75, 0.65, 0.45)
 
+## Auditoria pré-pré-alfa (Prioridade 1, "Custo em Fragmentos"): cor por
+## Facção, nunca inventada — reaproveita exatamente os mesmos tons já
+## estabelecidos na própria arte/UI do jogo para cada Facção (idênticos
+## aos usados no preenchimento dos ícones de Filtro desta mesma tela:
+## vermelho/Império, verde/Natureza, roxo/Mortos-Vivos), só clareados o
+## suficiente para servir de cor de TEXTO legível sobre fundo escuro
+## (nunca a cor de preenchimento sólida do ícone, ilegível como texto).
+const FACTION_TEXT_COLORS: Dictionary = {
+	"Império": Color(0.95, 0.45, 0.40),
+	"Natureza": Color(0.55, 0.90, 0.50),
+	"Mortos-Vivos": Color(0.80, 0.55, 0.95),
+}
+
+func _faction_text_color(faction: String) -> Color:
+	return FACTION_TEXT_COLORS.get(faction, HUD_TEXT_COLOR)
+
+
+## MM:SS a partir de segundos inteiros — nunca H:MM:SS (Produção não
+## passa de dezenas de minutos, per ACADEMY.md/BALANCING_SIMULATION.md).
+func _format_mmss(total_seconds: int) -> String:
+	var minutes: int = total_seconds / 60
+	var seconds: int = total_seconds % 60
+	return "%02d:%02d" % [minutes, seconds]
+
 ## --- Regiões recalibradas por varredura de cor PIXEL A PIXEL sobre
 ## academia_artifice.png (1536x1024) — cada Rect2 abaixo foi obtida
 ## detectando a borda dourada/o preenchimento azul-marinho real de
@@ -67,8 +91,29 @@ const FACCAO_ICON_SIZE: float = 0.0500
 ## onde a forma exata não importa) produziria uma ELIPSE, não um
 ## círculo, porque a fração X é relativa a 1536 e a fração Y é
 ## relativa a 1024. 66,5px reais vira frações diferentes em cada eixo.
-const FACCAO_RING_WIDTH: float = 0.0433
-const FACCAO_RING_HEIGHT: float = 0.0649
+## Auditoria pré-pré-alfa (achado real, medido por varredura de pixel —
+## nunca por estimativa visual, ver measure_academia_ring.gd): os valores
+## antigos (0.0433 / 0.0649) produziam um anel cujo topo já coincidia
+## exatamente com a borda superior real do ícone (delta 0px), mas cuja
+## borda inferior ultrapassava a borda inferior real do ícone em 9px —
+## ou seja, um anel grande demais (não deslocado), estourando para baixo.
+## Reduzido proporcionalmente (mesma razão W/H, preservando o círculo
+## perfeito via RING_CORNER_RADIUS) por um fator medido diretamente do
+## bounding box renderizado (58/69 ≈ 0,84), sem alterar a fórmula de
+## centralização (que já produzia o centro correto).
+const FACCAO_RING_WIDTH: float = 0.0364
+const FACCAO_RING_HEIGHT: float = 0.0545
+
+## Correção de posição medida por varredura de pixel real (achado:
+## reduzir o tamanho do anel não mudou o deslocamento — o CENTRO em si
+## estava errado, não o raio; o centro do hotspot não coincide com o
+## centro visual real do ícone). Medido diretamente no viewport
+## renderizado (measure_academia_ring2.gd): centro do anel a (50.5, 40.0)
+## vs centro do ícone a (45.0, 30.0) dentro do mesmo recorte — delta de
+## +5.5px (direita) / +10.0px (baixo) a corrigir. Desloca o centro do
+## anel para a ESQUERDA e para CIMA nessa mesma proporção.
+const FACCAO_RING_OFFSET_X: float = -0.0057
+const FACCAO_RING_OFFSET_Y: float = 0.0154
 const FACCAO_VALUES: Array[String] = ["Império", "Natureza", "Mortos-Vivos", "(todas)"]
 
 const TIPO_DROPDOWN: Rect2 = Rect2(0.0098, 0.3594, 0.1361, 0.0410)
@@ -248,8 +293,8 @@ func _build_faccao_filter(parent: Control) -> void:
 			# cada eixo) — nunca o rect do hotspot, que é de propósito
 			# um pouco maior pra dar folga de clique.
 			var ring_rect := Rect2(
-				center_x - FACCAO_RING_WIDTH / 2.0,
-				FACCAO_ICON_Y + (FACCAO_ICON_SIZE - FACCAO_RING_HEIGHT) / 2.0,
+				center_x - FACCAO_RING_WIDTH / 2.0 + FACCAO_RING_OFFSET_X,
+				FACCAO_ICON_Y + (FACCAO_ICON_SIZE - FACCAO_RING_HEIGHT) / 2.0 - FACCAO_RING_OFFSET_Y,
 				FACCAO_RING_WIDTH, FACCAO_RING_HEIGHT
 			)
 			_build_selection_ring(parent, ring_rect)
@@ -662,6 +707,18 @@ func _on_estrategia_gui_input(event: InputEvent, preserve: bool) -> void:
 
 ## --- Preview da Produção (recalculado automaticamente, sem botão
 ## "Prever" — a arte não desenha um). ---
+##
+## Auditoria pré-pré-alfa (Prioridade 1): "Resultado" mostrava um resumo
+## textual completo (nome + quantidade de cada ingrediente), centralizado
+## com clip_text — em nomes longos isso cortava literalmente no MEIO da
+## palavra dos dois lados (achado real via screenshot: "ÇÃO PUTRE" em vez
+## de "Abominação Putrefata"), ilegível. Substituído por uma indicação
+## compacta (só o nome da Carta-alvo, truncada à ESQUERDA — nunca no
+## meio) + a carta COMPLETA em hover, reaproveitando ArmyCardSlot (mesmo
+## componente/tooltip nativo já usado no Editor de Exército — nenhuma
+## segunda implementação de carta). "Custo em Fragmentos" simplificado
+## pra só o número, colorido pela Facção (_faction_text_color) — nunca
+## mais "Nome: número".
 func _build_preview(parent: Control, preview_result: Dictionary) -> void:
 	if preview_result.is_empty():
 		return
@@ -670,17 +727,88 @@ func _build_preview(parent: Control, preview_result: Dictionary) -> void:
 		_value_label(parent, PREVIEW_RESULTADO_BOX, "Previsão inválida: %s" % preview_result["reason"], 11, HUD_ERROR_COLOR)
 		return
 
-	var produce_summary: String = ""
-	for card_name: String in preview_result["new_cards_to_produce"]:
-		produce_summary += "%s x%d " % [card_name, preview_result["new_cards_to_produce"][card_name]]
-	if produce_summary == "":
-		produce_summary = "reaproveitado do inventário"
-	_value_label(parent, PREVIEW_RESULTADO_BOX, produce_summary.strip_edges(), 11, HUD_TEXT_COLOR)
+	var compact_summary: String = _selected_produce_card.card_name if _selected_produce_card != null else ""
+	_value_label(parent, PREVIEW_RESULTADO_BOX, compact_summary, 11, HUD_TEXT_COLOR, HORIZONTAL_ALIGNMENT_LEFT)
 
-	var cost_color: Color = HUD_ACCENT_SELECTED if not preview_result["affordable"] else HUD_TEXT_COLOR
-	_value_label(parent, CUSTO_FRAGMENTO_BOX, "%s: %d" % [preview_result["faction"], preview_result["total_fragment_cost"]], 12, cost_color)
+	if _selected_produce_card != null:
+		var hover_slot := ArmyCardSlot.new()
+		_anchor_control(hover_slot, PREVIEW_RESULTADO_BOX)
+		hover_slot.mouse_filter = Control.MOUSE_FILTER_STOP
+		hover_slot.set_tooltip_builder(func() -> Control: return _build_card_hover_tooltip(_selected_produce_card))
+		parent.add_child(hover_slot)
+
+	var cost_color: Color = HUD_ERROR_COLOR if not preview_result["affordable"] else _faction_text_color(preview_result["faction"])
+	_value_label(parent, CUSTO_FRAGMENTO_BOX, str(preview_result["total_fragment_cost"]), 15, cost_color)
 
 	_value_label(parent, TEMPO_PRODUCAO_BOX, "%ds" % int(preview_result["sequential_time_seconds"]), 12, HUD_TEXT_COLOR)
+
+
+## Painel de carta completa reutilizado como tooltip nativo (hover) —
+## mesmo padrão de army_editor_panel.gd::_build_card_tooltip(), duplicado
+## localmente (convenção já estabelecida neste projeto: nenhum código
+## compartilhado entre telas, só o vocabulário/padrão visual). Inclui
+## Energia/Soldo (mesma fonte de verdade de sempre) — antes ausentes de
+## qualquer carta exibida na Academia.
+func _build_card_hover_tooltip(card: CardResource) -> Control:
+	var panel := _make_card_panel()
+	var outer_vbox := VBoxContainer.new()
+	outer_vbox.add_theme_constant_override("separation", 4)
+	panel.add_child(outer_vbox)
+
+	var card_width: float = 170.0
+	var card_slot := Control.new()
+	card_slot.custom_minimum_size = Vector2(card_width, card_width / BattleCardView.CARD_ASPECT_RATIO)
+	outer_vbox.add_child(card_slot)
+
+	var card_view := BattleCardView.new()
+	card_view.set_anchors_preset(Control.PRESET_FULL_RECT)
+	card_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card_slot.add_child(card_view)
+	card_view.set_card(card)
+	card_view.set_stats(card.atk, card.hp, card.esc)
+	card_view.set_compact(false)
+
+	var energy_soldo_row := HBoxContainer.new()
+	outer_vbox.add_child(energy_soldo_row)
+	var energy_label := Label.new()
+	energy_label.text = "Energia %d" % EnergyArmy.card_energy(card.tier)
+	energy_label.add_theme_font_override("font", HUD_FONT)
+	energy_label.add_theme_font_size_override("font_size", 11)
+	energy_label.add_theme_color_override("font_color", HUD_TEXT_COLOR)
+	energy_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	energy_soldo_row.add_child(energy_label)
+	var soldo_label := Label.new()
+	soldo_label.text = "Soldo %d" % Soldo.cost_for_rarity(card.rarity)
+	soldo_label.add_theme_font_override("font", HUD_FONT)
+	soldo_label.add_theme_font_size_override("font_size", 11)
+	soldo_label.add_theme_color_override("font_color", HUD_ACCENT_SELECTED)
+	soldo_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	energy_soldo_row.add_child(soldo_label)
+
+	return panel
+
+
+## Mesmo estilo de painel/borda já usado em army_editor_panel.gd
+## (_make_card_panel), duplicado localmente por convenção do projeto.
+func _make_card_panel() -> PanelContainer:
+	var panel := PanelContainer.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.03, 0.04, 0.08, 0.97)
+	style.border_width_left = 1
+	style.border_width_right = 1
+	style.border_width_top = 1
+	style.border_width_bottom = 1
+	style.border_color = Color(HUD_ACCENT.r, HUD_ACCENT.g, HUD_ACCENT.b, 0.6)
+	style.corner_radius_top_left = 4
+	style.corner_radius_top_right = 4
+	style.corner_radius_bottom_left = 4
+	style.corner_radius_bottom_right = 4
+	style.content_margin_left = 8.0
+	style.content_margin_right = 8.0
+	style.content_margin_top = 6.0
+	style.content_margin_bottom = 6.0
+	panel.add_theme_stylebox_override("panel", style)
+	return panel
 
 
 func _build_artifices(parent: Control, kingdom: Kingdom) -> void:
@@ -749,6 +877,12 @@ func _build_artifices(parent: Control, kingdom: Kingdom) -> void:
 		list.add_child(empty_label)
 
 
+func _on_fila_scroll_resized(scroll: ScrollContainer, list: VBoxContainer) -> void:
+	if not is_instance_valid(list):
+		return
+	list.custom_minimum_size.x = scroll.size.x
+
+
 func _build_fila(parent: Control, kingdom: Kingdom) -> void:
 	var region := Control.new()
 	_anchor_control(region, FILA_REGION)
@@ -770,22 +904,61 @@ func _build_fila(parent: Control, kingdom: Kingdom) -> void:
 	var list := VBoxContainer.new()
 	list.add_theme_constant_override("separation", 4)
 	scroll.add_child(list)
+	# CAUSA-RAIZ real encontrada nesta auditoria (achado via screenshot: o
+	# nome da Carta na Fila simplesmente não aparecia, mesmo com o dado
+	# certo em memória — confirmado por print — e sem nenhum erro de
+	# script): ScrollContainer NUNCA estica o filho (VBoxContainer) até
+	# sua própria largura sozinho (mesma causa-raiz já documentada e
+	# corrigida em bestiario_panel.gd::_on_detail_scroll_resized) — sem
+	# isso, `list` fica só larga o suficiente pro conteúdo MÍNIMO de cada
+	# linha (name_label(1px) + time_label(48px) + botão X), sobrando
+	# quase nada pro EXPAND_FILL do nome distribuir. Provavelmente já
+	# afetava a Fila mesmo ANTES desta etapa (nunca visto populada em
+	# screenshot real até agora). Mesma correção: força a largura mínima
+	# de `list` a acompanhar `scroll` a cada resize.
+	scroll.resized.connect(_on_fila_scroll_resized.bind(scroll, list))
+	_on_fila_scroll_resized(scroll, list)
 
+	var now_unix: int = GameClock.now_unix()
 	for master: AcademyMaster in kingdom.academy_artifices:
 		for task: AcademyTask in master.queue:
 			var row := HBoxContainer.new()
 			row.custom_minimum_size = Vector2(0, 22)
+			row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			list.add_child(row)
 
-			var label := Label.new()
-			label.text = "%s x%d (%s)" % [task.target_card_name, task.quantity, "iniciada" if task.has_started() else "na fila"]
-			label.add_theme_font_override("font", HUD_FONT)
-			label.add_theme_font_size_override("font_size", 11)
-			label.add_theme_color_override("font_color", HUD_TEXT_COLOR)
-			label.clip_text = true
-			label.custom_minimum_size = Vector2(1, 0)
-			label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			row.add_child(label)
+			var target_template: CardResource = GameDatabase.get_card(task.target_card_name)
+			if target_template != null:
+				row.set_script(ArmyCardSlot)
+				row.mouse_filter = Control.MOUSE_FILTER_STOP
+				row.set_tooltip_builder(func() -> Control: return _build_card_hover_tooltip(target_template))
+
+			# Auditoria pré-pré-alfa (Prioridade 3): NOME + tempo restante
+			# (MM:SS, só quando a tarefa já começou — end_unix/start_unix
+			# reais de AcademyTask, nunca um valor inventado; uma tarefa
+			# ainda "na fila" não tem contagem regressiva própria porque
+			# ainda não começou a rodar). Hover mostra a carta completa
+			# (mesmo ArmyCardSlot/tooltip reutilizado no Resultado acima).
+			var name_label := Label.new()
+			name_label.text = task.target_card_name.to_upper()
+			name_label.add_theme_font_override("font", HUD_FONT)
+			name_label.add_theme_font_size_override("font_size", 11)
+			name_label.add_theme_color_override("font_color", HUD_TEXT_COLOR)
+			name_label.clip_text = true
+			name_label.custom_minimum_size = Vector2(1, 0)
+			name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			row.add_child(name_label)
+
+			var time_label := Label.new()
+			time_label.text = _format_mmss(maxi(task.end_unix - now_unix, 0)) if task.has_started() else "na fila"
+			time_label.add_theme_font_override("font", HUD_FONT)
+			time_label.add_theme_font_size_override("font_size", 11)
+			time_label.add_theme_color_override("font_color", HUD_ACCENT_SELECTED if task.has_started() else HUD_MUTED_COLOR)
+			time_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+			time_label.custom_minimum_size = Vector2(48, 0)
+			time_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			row.add_child(time_label)
 
 			var cancel_button := Button.new()
 			cancel_button.text = "X"
@@ -1001,11 +1174,11 @@ func _style_academia_button(button: Button) -> void:
 	button.add_theme_stylebox_override("focus", hover_style)
 
 
-func _value_label(parent: Control, rect: Rect2, text: String, font_size: int, color: Color) -> void:
+func _value_label(parent: Control, rect: Rect2, text: String, font_size: int, color: Color, alignment: HorizontalAlignment = HORIZONTAL_ALIGNMENT_CENTER) -> void:
 	var label := Label.new()
 	label.text = text
 	_anchor_control(label, rect)
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.horizontal_alignment = alignment
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	label.clip_text = true

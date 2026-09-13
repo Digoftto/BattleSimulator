@@ -18,6 +18,7 @@ static func run(ctx: TestRunner.Context) -> bool:
 	print("[Minas] Validando que a Mina Inicial nunca expira (bug relatado: mostrava Ciclo de 100h)...")
 
 	var kingdom := Kingdom.new()
+	kingdom.deposito_level = 10  # capacidade alta o bastante para não mascarar o acúmulo real com o teto do Depósito
 	kingdom.create_initial_mines()
 	var mina: Mina = kingdom.initial_mines[0]
 	var start: int = GameClock.now_unix()
@@ -35,5 +36,11 @@ static func run(ctx: TestRunner.Context) -> bool:
 		str(kingdom.get_raw_resource(resource_name) > 0), kingdom.get_raw_resource(resource_name), resource_name
 	])
 	ctx.check(kingdom.get_raw_resource(resource_name) > 0, "Produção deve ser creditada além das 100h, sem travar num teto (obtido: %d)" % kingdom.get_raw_resource(resource_name))
+
+	# Acúmulo exato: Mina Inicial Nível 1 = 5 Recursos/hora (FORMULAS.md),
+	# então 200h de produção contínua × Eficiência 100% = 1000.
+	var expected_total: int = 5 * 200
+	print("  Acúmulo em 200h a 5/hora (Nível 1) -> %s: %d (esperado: %d)" % [resource_name, kingdom.get_raw_resource(resource_name), expected_total])
+	ctx.check(kingdom.get_raw_resource(resource_name) == expected_total, "Acúmulo da Mina Inicial em 200h deve ser exatamente %d (5/hora, obtido: %d)" % [expected_total, kingdom.get_raw_resource(resource_name)])
 
 	return true

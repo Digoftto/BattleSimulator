@@ -568,6 +568,17 @@ func _build_detail_area(texture_rect: TextureRect) -> void:
 	vbox.add_child(_make_centered_label("%s — Tier %d" % [template.rarity, template.tier], 12, HUD_TEXT_COLOR))
 	vbox.add_child(_make_centered_label("ATK %d   HP %d   ESC %d" % [template.atk, template.hp, template.esc], 12, HUD_TEXT_COLOR))
 
+	# Auditoria pré-pré-alfa: Energia/Soldo estavam ausentes do Bestiário
+	# (só existiam no Editor de Exército) — mesma fonte de verdade já usada
+	# em toda parte (ENERGY.md/SOLDO.md via EnergyArmy.card_energy()/
+	# Soldo.cost_for_rarity(), nunca recalculado aqui), mesma linguagem
+	# visual desta ficha (linha centralizada, cor de destaque), evitando
+	# uma terceira implementação independente.
+	vbox.add_child(_make_centered_label(
+		"Energia %d   Soldo %d" % [EnergyArmy.card_energy(template.tier), Soldo.cost_for_rarity(template.rarity)],
+		12, HUD_ACCENT
+	))
+
 	# Característica de Unidade (Tier I) — ABILITIES.md é a autoridade;
 	# nome + descrição real via GameDatabase.traits_by_name (mesmo índice
 	# usado pelo motor de Combate), nunca texto inventado.

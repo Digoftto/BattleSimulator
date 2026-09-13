@@ -22,11 +22,20 @@ extends RefCounted
 static func run(ctx: TestRunner.Context) -> bool:
 	print("[Minas] Validando pré-requisitos: produção, custo em PG, capacidade dos Depósitos...")
 
-	# Produção Base — Mina Inicial (geométrica: 1, 2, 4, 8/hora).
+	# Produção Base — Mina Inicial (geométrica: 5, 10, 20, 40/hora).
+	var initial_mine_level_1: int = MineEconomy.base_production_per_hour(MineEconomy.Region.MINA_INICIAL, 1)
+	print("  Mina Inicial Nível 1 -> Produção Base: %d/hora (esperado: 5)" % initial_mine_level_1)
+	ctx.check(initial_mine_level_1 == 5, "Mina Inicial Nível 1 deve produzir 5 Recursos/hora (FORMULAS.md, obtido: %d)" % initial_mine_level_1)
 	for level in range(1, 5):
 		print("  Mina Inicial Nível %d -> Produção Base: %d/hora" % [
 			level, MineEconomy.base_production_per_hour(MineEconomy.Region.MINA_INICIAL, level)
 		])
+
+	# Nenhuma Mina Regional foi alterada por esta mudança (Região 1
+	# continua 5/10/15/20/25, Região 2 continua 10/20/30/40/50).
+	ctx.check(MineEconomy.base_production_per_hour(MineEconomy.Region.REGIAO_1, 1) == 5, "Região 1 Nível 1 não deve ter sido alterada (esperado: 5)")
+	ctx.check(MineEconomy.base_production_per_hour(MineEconomy.Region.REGIAO_2, 1) == 10, "Região 2 Nível 1 não deve ter sido alterada (esperado: 10)")
+	ctx.check(MineEconomy.base_production_per_hour(MineEconomy.Region.REGIAO_3, 1) == 20, "Região 3 Nível 1 não deve ter sido alterada (esperado: 20)")
 
 	# Produção Base — Região 1 (aritmética: 5, 10, 15, 20, 25/hora).
 	for level in range(1, 6):

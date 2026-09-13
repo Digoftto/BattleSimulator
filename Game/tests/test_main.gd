@@ -178,6 +178,9 @@ func _ready() -> void:
 	runner.register("army_editor_ux_audit_findings", "validate_army_editor_ux_audit_findings", preload("res://tests/unit/test_army_editor_ux_audit_findings.gd").run)
 	runner.register("campo_de_prova_relatorio_baixas", "validate_campo_de_prova_relatorio_baixas", preload("res://tests/unit/test_campo_de_prova_relatorio_baixas.gd").run)
 	runner.register("city_panel_economy_hints", "validate_city_panel_economy_hints", preload("res://tests/unit/test_city_panel_economy_hints.gd").run)
+	runner.register("bestiario_energy_soldo", "validate_bestiario_energy_soldo", preload("res://tests/unit/test_bestiario_energy_soldo.gd").run)
+	runner.register("command_center_glow_evolution_tutorial", "validate_command_center_glow_evolution_tutorial", preload("res://tests/unit/test_command_center_glow_evolution_tutorial.gd").run)
+	runner.register("academia_fila_card_name_rendering", "validate_academia_fila_card_name_rendering", preload("res://tests/unit/test_academia_fila_card_name_rendering.gd").run)
 
 	var suite_filter: String = _arg_value("--suite=")
 	var test_filter: String = _arg_value("--test=")
