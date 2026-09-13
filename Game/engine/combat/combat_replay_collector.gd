@@ -26,6 +26,13 @@ extends RefCounted
 
 ## Cada item: {"kind": String, "turn": int, ...campos específicos do tipo}.
 ## "kind" ∈ {"move", "attack", "heal", "death", "turn_start", "turn_end"}.
+## "turn_end" carrega também o snapshot de Affinity já congelado
+## naquele turno (item #18, auditoria pré-pré-alfa): "affinity_points"/
+## "affinity_levels" (Dictionary side:int -> Dictionary faction:String
+## -> int, cópia profunda de CombatState) e
+## "undead_affinity_death_bonus_active" (Dictionary side:int -> bool) —
+## nunca recalculados aqui, só copiados no instante exato em que
+## AffinityRuntime.snapshot_turn() já tinha rodado para aquele turno.
 var replay_events: Array[Dictionary] = []
 
 ## Snapshot do tabuleiro completo ANTES do 1º turno — capturado por
@@ -88,8 +95,25 @@ func _on_turn_start(_event_type: CombatEventType.Type, context: CombatContext) -
 	replay_events.append({"kind": "turn_start", "turn": context.turn})
 
 
+## Affinity em tempo real (auditoria pré-pré-alfa, item #18): captura o
+## snapshot CONGELADO deste turno (AffinityRuntime.snapshot_turn(), já
+## computado por CombatEngine._environment_update_phase() ANTES deste
+## evento — TURN_END é publicado só depois de Ambiente/Movimento/
+## Execução/Morte do turno) — nunca recalculado aqui, só copiado.
+## duplicate(true) é obrigatório: affinity_points/affinity_levels/
+## undead_affinity_death_bonus_active são as MESMAS Dictionaries
+## reescritas pelo mesmo CombatState a cada turno — sem a cópia
+## profunda, todo evento gravado apontaria pro valor do ÚLTIMO turno da
+## batalha (mesmo bug, em espírito, do "card" vivo em initial_board,
+## mas aqui uma referência de Dictionary, não de Resource).
 func _on_turn_end(_event_type: CombatEventType.Type, context: CombatContext) -> void:
-	replay_events.append({"kind": "turn_end", "turn": context.turn})
+	replay_events.append({
+		"kind": "turn_end",
+		"turn": context.turn,
+		"affinity_points": context.state.affinity_points.duplicate(true),
+		"affinity_levels": context.state.affinity_levels.duplicate(true),
+		"undead_affinity_death_bonus_active": context.state.undead_affinity_death_bonus_active.duplicate(true),
+	})
 
 
 ## CombatContext não carrega a posição de ORIGEM do movimento (só

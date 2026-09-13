@@ -169,6 +169,14 @@ const HOVER_PREVIEW_WIDTH_PX: float = 180.0
 ## mesmo conceito ("respiro visual"), nunca um valor novo inventado.
 const HOVER_PREVIEW_MARGIN_PX: float = 24.0
 
+## Affinity em tempo real (auditoria pré-pré-alfa, item #18) — largura
+## fixa, altura livre (cresce com o conteúdo real via VBoxContainer,
+## nunca um retângulo fixo que cortaria efeitos extras). Canto inferior
+## direito da área de batalha, mesma convenção de margem em px reais de
+## tela já usada acima para o popup de hover.
+const AFFINITY_PANEL_WIDTH_PX: float = 210.0
+const AFFINITY_PANEL_MARGIN_PX: float = 16.0
+
 ## ART-007: conversão POSIÇÃO LÓGICA (CombatBoard, 1-9) -> (linha de
 ## profundidade 0-2, coluna 0-2) — única fonte de verdade continua
 ## sendo CombatBoard.COLUMN_A/B/C (frente->fundo), nunca recalculada:
@@ -187,6 +195,20 @@ var _log_label: Label
 var _log_drawer: Control
 var _log_drawer_label: Label
 var _log_toggle_button: Button
+
+## Affinity em tempo real (item #18) — painel puramente representacional
+## do snapshot já congelado por AffinityRuntime.snapshot_turn() (ver
+## combat_replay_collector.gd::_on_turn_end()); nenhum cálculo próprio.
+var _affinity_panel: Control
+var _affinity_player_section: VBoxContainer
+var _affinity_enemy_section: VBoxContainer
+var _affinity_catalog: Array[AffinityLevelResource] = []
+## True assim que o 1º "turn_end" com dado de Affinity é processado —
+## evita mostrar o painel vazio antes da batalha sequer ter Turno 1
+## resolvido (nunca acontece em jogo real, já que Turno 1 sempre chega
+## antes do jogador ver a tela, mas protege qualquer consumidor futuro
+## que monte a View sem tocar _play_replay() inteiro).
+var _affinity_has_data: bool = false
 var _result_label: Label
 var _continue_button: Button
 var _skip_button: Button
@@ -378,6 +400,16 @@ func _build_battlefield_area() -> Control:
 	result_vbox.add_child(_continue_button)
 
 	_build_hover_preview(area)
+	# Anexado a battlefield_aspect (o AspectRatioContainer letterboxado),
+	# nunca a "area" (a região retangular inteira ANTES do letterbox) —
+	# achado real de validação visual em janela larga (1920x1080): "area"
+	# é mais larga que a imagem 1536:1024 letterboxada dentro dela,
+	# então ancorar à borda de "area" deixava o painel flutuando na
+	# margem preta ao lado da arte em vez de colado no canto da própria
+	# imagem do Campo de Batalha. AspectRatioContainer posiciona TODOS
+	# os filhos no mesmo retângulo letterboxado (mesmo padrão já usado
+	# por _battlefield_texture_rect/_unit_art_layer/_board_layer acima).
+	_build_affinity_panel(battlefield_aspect)
 
 	return area
 
@@ -447,6 +479,175 @@ func _build_hover_preview(_area: Control) -> void:
 	wrapper.add_child(_hover_preview)
 
 	_hover_preview_wrapper = wrapper
+
+
+## Affinity em tempo real (auditoria pré-pré-alfa, item #18) — canto
+## inferior direito da área de batalha. Ancorado por alinhamento
+## (VBoxContainer/HBoxContainer com ALIGNMENT_END dentro de um wrapper
+## full-rect com mouse_filter=IGNORE), nunca por âncora fracionária
+## fixa: a altura real do conteúdo varia (número de Facções/efeitos
+## ativos), então um retângulo de tamanho fixo cortaria ou sobraria
+## espaço — este padrão cresce/encolhe sozinho, sempre colado no canto,
+## em qualquer resolução. Começa invisível (só aparece a partir do 1º
+## snapshot real, ver _update_affinity_panel()) — nunca mostra uma
+## caixa vazia antes de a batalha ter Turno 1 resolvido.
+##
+## DECISÃO DE DESIGN (auditoria, sem regra de Affinity nova): mostra os
+## DOIS lados (Seu Exército + Inimigo) empilhados no mesmo painel
+## compacto, em vez de abas/alternância — opção mais simples pedida
+## quando há ambiguidade, evita um controle de UI extra só para trocar
+## de lado. Cada lado só lista Facções com Nível > 0 (nunca uma linha
+## para bônus inexistente); um lado sem nenhum Nível ativo mostra uma
+## única linha "Nenhum bônus ativo." (situação real, não uma lista
+## vazia sem explicação).
+func _build_affinity_panel(battlefield_container: Control) -> void:
+	_affinity_catalog = GameDatabase.affinity_levels
+
+	var wrapper := Control.new()
+	wrapper.set_anchors_preset(Control.PRESET_FULL_RECT)
+	wrapper.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	battlefield_container.add_child(wrapper)
+
+	var v_align := VBoxContainer.new()
+	v_align.set_anchors_preset(Control.PRESET_FULL_RECT)
+	v_align.alignment = BoxContainer.ALIGNMENT_END
+	v_align.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	wrapper.add_child(v_align)
+
+	var h_align := HBoxContainer.new()
+	h_align.alignment = BoxContainer.ALIGNMENT_END
+	h_align.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	v_align.add_child(h_align)
+
+	# Margem real de tela entre o painel e a borda da área de batalha
+	# (mesma convenção de HOVER_PREVIEW_MARGIN_PX) — um único
+	# MarginContainer envolvendo o painel, dentro do alinhamento
+	# bottom-right já estabelecido acima por v_align/h_align.
+	var outer_margin := MarginContainer.new()
+	outer_margin.add_theme_constant_override("margin_left", int(AFFINITY_PANEL_MARGIN_PX))
+	outer_margin.add_theme_constant_override("margin_right", int(AFFINITY_PANEL_MARGIN_PX))
+	outer_margin.add_theme_constant_override("margin_top", int(AFFINITY_PANEL_MARGIN_PX))
+	outer_margin.add_theme_constant_override("margin_bottom", int(AFFINITY_PANEL_MARGIN_PX))
+	outer_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	h_align.add_child(outer_margin)
+
+	var panel := PanelContainer.new()
+	panel.visible = false
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.custom_minimum_size = Vector2(AFFINITY_PANEL_WIDTH_PX, 0)
+	outer_margin.add_child(panel)
+
+	var inner_margin := MarginContainer.new()
+	inner_margin.add_theme_constant_override("margin_left", 10)
+	inner_margin.add_theme_constant_override("margin_right", 10)
+	inner_margin.add_theme_constant_override("margin_top", 8)
+	inner_margin.add_theme_constant_override("margin_bottom", 8)
+	panel.add_child(inner_margin)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 4)
+	inner_margin.add_child(vbox)
+
+	var title := Label.new()
+	title.text = "AFFINITY"
+	title.add_theme_font_size_override("font_size", 13)
+	title.add_theme_color_override("font_color", Color(0.95, 0.80, 0.35))
+	vbox.add_child(title)
+
+	_affinity_player_section = VBoxContainer.new()
+	_affinity_player_section.add_theme_constant_override("separation", 1)
+	vbox.add_child(_affinity_player_section)
+
+	vbox.add_child(HSeparator.new())
+
+	_affinity_enemy_section = VBoxContainer.new()
+	_affinity_enemy_section.add_theme_constant_override("separation", 1)
+	vbox.add_child(_affinity_enemy_section)
+
+	_affinity_panel = panel
+
+
+## Chamado a cada evento "turn_end" durante a reprodução (_apply_replay_event())
+## — NUNCA recalcula Affinity, só formata o snapshot já congelado que
+## combat_replay_collector.gd::_on_turn_end() copiou de CombatState no
+## instante exato em que AffinityRuntime.snapshot_turn() já tinha
+## rodado para aquele turno. Se o evento não carregar esses campos
+## (replay gravado antes desta funcionalidade existir, ou um teste que
+## monte um "turn_end" reduzido de propósito), degrada graciosamente
+## para "Nenhum bônus ativo." em vez de falhar — nunca inventa um valor.
+func _update_affinity_panel(event: Dictionary) -> void:
+	if _affinity_panel == null:
+		return
+
+	var points_by_side: Dictionary = event.get("affinity_points", {})
+	var levels_by_side: Dictionary = event.get("affinity_levels", {})
+	var undead_bonus_by_side: Dictionary = event.get("undead_affinity_death_bonus_active", {})
+
+	var enemy_side: int = 1 - player_side
+	_fill_affinity_section(_affinity_player_section, player_side, "SEU EXÉRCITO", points_by_side, levels_by_side, undead_bonus_by_side)
+	_fill_affinity_section(_affinity_enemy_section, enemy_side, "INIMIGO", points_by_side, levels_by_side, undead_bonus_by_side)
+
+	_affinity_has_data = true
+	_affinity_panel.visible = not _log_drawer_open
+
+
+func _fill_affinity_section(container: VBoxContainer, side: int, title_text: String, points_by_side: Dictionary, levels_by_side: Dictionary, undead_bonus_by_side: Dictionary) -> void:
+	for child: Node in container.get_children():
+		container.remove_child(child)
+		child.free()
+
+	var title := Label.new()
+	title.text = title_text
+	title.add_theme_font_size_override("font_size", 11)
+	title.add_theme_color_override("font_color", Color(0.75, 0.65, 0.45))
+	container.add_child(title)
+
+	var levels_for_side: Dictionary = levels_by_side.get(side, {})
+	var points_for_side: Dictionary = points_by_side.get(side, {})
+	var active_factions: Array = levels_for_side.keys().filter(func(faction: String) -> bool: return levels_for_side[faction] > 0)
+
+	if active_factions.is_empty():
+		var none_label := Label.new()
+		none_label.text = "Nenhum bônus ativo."
+		none_label.add_theme_font_size_override("font_size", 10)
+		none_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.58))
+		container.add_child(none_label)
+		return
+
+	for faction: String in active_factions:
+		var level: int = levels_for_side[faction]
+		var points: int = points_for_side.get(faction, 0)
+
+		var header := Label.new()
+		header.text = "%s — Nível %d (%d pts)" % [faction, level, points]
+		header.add_theme_font_size_override("font_size", 10)
+		header.add_theme_color_override("font_color", Color(0.9, 0.9, 0.87))
+		container.add_child(header)
+
+		# Affinity.active_effects() é a MESMA função pura já usada em
+		# outros pontos do projeto (nunca reimplementada aqui) — devolve
+		# só os efeitos REAIS do catálogo (GameDatabase.affinity_levels),
+		# nunca um texto inventado.
+		var effects: Array[AffinityLevelResource] = Affinity.active_effects(faction, points, _affinity_catalog)
+		for entry: AffinityLevelResource in effects:
+			var line := Label.new()
+			var text: String = "• %s" % entry.effect_description
+			# Caso especial Mortos-Vivos Nível II (auditoria confirmou:
+			# o bônus de +5% ATK é recalculado ao vivo em
+			# CombatEngine._effective_attack(), nunca pré-somado num
+			# campo do snapshot — mas a FLAG que decide se ele está
+			# valendo ESTE turno, undead_affinity_death_bonus_active,
+			# já é parte do mesmo snapshot congelado, então refletir
+			# ela aqui não é uma 2ª fórmula, só mostrar o mesmo booleano
+			# que CombatEngine já usa).
+			if faction == "Mortos-Vivos" and entry.level == 2:
+				var bonus_active: bool = undead_bonus_by_side.get(side, false)
+				text += "  [ativo agora]" if bonus_active else "  [aguardando 1ª derrota]"
+			line.text = text
+			line.autowrap_mode = TextServer.AUTOWRAP_WORD
+			line.add_theme_font_size_override("font_size", 9)
+			line.add_theme_color_override("font_color", Color(0.8, 0.8, 0.78))
+			container.add_child(line)
 
 
 ## ART-007 secao 9/11: faixa compacta única — último evento + Log +
@@ -884,6 +1085,13 @@ func _on_speed_button_pressed() -> void:
 func _on_log_toggle_pressed() -> void:
 	_log_drawer_open = not _log_drawer_open
 	_log_drawer.visible = _log_drawer_open
+	# Affinity em tempo real (item #18): o Log (full-width, canto
+	# inferior) e o painel de Affinity (canto inferior direito)
+	# disputariam o mesmo espaço quando o Log está aberto — solução
+	# mais simples pedida: nunca reposiciona nenhum dos dois, só
+	# esconde o Affinity temporariamente enquanto o Log estiver aberto.
+	if _affinity_panel != null:
+		_affinity_panel.visible = _affinity_has_data and not _log_drawer_open
 
 
 func _on_continue_pressed() -> void:
@@ -913,6 +1121,7 @@ func _apply_replay_event(event: Dictionary) -> void:
 			_append_structured(event["turn"], "TURN_START", {})
 		"turn_end":
 			_append_structured(event["turn"], "TURN_END", {})
+			_update_affinity_panel(event)
 		"move":
 			_apply_move_event(event)
 		"attack":
